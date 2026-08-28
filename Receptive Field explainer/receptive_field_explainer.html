@@ -1,0 +1,1460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIY Receptive Field — An Interactive Explainer</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=EB+Garamond:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --ink: #111111;
+    --ink-light: #555555;
+    --paper: #faf9f7;
+    --paper-warm: #f2efe9;
+    --rule: #cccccc;
+    --accent: #111111;
+    --highlight: #e8e4dc;
+    --success: #2a6b2a;
+    --fail: #8b1a1a;
+    --mono: 'IBM Plex Mono', monospace;
+    --serif: 'EB Garamond', Georgia, serif;
+    --display: 'Playfair Display', Georgia, serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 19px;
+    line-height: 1.75;
+    max-width: 740px;
+    margin: 0 auto;
+    padding: 0 2rem 6rem;
+  }
+
+  /* ── TYPOGRAPHY ─────────────────────────────────── */
+  h1 {
+    font-family: var(--display);
+    font-size: 2.8rem;
+    font-weight: 700;
+    line-height: 1.15;
+    margin: 4rem 0 0.5rem;
+    letter-spacing: -0.01em;
+  }
+  h2 {
+    font-family: var(--display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin: 3.5rem 0 1rem;
+    border-bottom: 1.5px solid var(--ink);
+    padding-bottom: 0.4rem;
+  }
+  h3 {
+    font-family: var(--display);
+    font-size: 1.2rem;
+    font-weight: 400;
+    font-style: italic;
+    margin: 2.5rem 0 0.75rem;
+  }
+  p { margin-bottom: 1.1rem; }
+  em { font-style: italic; }
+  strong { font-weight: 600; }
+  a { color: var(--ink); }
+  small { font-size: 0.82em; color: var(--ink-light); }
+
+  .subtitle {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 1.1rem;
+    color: var(--ink-light);
+    margin-bottom: 2rem;
+  }
+
+  .part-label {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-top: 5rem;
+    margin-bottom: -0.5rem;
+  }
+
+  hr { border: none; border-top: 1px solid var(--rule); margin: 2.5rem 0; }
+
+  /* ── NAVIGATION ──────────────────────────────────── */
+  nav {
+    position: sticky;
+    top: 0;
+    background: var(--paper);
+    border-bottom: 1px solid var(--rule);
+    padding: 0.6rem 0;
+    z-index: 100;
+    display: flex;
+    gap: 1.5rem;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.05em;
+  }
+  nav a { text-decoration: none; color: var(--ink-light); }
+  nav a:hover { color: var(--ink); }
+  nav a.active { color: var(--ink); border-bottom: 1.5px solid var(--ink); }
+
+  /* ── INTERACTIVE PANELS ──────────────────────────── */
+  .interactive {
+    background: var(--paper-warm);
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    padding: 1.5rem 1.75rem;
+    margin: 2rem 0;
+  }
+  .interactive-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-bottom: 1rem;
+    display: block;
+  }
+
+  /* ── MATH ────────────────────────────────────────── */
+  .math-block {
+    background: var(--highlight);
+    border-left: 3px solid var(--ink);
+    padding: 1rem 1.5rem;
+    margin: 1.5rem 0;
+    overflow-x: auto;
+    text-align: center;
+  }
+  .katex { font-size: 1.05em; }
+
+  /* ── PSEUDOCODE ──────────────────────────────────── */
+  .pseudocode {
+    background: var(--highlight);
+    border: 1px solid var(--rule);
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    padding: 1.1rem 1.4rem;
+    margin: 1.5rem 0;
+    line-height: 1.8;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  /* ── CALLOUT ─────────────────────────────────────── */
+  .callout {
+    border-left: 3px solid var(--ink-light);
+    padding: 0.6rem 1.2rem;
+    margin: 1.5rem 0;
+    color: var(--ink-light);
+    font-style: italic;
+    font-size: 0.95em;
+  }
+
+  /* ── NEURON DIAGRAM ──────────────────────────────── */
+  .neuron-demo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1.2rem;
+  }
+  .neuron-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .input-slider-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+  }
+  .input-val {
+    width: 3rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    padding: 0.15rem 0.3rem;
+  }
+  .arrow-line {
+    height: 2px;
+    background: var(--ink);
+    flex: 1;
+    min-width: 20px;
+    max-width: 60px;
+    position: relative;
+  }
+  .arrow-line::after {
+    content: '▶';
+    font-size: 0.6rem;
+    position: absolute;
+    right: -8px;
+    top: -7px;
+  }
+  .neuron-body {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 2px solid var(--ink);
+    background: var(--paper);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    text-align: center;
+    transition: background 0.3s;
+  }
+  .neuron-body.firing { background: var(--ink); color: var(--paper); }
+  .neuron-sum { font-size: 0.65rem; color: var(--ink-light); margin-top: 2px; }
+  .neuron-output {
+    font-family: var(--mono);
+    font-size: 1.5rem;
+    font-weight: 500;
+    transition: color 0.3s;
+  }
+  .neuron-output.on { color: var(--success); }
+  .neuron-output.off { color: var(--fail); }
+
+  /* ── SLIDER STYLES ───────────────────────────────── */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    margin: 0.5rem 0;
+  }
+  .slider-label {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    min-width: 5rem;
+    color: var(--ink-light);
+  }
+  .slider-val {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    min-width: 3rem;
+    text-align: right;
+  }
+
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 24px;
+    flex: 1;
+    background: transparent;
+    cursor: grab;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--ink);
+    border-radius: 1px;
+  }
+  input[type=range]::-moz-range-track {
+    height: 2px;
+    background: var(--ink);
+    border-radius: 1px;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    margin-top: -8px;
+    cursor: grab;
+  }
+  input[type=range]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid var(--ink);
+    cursor: grab;
+  }
+
+  /* ── HEAVISIDE CANVAS ────────────────────────────── */
+  canvas {
+    border: 1px solid var(--rule);
+    display: block;
+    background: var(--paper);
+  }
+
+  /* ── WEIGHT GRID ─────────────────────────────────── */
+  .grid-section {
+    display: flex;
+    gap: 2rem;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    margin: 1rem 0;
+  }
+  .grid-container { flex: 0 0 auto; }
+  .pixel-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 56px);
+    gap: 4px;
+  }
+  .pixel-cell {
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .pixel-cell.on  { background: var(--ink); color: var(--paper); }
+  .pixel-cell.off { background: var(--paper); color: var(--ink); }
+
+  .weight-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 56px);
+    gap: 4px;
+  }
+  .weight-input {
+    width: 56px;
+    height: 56px;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    color: var(--ink);
+    -moz-appearance: textfield;
+  }
+  .weight-input::-webkit-inner-spin-button,
+  .weight-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .weight-input:focus { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+  .grid-label {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    margin-bottom: 0.4rem;
+    text-align: center;
+  }
+
+  /* ── OUTPUT PANEL ────────────────────────────────── */
+  .output-panel {
+    flex: 1 1 180px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  .output-eq {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    background: var(--highlight);
+    padding: 0.6rem 0.8rem;
+    line-height: 1.8;
+  }
+  .result-badge {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    text-align: center;
+    border: 1.5px solid var(--ink);
+    letter-spacing: 0.05em;
+    transition: background 0.3s, color 0.3s;
+  }
+  .result-badge.fires { background: var(--ink); color: var(--paper); }
+  .result-badge.silent { background: var(--paper); color: var(--ink); }
+
+  /* ── STIMULUS SELECTOR ───────────────────────────── */
+  .stim-selector {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin: 0.8rem 0;
+  }
+  .stim-btn {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    border: 1px solid var(--ink);
+    background: var(--paper);
+    color: var(--ink);
+    padding: 0.3rem 0.7rem;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .stim-btn:hover { background: var(--highlight); }
+  .stim-btn.active { background: var(--ink); color: var(--paper); }
+
+  /* ── SCORE CARDS ─────────────────────────────────── */
+  .score-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+    margin: 1rem 0;
+  }
+  .score-card {
+    border: 1px solid var(--rule);
+    padding: 0.5rem;
+    text-align: center;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+  }
+  .score-card .card-name { color: var(--ink-light); margin-bottom: 0.2rem; }
+  .score-card .card-val { font-size: 1.1rem; font-weight: 500; }
+  .score-card.fires .card-val { color: var(--success); }
+  .score-card.silent .card-val { color: var(--fail); }
+
+  /* ── REFLECTION SECTION ──────────────────────────── */
+  .assumption-list {
+    list-style: none;
+    margin: 1rem 0;
+  }
+  .assumption-list li {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    gap: 1rem;
+    align-items: flex-start;
+    font-size: 0.95rem;
+  }
+  .assumption-list li:last-child { border-bottom: none; }
+  .assump-tag {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    background: var(--ink);
+    color: var(--paper);
+    padding: 0.15rem 0.4rem;
+    white-space: nowrap;
+    margin-top: 0.2rem;
+    flex-shrink: 0;
+  }
+
+  /* ── SCROLL REVEAL ───────────────────────────────── */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .reveal.visible { opacity: 1; transform: none; }
+
+  /* ── RETINA DIAGRAM ──────────────────────────────── */
+  #retina-canvas { margin: 0 auto; display: block; }
+
+  /* ── TOPOGRAPHY DEMO ─────────────────────────────── */
+  .topo-demo { display: flex; gap: 2rem; align-items: center; justify-content: center; flex-wrap: wrap; }
+
+  @media (max-width: 600px) {
+    body { font-size: 17px; padding: 0 1rem 4rem; }
+    h1 { font-size: 2rem; }
+    .score-grid { grid-template-columns: repeat(2, 1fr); }
+    .grid-section { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+
+<nav id="top-nav">
+  <a href="#part1" class="active">I. The Neuron</a>
+  <a href="#part2">II. Receptive Fields</a>
+  <a href="#reflections">III. Reflections</a>
+</nav>
+
+<!-- ════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════ -->
+<p class="part-label" style="margin-top:3rem;">An Interactive Explainer</p>
+<h1>DIY Receptive Field</h1>
+<p class="subtitle">From a single neuron to visual pattern recognition</p>
+<p style="color:var(--ink-light); font-size:0.88rem; font-style:italic; margin-bottom:2rem;">Based on Negrello, Cornelise & Santoro · Erasmus MC Neuroscience</p>
+
+<p>Your visual cortex contains neurons that fire selectively — some for edges tilted left, others for tilted right, others for horizontal bars. This selectivity, called a <strong>receptive field</strong>, emerges from something surprisingly simple: weighted sums and a threshold. This explainer builds that intuition from scratch.</p>
+
+<hr>
+
+<!-- ════════════════════════════════════════════════════
+     PART I — THE McCULLOCH-PITTS NEURON
+════════════════════════════════════════════════════ -->
+<p class="part-label" id="part1">Part I</p>
+<h2>The McCulloch-Pitts Neuron</h2>
+
+<p>In 1943, Warren McCulloch and Walter Pitts proposed the first mathematical model of a neuron. Their key insight: a neuron is a <em>threshold device</em>. It collects signals from many sources, combines them, and fires only if the combined signal crosses a minimum level.</p>
+
+<h3>Step 1 — Weighted inputs</h3>
+
+<p>Each incoming signal \(x_i\) is multiplied by a weight \(w_i\). The weight encodes the <em>strength</em> of the synaptic connection. Positive weights are excitatory; negative weights are inhibitory.</p>
+
+<div class="math-block">
+  \[\text{weighted sum} = w_1 x_1 + w_2 x_2 + \cdots + w_n x_n = \mathbf{w}^{\top} \mathbf{x}\]
+</div>
+
+<p>This is a <strong>dot product</strong> — or equivalently, a matrix multiplication of a row vector by a column vector. The result is a single number: the neuron's total input current.</p>
+
+<h3>Step 2 — The Heaviside threshold</h3>
+
+<p>The neuron fires (outputs 1) if the weighted sum exceeds a threshold \(\theta\), and stays silent (outputs 0) otherwise. The function that does this is the <strong>Heaviside step function</strong>, named after the self-taught mathematician Oliver Heaviside.</p>
+
+<div class="math-block">
+  \[H(z) = \begin{cases} 1 & z \geq 0 \\ 0 & z < 0 \end{cases} \qquad \text{where } z = \mathbf{w}^{\top}\mathbf{x} - \theta\]
+</div>
+
+<div class="interactive reveal">
+  <span class="interactive-label">Interactive — Heaviside function</span>
+  <p style="font-size:0.9em; margin-bottom:1rem;">Drag the slider to move the input value \(z\). Watch the function switch at zero.</p>
+  <canvas id="heaviside-canvas" width="580" height="160"></canvas>
+  <div class="slider-row" style="margin-top:1rem;">
+    <span class="slider-label">input <em>z</em></span>
+    <input type="range" id="hz-slider" min="-5" max="5" step="0.05" value="-3">
+    <span class="slider-val" id="hz-val">−3.00</span>
+  </div>
+  <div style="margin-top:0.5rem; font-family:var(--mono); font-size:0.9rem;">
+    H(<span id="hz-display">−3.00</span>) = <strong id="hz-output" style="font-size:1.2rem;">0</strong>
+  </div>
+</div>
+
+<h3>The neuron, complete</h3>
+
+<p>Putting it together, a McCulloch-Pitts neuron is entirely described by three things: its <strong>weight vector</strong> \(\mathbf{w}\), its <strong>inputs</strong> \(\mathbf{x}\), and its <strong>threshold</strong> \(\theta\).</p>
+
+<div class="pseudocode">function neuron(x, w, θ):
+    z ← dot(w, x) − θ        // linear combination minus threshold
+    return H(z)               // Heaviside: 1 if z ≥ 0, else 0</div>
+
+<div class="interactive reveal">
+  <span class="interactive-label">Interactive — A neuron as a linear classifier</span>
+  <p style="font-size:0.9em; margin-bottom:1.2rem;">With two inputs, the neuron's input space is a plane. The condition \(w_1 x_1 + w_2 x_2 = \theta\) defines a <strong>line</strong> — the <em>decision boundary</em> — that divides inputs that fire the neuron from those that do not. Adjust weights and threshold to move it.</p>
+
+  <div style="display:flex; gap:1.5rem; align-items:flex-start; flex-wrap:wrap;">
+
+    <!-- Controls -->
+    <div style="flex:1 1 200px; min-width:180px;">
+      <div class="slider-row">
+        <span class="slider-label">w₁</span>
+        <input type="range" id="nd-w1" min="-3" max="3" step="0.1" value="1">
+        <span class="slider-val" id="nd-w1-val">1.0</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">w₂</span>
+        <input type="range" id="nd-w2" min="-3" max="3" step="0.1" value="1">
+        <span class="slider-val" id="nd-w2-val">1.0</span>
+      </div>
+      <div class="slider-row">
+        <span class="slider-label">threshold θ</span>
+        <input type="range" id="nd-theta" min="-3" max="3" step="0.1" value="1.5">
+        <span class="slider-val" id="nd-theta-val">1.5</span>
+      </div>
+
+      <div style="font-family:var(--mono); font-size:0.82rem; background:var(--highlight); padding:0.7rem 0.9rem; margin-top:0.8rem; line-height:2;">
+        <div id="nd-eq">—</div>
+      </div>
+
+      <div style="margin-top:1rem; font-family:var(--mono); font-size:0.8rem; color:var(--ink-light); line-height:1.9;">
+        <div>● filled  = fires (output 1)</div>
+        <div>○ open    = silent (output 0)</div>
+      </div>
+
+      <div style="margin-top:1rem; padding:0.7rem 0.9rem; border:1px solid var(--rule); font-family:var(--mono); font-size:0.78rem; line-height:1.9;" id="nd-truth">
+      </div>
+    </div>
+
+    <!-- Canvas -->
+    <div style="flex:0 0 auto;">
+      <canvas id="nd-canvas" width="290" height="290" style="display:block;"></canvas>
+    </div>
+
+  </div>
+</div>
+
+<div class="callout">
+  With weights \(w_1 = w_2 = 1\) and threshold \(\theta = 1.5\), the neuron fires only when <em>both</em> inputs are active — an <strong>AND gate</strong>, or coincidence detector. Both signals must arrive together to push the weighted sum past the threshold. This is one of the simplest forms of pattern recognition: detecting the co-occurrence of two events.
+</div>
+
+<!-- ════════════════════════════════════════════════════
+     PART II — RECEPTIVE FIELDS
+════════════════════════════════════════════════════ -->
+<p class="part-label" id="part2" style="margin-top:5rem;">Part II</p>
+<h2>Receptive Fields & Pattern Recognition</h2>
+
+<h3>What is a receptive field?</h3>
+
+<p>A neuron's <strong>receptive field</strong> is the region of sensory space — and the set of stimuli within it — that causes it to fire. In vision, this means a tiny patch of retina: a few photoreceptors whose signals converge onto one neuron.</p>
+
+<canvas id="retina-canvas" width="560" height="160" style="width:100%; border:1px solid var(--rule);"></canvas>
+<p style="text-align:center; font-size:0.82em; color:var(--ink-light); margin-top:0.5rem; font-style:italic;">A patch of retina — each square is one photoreceptor (filled = illuminated). The outlined region is the neuron's 3×3 receptive field.</p>
+
+<h3>Topographic projections</h3>
+
+<p>Crucially, retinal projections to the cortex are largely <strong>topographic</strong> — nearby cells on the retina connect to nearby cells in the cortex. This spatial order is preserved across multiple processing stages. A 3×3 patch of retina maps, roughly in order, to 9 input connections on a cortical neuron.</p>
+
+<div class="interactive reveal">
+  <span class="interactive-label">Concept — Topographic mapping</span>
+  <canvas id="topo-canvas" width="560" height="180"></canvas>
+  <p style="font-size:0.85em; color:var(--ink-light); margin-top:0.5rem; text-align:center; font-style:italic;">Hover over a retinal pixel to trace its projection. Spatial order is approximately preserved.</p>
+</div>
+
+<h3>From 2D grid to 1D vector</h3>
+
+<p>Topography tells us <em>which</em> pixel connects to <em>which</em> weight. But a neuron doesn't "see" a grid — it receives a list of currents along its dendrites. To compute the dot product, both the stimulus and the weight matrix must be <strong>flattened</strong> into 9-element vectors, reading the grid row by row.</p>
+
+<p>This flattening is a bookkeeping convention, not a biological operation. What matters is that the <em>correspondence is preserved</em>: pixel \((r, c)\) always maps to the same position in the vector — and to the same weight.</p>
+
+<div class="interactive reveal">
+  <span class="interactive-label">Interactive — Flattening a 3×3 grid into a 9×1 vector</span>
+  <p style="font-size:0.9em; margin-bottom:1rem;">Hover over any cell to see its position in the flattened vector. The index is read <em>row by row</em>, left to right, top to bottom.</p>
+  <canvas id="flatten-canvas" width="560" height="220"></canvas>
+  <div style="margin-top:0.9rem; font-family:var(--mono); font-size:0.82rem; color:var(--ink-light); text-align:center;" id="flatten-label">
+    hover a cell to inspect its index
+  </div>
+</div>
+
+<div class="math-block">
+  \[\mathbf{x} = \begin{bmatrix} x_0 \\ x_1 \\ x_2 \\ x_3 \\ x_4 \\ x_5 \\ x_6 \\ x_7 \\ x_8 \end{bmatrix} \leftarrow \begin{bmatrix} x_{00} & x_{01} & x_{02} \\ x_{10} & x_{11} & x_{12} \\ x_{20} & x_{21} & x_{22} \end{bmatrix} \qquad \mathbf{w} = \begin{bmatrix} w_0 \\ w_1 \\ \vdots \\ w_8 \end{bmatrix} \leftarrow \begin{bmatrix} w_{00} & w_{01} & w_{02} \\ w_{10} & w_{11} & w_{12} \\ w_{20} & w_{21} & w_{22} \end{bmatrix}\]
+</div>
+
+<p>Both vectors have the same length (9), so their dot product is well-defined. The weight at position \(i\) multiplies the pixel at position \(i\) — the spatial correspondence that topography established is now encoded in the <em>order</em> of the vector.</p>
+
+<div class="pseudocode">// Flattening: 3×3 matrix → 9×1 vector (row-major order)
+flatten(M):
+    v ← []
+    for r in 0..2:
+        for c in 0..2:
+            v.append( M[r][c] )   // index i = 3·r + c
+    return v                      // length 9
+
+// Then the neuron is simply:
+y ← H( dot(w_flat, x_flat) − θ )</div>
+
+<h3>The 3×3 receptive field</h3>
+
+<p>We model a neuron that receives from exactly 9 photoreceptors arranged in a 3×3 grid. Each pixel sends one input \(x_i \in \{0, 1\}\). The neuron has 9 corresponding weights \(w_i\). Because both are flattened in the same order, their dot product correctly computes the weighted sum over the spatial patch.</p>
+
+<p>The key question: <em>what weights make a neuron prefer a specific pattern?</em></p>
+
+<div class="callout">
+  Think about it geometrically: the weights that best distinguish a pattern are those that <em>look like</em> the pattern. High weight where the pattern is bright; low or negative weight where it is dark. The dot product is then maximised for the preferred stimulus.
+</div>
+
+<h3>Design your own feature detector</h3>
+
+<p>Below is a 3×3 stimulus grid (click to toggle pixels on/off) and a weight matrix (type any number in each cell). The neuron fires when the weighted sum exceeds the threshold slider. Your goal: find weights that fire for a <strong>vertical bar</strong> and stay silent for all others.</p>
+
+<div class="interactive reveal">
+  <span class="interactive-label">Exercise — Weight the detector</span>
+
+  <div class="stim-selector">
+    <span style="font-family:var(--mono); font-size:0.78rem; color:var(--ink-light); align-self:center;">Load stimulus: </span>
+    <button class="stim-btn active" onclick="loadStimulus('vertical')">vertical</button>
+    <button class="stim-btn" onclick="loadStimulus('horizontal')">horizontal</button>
+    <button class="stim-btn" onclick="loadStimulus('diagonal_r')">diagonal ╲</button>
+    <button class="stim-btn" onclick="loadStimulus('diagonal_l')">diagonal ╱</button>
+    <button class="stim-btn" onclick="loadStimulus('custom')">custom</button>
+  </div>
+
+  <div class="grid-section">
+    <div class="grid-container">
+      <p class="grid-label">stimulus (click to toggle)</p>
+      <div class="pixel-grid" id="stimulus-grid"></div>
+    </div>
+    <div style="display:flex; align-items:center; font-size:1.5rem; color:var(--ink-light); padding-top:1.4rem;">⊙</div>
+    <div class="grid-container">
+      <p class="grid-label">weight matrix</p>
+      <div class="weight-grid" id="weight-grid"></div>
+    </div>
+  </div>
+
+  <div class="slider-row" style="margin: 1rem 0; max-width: 420px;">
+    <span class="slider-label">threshold θ</span>
+    <input type="range" id="rf-theta" min="-10" max="10" step="0.5" value="4">
+    <span class="slider-val" id="rf-theta-val">4.0</span>
+  </div>
+
+  <div class="output-eq" id="rf-equation">—</div>
+
+  <div class="result-badge silent" id="rf-result">SILENT — neuron does not fire</div>
+
+  <hr style="margin: 1.2rem 0;">
+
+  <p style="font-family:var(--mono); font-size:0.78rem; color:var(--ink-light); letter-spacing:0.05em; text-transform:uppercase; margin-bottom:0.6rem;">Test all stimuli at once</p>
+  <div class="score-grid" id="all-scores"></div>
+
+  <details style="margin-top:1rem; font-size:0.88rem;">
+    <summary style="cursor:pointer; font-family:var(--mono); font-size:0.78rem; color:var(--ink-light); letter-spacing:0.05em; text-transform:uppercase;">Show a working solution →</summary>
+    <div style="margin-top:0.8rem; background:var(--highlight); padding:0.8rem 1rem; font-family:var(--mono); font-size:0.82rem; line-height:1.9;">
+      One solution for a vertical bar detector:<br><br>
+      Weights: <strong>−1, +2, −1 / −1, +3, −1 / −1, +2, −1</strong><br>
+      Threshold θ: <strong>6</strong><br><br>
+      <button class="stim-btn" onclick="loadSolution()">Load this solution</button>
+    </div>
+  </details>
+</div>
+
+<h3>A network of detectors</h3>
+
+<p>Now suppose you want four neurons, each preferring a different orientation. Each neuron has its own weight vector but shares the same 9 inputs. The whole layer is described by a <strong>weight matrix</strong> \(\mathbf{W}\), where each row is one neuron's weights:</p>
+
+<div class="math-block">
+  \[\mathbf{y} = H\!\left(\mathbf{W}\,\mathbf{x} - \theta\right)\]
+</div>
+
+<div class="pseudocode">// Feed-forward network of 4 orientation detectors
+function FFNN(W, x, θ):
+    for each row w_i in W:
+        y_i ← H( dot(w_i, x) − θ )
+    return [y_1, y_2, y_3, y_4]</div>
+
+<p>This is the basic operation of a convolutional filter — slide this 3×3 neuron over a larger image and you get a feature map showing where vertical bars appear. Stack multiple such layers, and you have the beginning of a deep convolutional network.</p>
+
+<!-- ════════════════════════════════════════════════════
+     PART III — REFLECTIONS
+════════════════════════════════════════════════════ -->
+<p class="part-label" id="reflections" style="margin-top:5rem;">Part III</p>
+<h2>Assumptions & Their Limits</h2>
+
+<p>Every model rests on simplifications. These are not flaws — they are design choices that make the model tractable. Understanding them is what separates a user of a model from a scientist who can extend it.</p>
+
+<ul class="assumption-list">
+  <li>
+    <span class="assump-tag">A1</span>
+    <div>
+      <strong>Continuous, static inputs.</strong> We used pixel values of exactly 0 or 1 — the stimulus doesn't change over time. Real photoreceptors produce graded, noisy, time-varying signals. Ask yourself: under what illumination conditions might binary inputs be a reasonable approximation?
+    </div>
+  </li>
+  <li>
+    <span class="assump-tag">A2</span>
+    <div>
+      <strong>Integration in a single time step.</strong> Our neuron collects all 9 inputs simultaneously and fires or not, once. Biological neurons integrate inputs over tens of milliseconds, and the timing between inputs matters. Look up <em>coincidence detection</em> and <em>spike-timing-dependent plasticity</em> for when this assumption breaks down — and why it might matter.
+    </div>
+  </li>
+  <li>
+    <span class="assump-tag">A3</span>
+    <div>
+      <strong>The Heaviside (all-or-nothing) output.</strong> We output exactly 0 or 1. Many real neurons fire at graded rates and are better modeled by a sigmoid or ReLU activation. Yet in the primary visual cortex, many cells do behave approximately as threshold units for their preferred stimuli.
+    </div>
+  </li>
+  <li>
+    <span class="assump-tag">A4</span>
+    <div>
+      <strong>Strict topography.</strong> We assumed the spatial layout of the retina is perfectly preserved in the weight matrix — pixel (0,0) connects to weight (0,0). The cortex is largely topographic, but with significant scatter, magnification factors, and remapping. Research: what happens to receptive field structure at the edges of V1?
+    </div>
+  </li>
+  <li>
+    <span class="assump-tag">A5</span>
+    <div>
+      <strong>Linear combination.</strong> Synaptic currents sum linearly in our model. Dendrites, however, can perform non-linear operations — local dendritic spikes, NMDA receptor dynamics. Under what conditions can a real dendrite be approximated as a simple summing device?
+    </div>
+  </li>
+</ul>
+
+<div class="interactive reveal" style="background:var(--ink); color:var(--paper); border-color:var(--ink);">
+  <p style="font-family:var(--display); font-size:1.3rem; font-weight:700; margin-bottom:0.8rem;">Nevertheless — this model works.</p>
+  <p style="font-size:0.95em; line-height:1.8; color:#dddddd;">Despite every simplification, the McCulloch-Pitts neuron predicts the existence of orientation-selective cells in V1, explains why their preferred stimuli resemble their weight vectors, and is the computational unit underlying modern convolutional neural networks. Hubel and Wiesel discovered orientation selectivity in 1959 — the model anticipated it. That is the hallmark of a good scientific model: it is simple enough to understand, yet powerful enough to surprise you with what it predicts.</p>
+  <p style="margin-top:1rem; font-size:0.88em; color:#aaaaaa;">Research directions: Explore the conditions under which each assumption holds in the cortex. Look up integrate-and-fire neurons, rate-coded models, and sparse coding. You now have the foundation.</p>
+</div>
+
+<hr>
+<p style="font-size:0.82em; color:var(--ink-light); font-style:italic; text-align:center; padding-bottom:2rem;">
+  McCulloch & Pitts (1943) · Hubel & Wiesel (1959) · Rosenblatt (1958)<br>
+  Interactive explainer adapted from Negrello, Cornelise &amp; Santoro
+</p>
+
+<!-- ════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════ -->
+<script>
+// ── KaTeX render ──────────────────────────────────
+document.addEventListener("DOMContentLoaded", () => {
+  renderMathInElement(document.body, {
+    delimiters: [
+      {left:"\\[", right:"\\]", display:true},
+      {left:"\\(", right:"\\)", display:false},
+    ]
+  });
+  initAll();
+});
+
+function initAll() {
+  initNav();
+  initHeaviside();
+  initNeuronDemo();
+  initRetinaCanvas();
+  initTopoCanvas();
+  initFlattenCanvas();
+  initRFExercise();
+  initReveal();
+}
+
+// ── NAV ───────────────────────────────────────────
+function initNav() {
+  const links = document.querySelectorAll('nav a');
+  const sections = ['part1','part2','reflections'].map(id => document.getElementById(id));
+  window.addEventListener('scroll', () => {
+    let current = 0;
+    sections.forEach((s,i) => { if (s && s.getBoundingClientRect().top < 120) current = i; });
+    links.forEach((l,i) => l.classList.toggle('active', i === current));
+  });
+}
+
+// ── SCROLL REVEAL ─────────────────────────────────
+function initReveal() {
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); obs.unobserve(e.target); }});
+  }, {threshold: 0.1});
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+}
+
+// ── HEAVISIDE CANVAS ──────────────────────────────
+function initHeaviside() {
+  const canvas = document.getElementById('heaviside-canvas');
+  const ctx = canvas.getContext('2d');
+  const slider = document.getElementById('hz-slider');
+  const valEl = document.getElementById('hz-val');
+  const dispEl = document.getElementById('hz-display');
+  const outEl = document.getElementById('hz-output');
+
+  function drawHeaviside(z) {
+    const W = canvas.width, H = canvas.height;
+    const mx = W/2, my = H/2, sx = W/11, sy = H/2.8;
+    ctx.clearRect(0,0,W,H);
+
+    // axes
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(20,my); ctx.lineTo(W-20,my); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(mx,15); ctx.lineTo(mx,H-15); ctx.stroke();
+
+    // axis labels
+    ctx.fillStyle = '#999'; ctx.font = '11px IBM Plex Mono, monospace'; ctx.textAlign = 'center';
+    [-5,-4,-3,-2,-1,1,2,3,4,5].forEach(v => {
+      ctx.fillText(v, mx + v*sx, my+14);
+    });
+    ctx.textAlign = 'left';
+    ctx.fillText('1', mx+5, my - sy + 6);
+    ctx.fillText('0', mx+5, my + 6);
+    ctx.fillText('z', W-25, my-6);
+
+    // y-axis label H(z) — rotated vertically
+    ctx.save();
+    ctx.translate(13, my - sy/2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#999';
+    ctx.font = '11px IBM Plex Mono, monospace';
+    ctx.fillText('H(z)', 0, 0);
+    ctx.restore();
+
+    // heaviside curve
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(20, my); // H(z)=0 for z<0
+    ctx.lineTo(mx, my);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(mx, my - sy); // H(z)=1 for z>=0
+    ctx.lineTo(W-20, my - sy);
+    ctx.stroke();
+    // dashed vertical at 0
+    ctx.setLineDash([4,4]); ctx.strokeStyle = '#ccc';
+    ctx.beginPath(); ctx.moveTo(mx, my); ctx.lineTo(mx, my-sy); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // current z marker
+    const px = mx + z * sx;
+    const py = z >= 0 ? my - sy : my;
+    ctx.strokeStyle = '#111'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px, my+4); ctx.lineTo(px, my-4); ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI*2); ctx.fill();
+
+    // label
+    ctx.fillStyle = '#111'; ctx.font = 'bold 13px IBM Plex Mono, monospace'; ctx.textAlign = 'center';
+    const out = z >= 0 ? 1 : 0;
+    ctx.fillText(`H(${z.toFixed(2)}) = ${out}`, px, py - 16);
+
+    valEl.textContent = z.toFixed(2);
+    dispEl.textContent = z.toFixed(2);
+    outEl.textContent = out;
+  }
+
+  slider.addEventListener('input', () => drawHeaviside(parseFloat(slider.value)));
+  drawHeaviside(parseFloat(slider.value));
+}
+
+// ── NEURON DEMO (2-input, decision boundary) ──────
+function initNeuronDemo() {
+  const canvas = document.getElementById('nd-canvas');
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width, CH = canvas.height;
+
+  const sliderW1    = document.getElementById('nd-w1');
+  const sliderW2    = document.getElementById('nd-w2');
+  const sliderTheta = document.getElementById('nd-theta');
+  const valW1       = document.getElementById('nd-w1-val');
+  const valW2       = document.getElementById('nd-w2-val');
+  const valTheta    = document.getElementById('nd-theta-val');
+  const eqEl        = document.getElementById('nd-eq');
+  const truthEl     = document.getElementById('nd-truth');
+
+  // AND truth table points: [x1, x2, label]
+  const points = [[0,0,'(0,0)'],[1,0,'(1,0)'],[0,1,'(0,1)'],[1,1,'(1,1)']];
+
+  // Coordinate mapping: input space [−0.5, 1.5] → canvas
+  const PAD = 44;
+  const XMIN = -0.5, XMAX = 1.5, YMIN = -0.5, YMAX = 1.5;
+  function toCanvas(x, y) {
+    return [
+      PAD + (x - XMIN) / (XMAX - XMIN) * (CW - 2*PAD),
+      CH - PAD - (y - YMIN) / (YMAX - YMIN) * (CH - 2*PAD)
+    ];
+  }
+
+  function fires(x1, x2, w1, w2, theta) {
+    return (w1*x1 + w2*x2 - theta) >= 0;
+  }
+
+  function draw() {
+    const w1    = parseFloat(sliderW1.value);
+    const w2    = parseFloat(sliderW2.value);
+    const theta = parseFloat(sliderTheta.value);
+
+    ctx.clearRect(0, 0, CW, CH);
+
+    // ── shaded regions ──
+    // Sample a grid, shade firing region very lightly
+    const step = 4;
+    for (let px = 0; px < CW; px += step) {
+      for (let py = 0; py < CH; py += step) {
+        const x1 = XMIN + (px / (CW - 2*PAD - PAD)) * (XMAX - XMIN);
+        const x2 = YMAX - (py / (CH - 2*PAD - PAD)) * (YMAX - YMIN);
+        if (fires(x1, x2, w1, w2, theta)) {
+          ctx.fillStyle = 'rgba(0,0,0,0.045)';
+          ctx.fillRect(px, py, step, step);
+        }
+      }
+    }
+
+    // ── axes ──
+    const [ox, oy] = toCanvas(0, 0);
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1;
+    // x-axis
+    ctx.beginPath();
+    ctx.moveTo(PAD - 10, oy); ctx.lineTo(CW - PAD + 10, oy); ctx.stroke();
+    // y-axis
+    ctx.beginPath();
+    ctx.moveTo(ox, CH - PAD + 10); ctx.lineTo(ox, PAD - 10); ctx.stroke();
+
+    // axis tick labels
+    ctx.fillStyle = '#999'; ctx.font = '10px IBM Plex Mono, monospace'; ctx.textAlign = 'center';
+    [0, 1].forEach(v => {
+      const [cx] = toCanvas(v, 0); const [, cy] = toCanvas(0, v);
+      ctx.fillText(v, cx, oy + 14);
+      ctx.textAlign = 'right';
+      ctx.fillText(v, ox - 6, cy + 4);
+      ctx.textAlign = 'center';
+    });
+
+    // axis labels
+    ctx.fillStyle = '#aaa'; ctx.font = '11px IBM Plex Mono, monospace';
+    ctx.fillText('x₁', CW - PAD + 18, oy + 4);
+    ctx.textAlign = 'center';
+    ctx.fillText('x₂', ox, PAD - 16);
+
+    // ── decision boundary: w1·x1 + w2·x2 = θ ──
+    // solve for two endpoints at x1 = XMIN and x1 = XMAX
+    let boundaryPoints = [];
+    if (Math.abs(w2) > 0.001) {
+      // x2 = (theta - w1*x1) / w2
+      const x2atLeft  = (theta - w1*XMIN) / w2;
+      const x2atRight = (theta - w1*XMAX) / w2;
+      boundaryPoints = [[XMIN, x2atLeft], [XMAX, x2atRight]];
+    } else if (Math.abs(w1) > 0.001) {
+      // vertical line at x1 = theta/w1
+      const x1val = theta / w1;
+      boundaryPoints = [[x1val, YMIN], [x1val, YMAX]];
+    }
+
+    if (boundaryPoints.length === 2) {
+      const [ax, ay] = toCanvas(...boundaryPoints[0]);
+      const [bx, by] = toCanvas(...boundaryPoints[1]);
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5; ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.setLineDash([]);
+
+      // "fires" / "silent" region labels
+      // test centre of upper-right vs lower-left
+      const testFR = fires(1.2, 1.2, w1, w2, theta);
+      ctx.font = 'italic 10px IBM Plex Mono, monospace';
+      ctx.fillStyle = '#aaa'; ctx.textAlign = 'center';
+      const [lx, ly] = toCanvas(testFR ? 1.15 : -0.25, testFR ? 1.2 : -0.2);
+      const [rx, ry] = toCanvas(testFR ? -0.25 : 1.15, testFR ? -0.2 : 1.2);
+      ctx.fillText('fires', lx, ly);
+      ctx.fillText('silent', rx, ry);
+    }
+
+    // ── truth table points ──
+    points.forEach(([x1, x2, lbl]) => {
+      const [cx, cy] = toCanvas(x1, x2);
+      const f = fires(x1, x2, w1, w2, theta);
+      ctx.beginPath();
+      ctx.arc(cx, cy, 9, 0, Math.PI*2);
+      ctx.fillStyle   = f ? '#111' : '#faf9f7';
+      ctx.strokeStyle = '#111'; ctx.lineWidth = 1.8;
+      ctx.fill(); ctx.stroke();
+
+      ctx.fillStyle = f ? '#fff' : '#111';
+      ctx.font = 'bold 10px IBM Plex Mono, monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(f ? '1' : '0', cx, cy + 4);
+
+      // coordinate label offset to avoid overlap
+      const offX = x1 === 0 ? -16 : 16;
+      const offY = x2 === 0 ? 14 : -12;
+      ctx.fillStyle = '#aaa'; ctx.font = '9px IBM Plex Mono, monospace';
+      ctx.fillText(lbl, cx + offX, cy + offY);
+    });
+
+    // ── update text panels ──
+    valW1.textContent    = w1.toFixed(1);
+    valW2.textContent    = w2.toFixed(1);
+    valTheta.textContent = theta.toFixed(1);
+
+    eqEl.innerHTML =
+      `y = H(${w1.toFixed(1)}·x₁ + ${w2.toFixed(1)}·x₂ − ${theta.toFixed(1)})` +
+      `<br>boundary: ${w1.toFixed(1)}·x₁ + ${w2.toFixed(1)}·x₂ = ${theta.toFixed(1)}`;
+
+    // truth table
+    const rows = points.map(([x1, x2, lbl]) => {
+      const f = fires(x1, x2, w1, w2, theta);
+      return `x₁=${x1} x₂=${x2}  →  <strong>${f ? 1 : 0}</strong>`;
+    }).join('<br>');
+    truthEl.innerHTML = rows;
+  }
+
+  [sliderW1, sliderW2, sliderTheta].forEach(s => s.addEventListener('input', draw));
+  draw();
+}
+
+// ── RETINA CANVAS ─────────────────────────────────
+function initRetinaCanvas() {
+  const canvas = document.getElementById('retina-canvas');
+  const ctx = canvas.getContext('2d');
+  const ROWS = 4, COLS = 14;
+  const W = canvas.width, H = canvas.height;
+  const CELL = Math.floor(H / ROWS);
+  const PAD = Math.floor((W - COLS * CELL) / 2);
+
+  // Hand-crafted scene: a sparse but meaningful retinal activation
+  // Columns 0-13, rows 0-3. RF sits at rows 0-2, cols 5-7.
+  // The RF contains a vertical bar (col 6 lit, cols 5 & 7 dark).
+  const scene = [
+    // row 0
+    [0,0,1,0,0, 0,1,0, 0,0,1,0,0,0],
+    // row 1
+    [0,1,0,0,0, 0,1,0, 0,1,0,0,1,0],
+    // row 2
+    [0,0,0,1,0, 0,1,0, 0,0,0,1,0,0],
+    // row 3 (below RF)
+    [1,0,0,0,1, 0,0,1, 0,0,1,0,0,1],
+  ];
+
+  const rfR = 0, rfC = 5; // top-left corner of RF
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const x = PAD + c * CELL;
+        const y = r * CELL;
+        const inRF = r >= rfR && r <= rfR + 2 && c >= rfC && c <= rfC + 2;
+        const on   = scene[r][c] === 1;
+
+        // Cell fill
+        ctx.fillStyle = on ? '#111' : (inRF ? '#f5f3ef' : '#eae7e0');
+        ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+      }
+    }
+
+    // RF bounding box — drawn on top, clean and prominent
+    const rfX = PAD + rfC * CELL;
+    const rfY = rfR * CELL;
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(rfX + 1, rfY + 1, 3 * CELL - 2, 3 * CELL - 2);
+
+    // Small "RF" label tucked neatly below the box
+    ctx.fillStyle = '#555';
+    ctx.font = '10px IBM Plex Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('receptive field', rfX + 1.5 * CELL, rfY + 3 * CELL + 13);
+  }
+
+  draw();
+}
+
+// ── TOPOGRAPHY CANVAS ─────────────────────────────
+function initTopoCanvas() {
+  const canvas = document.getElementById('topo-canvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  let hoveredCell = -1;
+
+  const retina = { x: 40, y: 20, size: 48, gap: 4, rows: 3, cols: 3 };
+  const cortex = { x: W - 40 - 3*52, y: 20, size: 48, gap: 4, rows: 3, cols: 3 };
+
+  // slight scramble to show "topographic but not perfect"
+  const mapping = [0,1,2,3,4,5,6,7,8]; // identity (perfect topo)
+
+  function cellRect(grid, idx) {
+    const r = Math.floor(idx/3), c = idx%3;
+    return {
+      x: grid.x + c*(grid.size + grid.gap),
+      y: grid.y + r*(grid.size + grid.gap),
+      w: grid.size, h: grid.size,
+      cx: grid.x + c*(grid.size+grid.gap) + grid.size/2,
+      cy: grid.y + r*(grid.size+grid.gap) + grid.size/2,
+    };
+  }
+
+  function draw(hov) {
+    ctx.clearRect(0, 0, W, H);
+
+    // labels
+    ctx.fillStyle = '#999'; ctx.font = '11px IBM Plex Mono, monospace'; ctx.textAlign = 'center';
+    ctx.fillText('RETINA', retina.x + 1.5*(retina.size+retina.gap), H-8);
+    ctx.fillText('CORTEX', cortex.x + 1.5*(cortex.size+cortex.gap), H-8);
+
+    // draw cells
+    for (let i=0; i<9; i++) {
+      const rCell = cellRect(retina, i);
+      const cCell = cellRect(cortex, mapping[i]);
+      const active = hov === i;
+
+      ctx.fillStyle = active ? '#111' : '#e8e4dc';
+      ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1;
+      ctx.fillRect(rCell.x, rCell.y, rCell.w, rCell.h);
+      ctx.strokeRect(rCell.x, rCell.y, rCell.w, rCell.h);
+
+      ctx.fillStyle = active ? '#111' : '#e8e4dc';
+      ctx.fillRect(cCell.x, cCell.y, cCell.w, cCell.h);
+      ctx.strokeRect(cCell.x, cCell.y, cCell.w, cCell.h);
+
+      if (active) {
+        // draw connection
+        ctx.strokeStyle = '#111'; ctx.lineWidth = 1.5;
+        ctx.setLineDash([5,4]);
+        ctx.beginPath();
+        ctx.moveTo(rCell.cx, rCell.cy);
+        ctx.bezierCurveTo(rCell.cx + 80, rCell.cy, cCell.cx - 80, cCell.cy, cCell.cx, cCell.cy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        // index labels
+        ctx.fillStyle = '#fff'; ctx.font = 'bold 13px IBM Plex Mono, monospace'; ctx.textAlign='center';
+        ctx.fillText(i, rCell.cx, rCell.cy+5);
+        ctx.fillText(mapping[i], cCell.cx, cCell.cy+5);
+      } else {
+        ctx.fillStyle = '#999'; ctx.font = '11px IBM Plex Mono, monospace'; ctx.textAlign='center';
+        ctx.fillText(i, rCell.cx, rCell.cy+4);
+      }
+    }
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let found = -1;
+    for (let i=0; i<9; i++) {
+      const r = cellRect(retina, i);
+      if (mx>=r.x && mx<=r.x+r.w && my>=r.y && my<=r.y+r.h) { found=i; break; }
+    }
+    if (found !== hoveredCell) { hoveredCell=found; draw(hoveredCell); }
+  });
+  canvas.addEventListener('mouseleave', () => { hoveredCell=-1; draw(-1); });
+  draw(-1);
+}
+
+// ── FLATTEN CANVAS ────────────────────────────────
+function initFlattenCanvas() {
+  const canvas = document.getElementById('flatten-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // A vertical-bar stimulus for illustration
+  const grid = [0,1,0, 0,1,0, 0,1,0];
+  const CELL = 52, GAP = 5;
+  const gridX = 40, gridY = (H - (3*CELL + 2*GAP)) / 2;
+
+  // Vector column dimensions
+  const VEC_W = 44, VEC_H = 22, VEC_X = W - VEC_W - 30;
+  const VEC_TOP = (H - 9*VEC_H) / 2;
+
+  let hovered = -1;
+
+  function draw(hov) {
+    ctx.clearRect(0, 0, W, H);
+
+    const FONT_MONO = '11px IBM Plex Mono, monospace';
+    const FONT_MONO_SM = '10px IBM Plex Mono, monospace';
+
+    // ── Grid cells ──
+    for (let i = 0; i < 9; i++) {
+      const r = Math.floor(i / 3), c = i % 3;
+      const x = gridX + c * (CELL + GAP);
+      const y = gridY + r * (CELL + GAP);
+      const active = hov === i;
+      const on = grid[i] === 1;
+
+      ctx.fillStyle = active ? '#111' : (on ? '#555' : '#e8e4dc');
+      ctx.fillRect(x, y, CELL, CELL);
+      ctx.strokeStyle = active ? '#111' : '#bbb';
+      ctx.lineWidth = active ? 2 : 1;
+      ctx.strokeRect(x, y, CELL, CELL);
+
+      // index label inside cell
+      ctx.fillStyle = (active || on) ? '#fff' : '#999';
+      ctx.font = FONT_MONO_SM;
+      ctx.textAlign = 'center';
+      ctx.fillText(`x${i}`, x + CELL/2, y + CELL/2 - 6);
+      ctx.fillText(`[${r},${c}]`, x + CELL/2, y + CELL/2 + 8);
+    }
+
+    // Grid label
+    ctx.fillStyle = '#999'; ctx.font = FONT_MONO_SM; ctx.textAlign = 'center';
+    ctx.fillText('3×3 stimulus grid', gridX + (3*CELL + 2*GAP)/2, gridY + 3*CELL + 2*GAP + 16);
+
+    // ── Arrow ──
+    const arrowX1 = gridX + 3*CELL + 2*GAP + 12;
+    const arrowX2 = VEC_X - 12;
+    const arrowY = H / 2;
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1.5; ctx.setLineDash([5,4]);
+    ctx.beginPath(); ctx.moveTo(arrowX1, arrowY); ctx.lineTo(arrowX2, arrowY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#bbb';
+    ctx.beginPath();
+    ctx.moveTo(arrowX2, arrowY);
+    ctx.lineTo(arrowX2-8, arrowY-4);
+    ctx.lineTo(arrowX2-8, arrowY+4);
+    ctx.closePath(); ctx.fill();
+
+    // flatten label on arrow
+    ctx.fillStyle = '#aaa'; ctx.font = FONT_MONO_SM; ctx.textAlign = 'center';
+    ctx.fillText('flatten( )', (arrowX1 + arrowX2) / 2, arrowY - 9);
+    ctx.fillText('row by row', (arrowX1 + arrowX2) / 2, arrowY + 18);
+
+    // ── Vector bracket ──
+    const bx = VEC_X - 8, by = VEC_TOP - 4, bh = 9*VEC_H + 8;
+    ctx.strokeStyle = '#bbb'; ctx.lineWidth = 1.5;
+    // left bracket
+    ctx.beginPath();
+    ctx.moveTo(bx+6, by); ctx.lineTo(bx, by); ctx.lineTo(bx, by+bh); ctx.lineTo(bx+6, by+bh);
+    ctx.stroke();
+    // right bracket
+    const rx = VEC_X + VEC_W + 8;
+    ctx.beginPath();
+    ctx.moveTo(rx-6, by); ctx.lineTo(rx, by); ctx.lineTo(rx, by+bh); ctx.lineTo(rx-6, by+bh);
+    ctx.stroke();
+
+    // Vector label
+    ctx.fillStyle = '#999'; ctx.font = FONT_MONO_SM; ctx.textAlign = 'center';
+    ctx.fillText('9×1 vector  x', VEC_X + VEC_W/2, VEC_TOP + 9*VEC_H + 20);
+
+    // ── Vector cells ──
+    for (let i = 0; i < 9; i++) {
+      const vy = VEC_TOP + i * VEC_H;
+      const active = hov === i;
+      const on = grid[i] === 1;
+
+      ctx.fillStyle = active ? '#111' : (on ? '#555' : '#e8e4dc');
+      ctx.fillRect(VEC_X, vy, VEC_W, VEC_H - 2);
+      ctx.strokeStyle = active ? '#111' : '#bbb';
+      ctx.lineWidth = active ? 2 : 1;
+      ctx.strokeRect(VEC_X, vy, VEC_W, VEC_H - 2);
+
+      ctx.fillStyle = (active || on) ? '#fff' : '#999';
+      ctx.font = FONT_MONO_SM; ctx.textAlign = 'center';
+      ctx.fillText(`x${i}`, VEC_X + VEC_W/2, vy + VEC_H/2 + 2);
+
+      // connector line from grid cell to vector cell on hover
+      if (active) {
+        const r = Math.floor(i/3), c = i%3;
+        const gx = gridX + c*(CELL+GAP) + CELL;
+        const gy = gridY + r*(CELL+GAP) + CELL/2;
+        const vcy = vy + VEC_H/2 - 1;
+
+        ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+        ctx.beginPath();
+        ctx.moveTo(gx, gy);
+        ctx.bezierCurveTo(gx+40, gy, VEC_X-20, vcy, VEC_X, vcy);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    let found = -1;
+    // check grid cells
+    for (let i = 0; i < 9; i++) {
+      const r = Math.floor(i/3), c = i%3;
+      const x = gridX + c*(CELL+GAP), y = gridY + r*(CELL+GAP);
+      if (mx>=x && mx<=x+CELL && my>=y && my<=y+CELL) { found=i; break; }
+    }
+    // check vector cells
+    if (found === -1) {
+      for (let i = 0; i < 9; i++) {
+        const vy = VEC_TOP + i*VEC_H;
+        if (mx>=VEC_X && mx<=VEC_X+VEC_W && my>=vy && my<=vy+VEC_H) { found=i; break; }
+      }
+    }
+    if (found !== hovered) {
+      hovered = found;
+      draw(hovered);
+      const label = document.getElementById('flatten-label');
+      if (hovered >= 0) {
+        const r = Math.floor(hovered/3), c = hovered%3;
+        label.textContent = `cell (row ${r}, col ${c})  →  vector index ${hovered}  =  3·${r} + ${c}   |   value: ${grid[hovered]}`;
+      } else {
+        label.textContent = 'hover a cell to inspect its index';
+      }
+    }
+  });
+  canvas.addEventListener('mouseleave', () => { hovered=-1; draw(-1); document.getElementById('flatten-label').textContent='hover a cell to inspect its index'; });
+  draw(-1);
+}
+
+// ── RF EXERCISE ───────────────────────────────────
+const STIMULI = {
+  vertical:   [0,1,0, 0,1,0, 0,1,0],
+  horizontal: [0,0,0, 1,1,1, 0,0,0],
+  diagonal_r: [1,0,0, 0,1,0, 0,0,1],
+  diagonal_l: [0,0,1, 0,1,0, 1,0,0],
+  custom:     [0,0,0, 0,0,0, 0,0,0],
+};
+const STIM_LABELS = {vertical:'vertical', horizontal:'horizontal', diagonal_r:'diagonal ╲', diagonal_l:'diagonal ╱'};
+
+let currentStim = [...STIMULI.vertical];
+let weights = [0,0,0, 0,0,0, 0,0,0];
+let rfTheta = 4;
+let activeStimKey = 'vertical';
+
+function initRFExercise() {
+  buildStimulusGrid();
+  buildWeightGrid();
+  updateRF();
+
+  document.getElementById('rf-theta').addEventListener('input', e => {
+    rfTheta = parseFloat(e.target.value);
+    document.getElementById('rf-theta-val').textContent = rfTheta.toFixed(1);
+    updateRF();
+  });
+}
+
+function buildStimulusGrid() {
+  const grid = document.getElementById('stimulus-grid');
+  grid.innerHTML = '';
+  currentStim.forEach((val, i) => {
+    const cell = document.createElement('div');
+    cell.className = `pixel-cell ${val ? 'on' : 'off'}`;
+    cell.textContent = val;
+    cell.addEventListener('click', () => {
+      currentStim[i] = currentStim[i] ? 0 : 1;
+      cell.className = `pixel-cell ${currentStim[i] ? 'on' : 'off'}`;
+      cell.textContent = currentStim[i];
+      activeStimKey = 'custom';
+      document.querySelectorAll('.stim-btn').forEach(b => b.classList.toggle('active', b.textContent.trim()==='custom'));
+      updateRF();
+    });
+    grid.appendChild(cell);
+  });
+}
+
+function buildWeightGrid() {
+  const grid = document.getElementById('weight-grid');
+  grid.innerHTML = '';
+  weights.forEach((w, i) => {
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.className = 'weight-input';
+    inp.value = w; inp.step = 1;
+    inp.addEventListener('input', () => {
+      weights[i] = parseFloat(inp.value) || 0;
+      updateRF();
+    });
+    grid.appendChild(inp);
+  });
+}
+
+function neuronFire(stim, w, theta) {
+  let sum = 0;
+  for (let i=0; i<9; i++) sum += stim[i] * w[i];
+  return {sum, z: sum - theta, fires: (sum - theta) >= 0};
+}
+
+function updateRF() {
+  const {sum, z, fires} = neuronFire(currentStim, weights, rfTheta);
+
+  const terms = weights.map((w,i)=>`(${w})(${currentStim[i]})`).join(' + ');
+  document.getElementById('rf-equation').innerHTML =
+    `z = ${terms}<br>= ${sum.toFixed(1)} − ${rfTheta.toFixed(1)} = <strong>${z.toFixed(2)}</strong>`;
+
+  const result = document.getElementById('rf-result');
+  result.className = `result-badge ${fires ? 'fires' : 'silent'}`;
+  result.textContent = fires ? 'FIRES — output = 1' : 'SILENT — output = 0';
+
+  updateAllScores();
+}
+
+function updateAllScores() {
+  const container = document.getElementById('all-scores');
+  container.innerHTML = '';
+  Object.entries(STIMULI).forEach(([key, stim]) => {
+    if (key === 'custom') return;
+    const {fires} = neuronFire(stim, weights, rfTheta);
+    const card = document.createElement('div');
+    card.className = `score-card ${fires ? 'fires' : 'silent'}`;
+    card.innerHTML = `<div class="card-name">${STIM_LABELS[key]}</div><div class="card-val">${fires ? '1' : '0'}</div>`;
+    container.appendChild(card);
+  });
+}
+
+function loadStimulus(key) {
+  activeStimKey = key;
+  if (key !== 'custom') currentStim = [...STIMULI[key]];
+  document.querySelectorAll('.stim-btn').forEach(b => {
+    b.classList.toggle('active', b.textContent.trim() === (key==='diagonal_r'?'diagonal ╲':key==='diagonal_l'?'diagonal ╱':key));
+  });
+  buildStimulusGrid();
+  updateRF();
+}
+
+function loadSolution() {
+  const sol = [-1,2,-1, -1,3,-1, -1,2,-1];
+  weights = [...sol];
+  rfTheta = 6;
+  document.getElementById('rf-theta').value = 6;
+  document.getElementById('rf-theta-val').textContent = '6.0';
+  document.querySelectorAll('.weight-input').forEach((inp,i) => inp.value = sol[i]);
+  loadStimulus('vertical');
+  updateRF();
+}
+</script>
+</body>
+</html>

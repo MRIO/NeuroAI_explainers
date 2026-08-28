@@ -1,0 +1,278 @@
+tanh_grid.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Neural Grid with Tanh Neurons</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      margin: 0;
+    }
+    #left {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #right {
+      width: 320px;
+      padding: 16px;
+      box-sizing: border-box;
+      background: #181818;
+      border-left: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    canvas {
+      border: 1px solid #333;
+      background: #000;
+    }
+    .control-group {
+      margin-bottom: 8px;
+    }
+    label {
+      font-size: 0.9rem;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    .row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .small {
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <canvas id="networkCanvas" width="500" height="500"></canvas>
+  </div>
+  <div id="right">
+    <h2>Neural Grid Controls</h2>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="manualControl">
+        Manual control (use sliders instead of random walk)
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label for="sliderX">Stimulus X position</label>
+      <input type="range" id="sliderX" min="0" max="99" value="50">
+    </div>
+
+    <div class="control-group">
+      <label for="sliderY">Stimulus Y position</label>
+      <input type="range" id="sliderY" min="0" max="99" value="50">
+    </div>
+
+    <div class="control-group">
+      <label for="stimStrength">Stimulus strength</label>
+      <input type="range" id="stimStrength" min="0" max="2" step="0.01" value="0.8">
+      <div class="small">How strongly the walker drives the network</div>
+    </div>
+
+    <div class="control-group">
+      <label for="coupling">Coupling gain (g)</label>
+      <input type="range" id="coupling" min="0" max="1.5" step="0.01" value="0.9">
+      <div class="small">Scales the Gaussian recurrent kernel</div>
+    </div>
+
+    <div class="control-group">
+      <label for="updateSpeed">Update speed</label>
+      <input type="range" id="updateSpeed" min="1" max="5" step="1" value="2">
+      <div class="small">Iterations per animation frame</div>
+    </div>
+
+    <p class="small">
+      - 100×100 tanh neurons<br>
+      - Local Gaussian connectivity (radius ≈ 3)<br>
+      - Walker-driven Gaussian input (random walk or sliders)
+    </p>
+  </div>
+
+  <script>
+    // --- Model parameters ---
+    const N = 100;                 // grid size
+    const radius = 3;              // local connectivity radius in lattice units
+    const sigmaKernel = 2.0;       // std dev for recurrent Gaussian kernel
+    const sigmaStim = 2.0;         // std dev for stimulus Gaussian
+    const canvasSize = 500;        // canvas is canvasSize x canvasSize pixels
+
+    // --- DOM elements ---
+    const canvas = document.getElementById('networkCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const sliderX = document.getElementById('sliderX');
+    const sliderY = document.getElementById('sliderY');
+    const stimStrengthSlider = document.getElementById('stimStrength');
+    const couplingSlider = document.getElementById('coupling');
+    const updateSpeedSlider = document.getElementById('updateSpeed');
+    const manualControlCheckbox = document.getElementById('manualControl');
+
+    // --- State ---
+    let state = new Float32Array(N * N);
+    let nextState = new Float32Array(N * N);
+
+    // Initialize with small random values
+    for (let i = 0; i < state.length; i++) {
+      state[i] = (Math.random() - 0.5) * 0.1;
+    }
+
+    // Walker position (stimulus center)
+    let walker = { x: N / 2, y: N / 2 };
+
+    // --- Precompute recurrent Gaussian kernel ---
+    const kernel = [];
+    (function buildKernel() {
+      let sum = 0;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const r2 = dx * dx + dy * dy;
+          const val = Math.exp(-r2 / (2 * sigmaKernel * sigmaKernel));
+          kernel.push({ dx, dy, w: val });
+          sum += val;
+        }
+      }
+      // Normalize to sum=1; gain will be applied separately
+      for (const k of kernel) {
+        k.w /= sum;
+      }
+    })();
+
+    // --- Utility functions ---
+    function idx(x, y) {
+      return y * N + x;
+    }
+
+    // Periodic boundary conditions
+    function wrapIndex(x, N) {
+      if (x < 0) return x + N;
+      if (x >= N) return x - N;
+      return x;
+    }
+
+    // Random walk step for the walker
+    function stepWalker() {
+      const dir = Math.floor(Math.random() * 4);
+      if (dir === 0) walker.x += 1;
+      else if (dir === 1) walker.x -= 1;
+      else if (dir === 2) walker.y += 1;
+      else walker.y -= 1;
+
+      // Wrap around
+      walker.x = wrapIndex(walker.x, N);
+      walker.y = wrapIndex(walker.y, N);
+    }
+
+    // --- Network update ---
+    function updateNetwork() {
+      const couplingGain = parseFloat(couplingSlider.value);     // recurrent gain g
+      const stimStrength = parseFloat(stimStrengthSlider.value); // stimulus amplitude
+
+      // Update walker position
+      if (manualControlCheckbox.checked) {
+        walker.x = parseInt(sliderX.value);
+        walker.y = parseInt(sliderY.value);
+      } else {
+        stepWalker();
+      }
+
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          let input = 0.0;
+
+          // Recurrent input: local Gaussian kernel with periodic boundaries
+          for (let k = 0; k < kernel.length; k++) {
+            const dx = kernel[k].dx;
+            const dy = kernel[k].dy;
+            const w = kernel[k].w;
+
+            const xx = wrapIndex(x + dx, N);
+            const yy = wrapIndex(y + dy, N);
+
+            input += w * state[idx(xx, yy)];
+          }
+          input *= couplingGain;
+
+          // External stimulus: Gaussian bump centered at walker
+          const dxw = x - walker.x;
+          const dyw = y - walker.y;
+          const r2 = dxw * dxw + dyw * dyw;
+          const stim = stimStrength * Math.exp(-r2 / (2 * sigmaStim * sigmaStim));
+          input += stim;
+
+          // Tanh activation (discrete time)
+          nextState[idx(x, y)] = Math.tanh(input);
+        }
+      }
+
+      // Swap buffers
+      const tmp = state;
+      state = nextState;
+      nextState = tmp;
+    }
+
+    // --- Visualization ---
+    function drawNetwork() {
+      // We’ll draw blocks of size cellSize x cellSize for each neuron.
+      const cellSize = canvasSize / N;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const v = state[idx(x, y)];
+          // Map v ∈ [-1, 1] to color between blue (negative) and red (positive)
+          const t = (v + 1) / 2; // 0..1
+          const r = Math.floor(255 * t);
+          const g = 0;
+          const b = Math.floor(255 * (1 - t));
+
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize + 1, cellSize + 1);
+        }
+      }
+
+      // Optionally draw the walker position as a small square outline
+      const cellSizePx = cellSize;
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        walker.x * cellSizePx,
+        walker.y * cellSizePx,
+        cellSizePx,
+        cellSizePx
+      );
+    }
+
+    // --- Animation loop ---
+    function loop() {
+      const updatesPerFrame = parseInt(updateSpeedSlider.value);
+      for (let i = 0; i < updatesPerFrame; i++) {
+        updateNetwork();
+      }
+      drawNetwork();
+      requestAnimationFrame(loop);
+    }
+
+    // Start animation
+    loop();
+  </script>
+</body>
+</html>

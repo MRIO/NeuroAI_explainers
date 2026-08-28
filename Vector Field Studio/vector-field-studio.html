@@ -1,0 +1,2374 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vector Field Studio</title>
+    <style>
+      :root {
+        --bg: #f7f1e4;
+        --bg-2: #efe3cb;
+        --ink: #152537;
+        --muted: #5b6978;
+        --panel: rgba(255, 251, 243, 0.8);
+        --panel-strong: rgba(255, 249, 239, 0.96);
+        --border: rgba(55, 65, 81, 0.16);
+        --shadow: 0 24px 70px rgba(36, 48, 64, 0.16);
+        --accent: #a34b1b;
+        --accent-2: #106c69;
+        --accent-3: #2451c2;
+        --canvas: #09101a;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(163, 75, 27, 0.18), transparent 24%),
+          radial-gradient(circle at top right, rgba(16, 108, 105, 0.14), transparent 22%),
+          linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+        font: 16px/1.55 "Avenir Next", "Segoe UI", sans-serif;
+      }
+
+      main {
+        width: min(1480px, calc(100vw - 28px));
+        margin: 0 auto;
+        padding: 18px 0 26px;
+      }
+
+      .hero,
+      .shell {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 28px;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(18px);
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+        gap: 22px;
+        padding: 26px 28px;
+        margin-bottom: 16px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        font: 700 12px/1.2 "Trebuchet MS", sans-serif;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font: 700 clamp(2.2rem, 5vw, 4.4rem)/0.96 "Iowan Old Style", Georgia, serif;
+        letter-spacing: -0.03em;
+      }
+
+      .lede {
+        margin-top: 12px;
+        max-width: 60ch;
+        color: var(--muted);
+      }
+
+      .hero-panels {
+        display: grid;
+        gap: 12px;
+      }
+
+      .hero-panel {
+        padding: 14px 16px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.64);
+        border: 1px solid rgba(55, 65, 81, 0.12);
+      }
+
+      .hero-panel strong {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--accent);
+        font: 700 12px/1.2 "Trebuchet MS", sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero-panel ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted);
+      }
+
+      .shell {
+        display: grid;
+        grid-template-columns: 360px minmax(0, 1fr);
+        gap: 18px;
+        padding: 18px;
+      }
+
+      .controls {
+        display: grid;
+        gap: 14px;
+        align-content: start;
+      }
+
+      .panel {
+        background: var(--panel-strong);
+        border: 1px solid rgba(55, 65, 81, 0.12);
+        border-radius: 22px;
+        padding: 16px;
+      }
+
+      .panel h2,
+      .panel h3 {
+        font-family: "Iowan Old Style", Georgia, serif;
+        letter-spacing: -0.02em;
+      }
+
+      .panel h2 {
+        font-size: 1.45rem;
+        margin-bottom: 10px;
+      }
+
+      .panel h3 {
+        font-size: 1.08rem;
+        margin-bottom: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+
+      .field:last-child {
+        margin-bottom: 0;
+      }
+
+      label,
+      .mini-label {
+        font: 700 12px/1.2 "Trebuchet MS", sans-serif;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      select,
+      button,
+      input[type="text"],
+      input[type="range"] {
+        width: 100%;
+      }
+
+      select,
+      input[type="text"] {
+        border: 1px solid rgba(55, 65, 81, 0.18);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.88);
+        color: var(--ink);
+        padding: 11px 12px;
+        font: 500 14px/1.3 "Avenir Next", "Segoe UI", sans-serif;
+      }
+
+      input[type="range"] {
+        accent-color: var(--accent);
+      }
+
+      .range-row {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+        align-items: center;
+      }
+
+      .range-value {
+        min-width: 52px;
+        text-align: right;
+        color: var(--accent-3);
+        font: 700 13px/1.2 "JetBrains Mono", "SFMono-Regular", monospace;
+      }
+
+      .check-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px 14px;
+      }
+
+      .check {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 14px;
+        color: var(--ink);
+      }
+
+      .button-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 14px;
+        padding: 12px 14px;
+        cursor: pointer;
+        color: white;
+        background: linear-gradient(135deg, var(--accent), #d06c29);
+        font: 700 14px/1 "Trebuchet MS", sans-serif;
+      }
+
+      button.secondary {
+        background: linear-gradient(135deg, var(--accent-2), #1d8f8a);
+      }
+
+      .expression-fields {
+        display: grid;
+        gap: 10px;
+      }
+
+      .expression-fields[hidden],
+      .aux-fields[hidden] {
+        display: none;
+      }
+
+      .aux-fields {
+        display: grid;
+        gap: 12px;
+      }
+
+      .stage {
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+        gap: 12px;
+        min-width: 0;
+      }
+
+      .canvas-card {
+        position: relative;
+        min-height: 680px;
+        background:
+          radial-gradient(circle at top, rgba(36, 81, 194, 0.18), transparent 28%),
+          linear-gradient(180deg, rgba(8, 16, 26, 0.96), rgba(5, 10, 17, 0.98));
+        border-radius: 28px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
+
+      .canvas-overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+
+      .canvas-chip {
+        position: absolute;
+        top: 16px;
+        left: 16px;
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 999px;
+        background: rgba(245, 244, 239, 0.12);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(247, 244, 236, 0.92);
+        font: 600 13px/1 "Trebuchet MS", sans-serif;
+        backdrop-filter: blur(10px);
+      }
+
+      .status {
+        position: absolute;
+        left: 16px;
+        bottom: 16px;
+        max-width: min(60ch, calc(100% - 32px));
+        padding: 12px 14px;
+        border-radius: 18px;
+        background: rgba(247, 244, 236, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        color: rgba(247, 244, 236, 0.92);
+        font-size: 14px;
+        backdrop-filter: blur(10px);
+      }
+
+      .status strong {
+        color: #ffe2b7;
+      }
+
+      .info-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 12px;
+      }
+
+      .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .metric {
+        padding: 14px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(55, 65, 81, 0.12);
+      }
+
+      .metric-label {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--muted);
+        font: 700 11px/1.2 "Trebuchet MS", sans-serif;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .metric-value {
+        font: 700 1.1rem/1.1 "JetBrains Mono", "SFMono-Regular", monospace;
+        color: var(--accent-3);
+      }
+
+      .help-list {
+        display: grid;
+        gap: 8px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .help-list div::before {
+        content: "";
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        margin-right: 9px;
+        border-radius: 999px;
+        background: var(--accent);
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      @media (max-width: 1140px) {
+        .hero,
+        .shell,
+        .info-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .canvas-card {
+          min-height: 560px;
+        }
+      }
+
+      @media (max-width: 760px) {
+        main {
+          width: min(calc(100vw - 16px), 1480px);
+          padding-top: 8px;
+        }
+
+        .hero,
+        .shell {
+          border-radius: 22px;
+          padding: 12px;
+        }
+
+        .canvas-card {
+          min-height: 440px;
+          border-radius: 22px;
+        }
+
+        .metric-grid,
+        .check-grid,
+        .button-row {
+          grid-template-columns: 1fr;
+        }
+
+        .canvas-chip,
+        .status {
+          font-size: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Dynamical Systems Playground</p>
+          <h1>Vector Field Studio</h1>
+          <p class="lede">
+            A self-contained HTML and JavaScript port of the classic 2-D vector-field applet. It keeps the preset
+            catalogue, draggable view controls, particle and vector displays, field-line overlays, and rectangle-based
+            circulation or flux measurements in one file.
+          </p>
+        </div>
+        <div class="hero-panels">
+          <div class="hero-panel">
+            <strong>What To Try</strong>
+            <ul>
+              <li>Switch between gradient fields and rotational fields to see when the surface view matters.</li>
+              <li>Use measure mode to compare circulation in rotational flows against flux in radial flows.</li>
+              <li>Write your own potential or vector field at the bottom of the control panel.</li>
+            </ul>
+          </div>
+          <div class="hero-panel">
+            <strong>How To Drive It</strong>
+            <ul>
+              <li>Drag the canvas to rotate or zoom, depending on the selected mouse mode.</li>
+              <li>When measure mode is active, drag a rectangle to compute circulation or flux.</li>
+              <li>Force mode adds inertia, so use Kick to inject velocity.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section class="shell">
+        <aside class="controls">
+          <section class="panel">
+            <h2>Scene</h2>
+            <div class="field">
+              <label for="functionSelect">Field Preset</label>
+              <select id="functionSelect"></select>
+            </div>
+            <div class="field">
+              <label for="displaySelect">Display</label>
+              <select id="displaySelect">
+                <option value="velocity">Particles (velocity)</option>
+                <option value="force">Particles (force)</option>
+                <option value="vectors">Field vectors</option>
+                <option value="none">None</option>
+                <option value="curlers">Curl detectors</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="floorColorSelect">Surface Color</label>
+              <select id="floorColorSelect">
+                <option value="field">Field magnitude</option>
+                <option value="potential">Potential</option>
+                <option value="none">Neutral</option>
+                <option value="div">Divergence</option>
+                <option value="curl">Curl z</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="floorLineSelect">Surface Overlay</label>
+              <select id="floorLineSelect">
+                <option value="none">None</option>
+                <option value="grid">Grid</option>
+                <option value="equip">Equipotentials</option>
+                <option value="lines">Streamlines</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="mouseModeSelect">Mouse Mode</label>
+              <select id="mouseModeSelect">
+                <option value="rotate">Adjust angle</option>
+                <option value="zoom">Adjust zoom</option>
+                <option value="circulation">Line integral</option>
+                <option value="flux">Surface integral</option>
+              </select>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h3>Motion</h3>
+            <div class="check-grid">
+              <label class="check"><input id="flatToggle" type="checkbox" /> Flat view</label>
+              <label class="check"><input id="pausedToggle" type="checkbox" /> Paused</label>
+              <label class="check"><input id="reverseToggle" type="checkbox" /> Reverse</label>
+              <label class="check"><input id="trailToggle" type="checkbox" checked /> Soft trails</label>
+            </div>
+            <div class="button-row" style="margin-top: 14px">
+              <button id="resetButton">Reset</button>
+              <button id="kickButton" class="secondary">Kick</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <h3>Parameters</h3>
+            <div class="field">
+              <div class="range-row">
+                <label for="strengthRange">Field strength</label>
+                <span class="range-value" id="strengthValue"></span>
+              </div>
+              <input id="strengthRange" type="range" min="1" max="120" value="80" />
+            </div>
+            <div class="field">
+              <div class="range-row">
+                <label for="particleRange">Particles</label>
+                <span class="range-value" id="particleValue"></span>
+              </div>
+              <input id="particleRange" type="range" min="50" max="1800" value="700" />
+            </div>
+            <div class="field">
+              <div class="range-row">
+                <label for="vectorRange">Vector density</label>
+                <span class="range-value" id="vectorValue"></span>
+              </div>
+              <input id="vectorRange" type="range" min="8" max="44" value="24" />
+            </div>
+            <div class="field">
+              <div class="range-row">
+                <label for="heightRange">Height scale</label>
+                <span class="range-value" id="heightValue"></span>
+              </div>
+              <input id="heightRange" type="range" min="0" max="200" value="65" />
+            </div>
+          </section>
+
+          <section class="panel">
+            <h3>Preset Controls</h3>
+            <div class="aux-fields" id="auxFields"></div>
+            <p class="small" id="auxHelp">This preset has no extra sliders.</p>
+          </section>
+
+          <section class="panel">
+            <h3>Custom Expressions</h3>
+            <div class="expression-fields" id="expressionFields" hidden>
+              <div class="field" id="potentialField">
+                <label for="potentialInput">Potential V(x, y)</label>
+                <input id="potentialInput" type="text" value="x*x" />
+              </div>
+              <div class="field" id="fieldXWrap">
+                <label for="fieldXInput">Fx(x, y)</label>
+                <input id="fieldXInput" type="text" value="x" />
+              </div>
+              <div class="field" id="fieldYWrap">
+                <label for="fieldYInput">Fy(x, y)</label>
+                <input id="fieldYInput" type="text" value="y" />
+              </div>
+              <p class="small">
+                Available symbols: <code>x</code>, <code>y</code>, <code>r</code>, <code>pi</code>, <code>e</code>,
+                and functions <code>sin</code>, <code>cos</code>, <code>tan</code>, <code>abs</code>, <code>exp</code>,
+                <code>log</code>, <code>sqrt</code>. As in the Java applet, <code>x</code> and <code>y</code> are scaled to
+                the range roughly [-10, 10].
+              </p>
+            </div>
+            <p class="small" id="expressionHelp">Select a user-defined preset to edit expressions.</p>
+          </section>
+        </aside>
+
+        <section class="stage">
+          <div class="canvas-card">
+            <canvas id="fieldCanvas"></canvas>
+            <div class="canvas-overlay">
+              <div class="canvas-chip">
+                <span id="chipField"></span>
+                <span id="chipMode"></span>
+              </div>
+              <div class="status" id="statusBox"></div>
+            </div>
+          </div>
+
+          <section class="info-grid">
+            <div class="panel">
+              <h3>Current Field</h3>
+              <p id="fieldDescription" class="lede" style="margin-top: 8px"></p>
+              <div class="help-list" style="margin-top: 14px">
+                <div id="hintA"></div>
+                <div id="hintB"></div>
+                <div id="hintC"></div>
+              </div>
+            </div>
+            <div class="panel">
+              <h3>Readout</h3>
+              <div class="metric-grid" style="margin-top: 14px">
+                <div class="metric">
+                  <span class="metric-label">Flat / Surface</span>
+                  <span class="metric-value" id="metricView"></span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Mean Speed</span>
+                  <span class="metric-value" id="metricSpeed"></span>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Divergence At Center</span>
+                  <span class="metric-value" id="metricDiv"></span>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script>
+      (() => {
+        const TAU = Math.PI * 2;
+        const GRID_SIZE = 56;
+        const STREAMLINE_SEEDS = 14;
+        const SOFT_TRAIL_ALPHA = 0.14;
+        const FULL_CLEAR_ALPHA = 1;
+        const MAX_PARTICLES = 1800;
+        const DENSITY_GRID = 16;
+        const CENTER_SAMPLE = { x: 0, y: 0 };
+
+        const els = {
+          canvas: document.getElementById("fieldCanvas"),
+          functionSelect: document.getElementById("functionSelect"),
+          displaySelect: document.getElementById("displaySelect"),
+          floorColorSelect: document.getElementById("floorColorSelect"),
+          floorLineSelect: document.getElementById("floorLineSelect"),
+          mouseModeSelect: document.getElementById("mouseModeSelect"),
+          flatToggle: document.getElementById("flatToggle"),
+          pausedToggle: document.getElementById("pausedToggle"),
+          reverseToggle: document.getElementById("reverseToggle"),
+          trailToggle: document.getElementById("trailToggle"),
+          resetButton: document.getElementById("resetButton"),
+          kickButton: document.getElementById("kickButton"),
+          strengthRange: document.getElementById("strengthRange"),
+          particleRange: document.getElementById("particleRange"),
+          vectorRange: document.getElementById("vectorRange"),
+          heightRange: document.getElementById("heightRange"),
+          strengthValue: document.getElementById("strengthValue"),
+          particleValue: document.getElementById("particleValue"),
+          vectorValue: document.getElementById("vectorValue"),
+          heightValue: document.getElementById("heightValue"),
+          auxFields: document.getElementById("auxFields"),
+          auxHelp: document.getElementById("auxHelp"),
+          expressionFields: document.getElementById("expressionFields"),
+          expressionHelp: document.getElementById("expressionHelp"),
+          potentialField: document.getElementById("potentialField"),
+          potentialInput: document.getElementById("potentialInput"),
+          fieldXWrap: document.getElementById("fieldXWrap"),
+          fieldYWrap: document.getElementById("fieldYWrap"),
+          fieldXInput: document.getElementById("fieldXInput"),
+          fieldYInput: document.getElementById("fieldYInput"),
+          chipField: document.getElementById("chipField"),
+          chipMode: document.getElementById("chipMode"),
+          statusBox: document.getElementById("statusBox"),
+          fieldDescription: document.getElementById("fieldDescription"),
+          hintA: document.getElementById("hintA"),
+          hintB: document.getElementById("hintB"),
+          hintC: document.getElementById("hintC"),
+          metricView: document.getElementById("metricView"),
+          metricSpeed: document.getElementById("metricSpeed"),
+          metricDiv: document.getElementById("metricDiv")
+        };
+
+        const ctx = els.canvas.getContext("2d");
+        const backgroundCanvas = document.createElement("canvas");
+        const bg = backgroundCanvas.getContext("2d");
+        const density = Array.from({ length: DENSITY_GRID }, () => new Uint16Array(DENSITY_GRID));
+        const particles = Array.from({ length: MAX_PARTICLES }, () => createParticle());
+        const auxState = [50, 50, 50];
+
+        const state = {
+          fieldStrengthSlider: 80,
+          particleCount: 700,
+          vectorDensity: 24,
+          heightScaleSlider: 65,
+          flatView: false,
+          paused: false,
+          reverse: false,
+          softTrails: true,
+          display: "velocity",
+          floorColor: "field",
+          floorLines: "equip",
+          mouseMode: "rotate",
+          selectedPresetId: "inverse-radial",
+          parseError: "",
+          measurement: null,
+          viewAngle: 0.76,
+          viewHeight: 1.9,
+          viewZoom: 1.65,
+          viewDistance: 5,
+          backgroundDirty: true,
+          functionDirty: true,
+          dims: { width: 0, height: 0, dpr: Math.max(1, window.devicePixelRatio || 1) },
+          isPointerDown: false,
+          dragStart: null,
+          dragCurrent: null,
+          dragViewAngleStart: 0,
+          dragViewHeightStart: 0,
+          dragViewZoomStart: 0,
+          lastFrame: 0,
+          meanSpeed: 0,
+          streamlineCache: null
+        };
+
+        const presets = buildPresets();
+        const presetById = new Map(presets.map((preset) => [preset.id, preset]));
+
+        for (const preset of presets) {
+          const option = document.createElement("option");
+          option.value = preset.id;
+          option.textContent = preset.name;
+          els.functionSelect.append(option);
+        }
+
+        function createParticle() {
+          return {
+            x: 0,
+            y: 0,
+            z: 0,
+            vx: 0,
+            vy: 0,
+            lifetime: 0,
+            theta: Math.random() * TAU
+          };
+        }
+
+        function clamp(value, lo, hi) {
+          return Math.max(lo, Math.min(hi, value));
+        }
+
+        function lerp(a, b, t) {
+          return a + (b - a) * t;
+        }
+
+        function fmt(value, digits = 3) {
+          if (!Number.isFinite(value)) return "n/a";
+          const abs = Math.abs(value);
+          if (abs >= 1000 || (abs > 0 && abs < 0.001)) return value.toExponential(2);
+          return value.toFixed(digits);
+        }
+
+        function sliderExp(value) {
+          return Math.exp((value - 50) / 10);
+        }
+
+        function getHeightScale() {
+          return Number(els.heightRange.value) / 100;
+        }
+
+        function getActivePreset() {
+          return presetById.get(state.selectedPresetId);
+        }
+
+        function getAux(index) {
+          return auxState[index] ?? 50;
+        }
+
+        function gridToDomain(index) {
+          return (index * 2) / GRID_SIZE - 1;
+        }
+
+        function domainToDensityIndex(value) {
+          return clamp(Math.floor(((value + 1) * DENSITY_GRID) / 2), 0, DENSITY_GRID - 1);
+        }
+
+        function makeDescription(text, hints) {
+          return { text, hints };
+        }
+
+        function currentExpressionMode() {
+          const preset = getActivePreset();
+          if (!preset) return null;
+          if (preset.id === "user-potential") return "potential";
+          if (preset.id === "user-field") return "field";
+          return null;
+        }
+
+        function compileExpression(source) {
+          const text = source.trim();
+          if (!text) {
+            return () => 0;
+          }
+          if (/[^0-9a-zA-Z_+\-*/^().,\s]/.test(text)) {
+            throw new Error("Unsupported character");
+          }
+          let expression = text
+            .replace(/\^/g, "**")
+            .replace(/\bpi\b/g, "PI")
+            .replace(/\be\b/g, "E")
+            .replace(/\bx\b/g, "X")
+            .replace(/\by\b/g, "Y")
+            .replace(/\br\b/g, "R");
+
+          const fnNames = ["sin", "cos", "tan", "abs", "exp", "log", "sqrt"];
+          for (const name of fnNames) {
+            expression = expression.replace(new RegExp(`\\b${name}\\b`, "g"), `Math.${name}`);
+          }
+          return new Function(
+            "x",
+            "y",
+            `
+              const X = x * 10;
+              const Y = y * 10;
+              const R = Math.hypot(x, y) * 10;
+              const PI = Math.PI;
+              const E = Math.E;
+              return (${expression});
+            `
+          );
+        }
+
+        function safeEval(fn, x, y) {
+          const value = fn(x, y);
+          if (!Number.isFinite(value)) throw new Error("Expression overflow");
+          return value;
+        }
+
+        let compiledPotential = compileExpression(els.potentialInput.value);
+        let compiledFieldX = compileExpression(els.fieldXInput.value);
+        let compiledFieldY = compileExpression(els.fieldYInput.value);
+
+        function buildPresets() {
+          const qLine = 0.0002;
+          const qPoint = 0.0003;
+
+          const presetsList = [
+            {
+              id: "inverse-radial",
+              name: "1/r single line",
+              description: makeDescription(
+                "A radial sink around a singular line at the origin. The surface is logarithmic, so the center becomes a deep funnel.",
+                [
+                  "Circulation is near zero away from the singularity.",
+                  "Flux through a box enclosing the center is non-zero.",
+                  "Switch to vectors to see the 1/r decay directly."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.hypot(x, y);
+                const r2 = Math.max(r * r, 1e-8);
+                return { fx: -qLine * x / r2, fy: -qLine * y / r2, pot: 0.4 * Math.log(r + 1e-12), singular: r < 0.004 };
+              }
+            },
+            {
+              id: "inverse-radial-double",
+              name: "1/r double lines",
+              aux: [{ label: "Line separation", min: 0, max: 100, value: 30 }],
+              description: makeDescription(
+                "Two identical radial line singularities. Moving the slider changes the interaction region between the sinks.",
+                [
+                  "With a large separation, each line behaves almost independently.",
+                  "Near the center, the field flattens when the two contributions balance.",
+                  "Surface colors show the combined magnitude clearly."
+                ]
+              ),
+              eval(x, y) {
+                const sep = getAux(0) / 100;
+                const x1 = x - sep;
+                const x2 = x + sep;
+                const r1 = Math.hypot(x1, y);
+                const r2 = Math.hypot(x2, y);
+                const inv1 = 1 / Math.max(r1 * r1, 1e-8);
+                const inv2 = 1 / Math.max(r2 * r2, 1e-8);
+                return {
+                  fx: qLine * (-x1 * inv1 - x2 * inv2),
+                  fy: qLine * (-y * inv1 - y * inv2),
+                  pot: 0.2 * (Math.log(r1 + 1e-12) + Math.log(r2 + 1e-12)),
+                  singular: r1 < 0.004 || r2 < 0.004
+                };
+              }
+            },
+            {
+              id: "inverse-squared-radial",
+              name: "1/r^2 single",
+              description: makeDescription(
+                "A point sink with inverse-square radial strength. Compared with the line field, the center becomes steeper and more localized.",
+                [
+                  "Flux is strongly concentrated near the origin.",
+                  "Equipotentials are circles.",
+                  "Particles accelerate more sharply than in the 1/r line case."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.hypot(x, y);
+                const r3 = Math.max(r * r * r, 1e-9);
+                return { fx: -qPoint * x / r3, fy: -qPoint * y / r3, pot: -0.3 / Math.max(r, 1e-6), singular: r < 0.005 };
+              }
+            },
+            {
+              id: "inverse-squared-radial-double",
+              name: "1/r^2 double",
+              aux: [{ label: "Charge separation", min: 0, max: 100, value: 30 }],
+              description: makeDescription(
+                "Two identical inverse-square sinks. The superposition creates a bridge region where vectors are no longer purely radial.",
+                [
+                  "Measure flux around one or both charges.",
+                  "The center line shows how superposition changes direction, not just magnitude.",
+                  "Flat view makes the symmetry easiest to read."
+                ]
+              ),
+              eval(x, y) {
+                const sep = getAux(0) / 100;
+                const x1 = x - sep;
+                const x2 = x + sep;
+                const r1 = Math.hypot(x1, y);
+                const r2 = Math.hypot(x2, y);
+                const rq1 = qPoint / Math.max(r1 * r1 * r1, 1e-9);
+                const rq2 = qPoint / Math.max(r2 * r2 * r2, 1e-9);
+                return {
+                  fx: -x1 * rq1 - x2 * rq2,
+                  fy: -y * rq1 - y * rq2,
+                  pot: -0.05 / Math.max(r1, 1e-6) - 0.05 / Math.max(r2, 1e-6),
+                  singular: r1 < 0.005 || r2 < 0.005
+                };
+              }
+            },
+            {
+              id: "inverse-rotational",
+              name: "1/r rotational",
+              nonGradient: true,
+              description: makeDescription(
+                "Pure circulation around the origin. This is the canonical contrast with the radial fields above: strong circulation, almost no net outward flux.",
+                [
+                  "Draw a measurement box around the center and compare circulation to flux.",
+                  "Particles orbit instead of falling inward.",
+                  "Divergence coloring stays weak away from the singularity."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.hypot(x, y);
+                const inv = 0.0001 / Math.max(r * r, 1e-8);
+                return { fx: -y * inv, fy: x * inv, pot: 0, singular: r < 0.006 };
+              }
+            },
+            {
+              id: "inverse-rotational-potential",
+              name: "1/r rotational potential",
+              description: makeDescription(
+                "A rotational field paired with a branch-cut potential surface. This makes the mismatch between a swirling vector field and a globally smooth scalar potential explicit.",
+                [
+                  "The surface jumps across the branch cut.",
+                  "Rotate the scene to see how the height discontinuity tracks angle.",
+                  "Circulation is the meaningful measurement here."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.hypot(x, y);
+                let angle = Math.atan2(y, x);
+                if (angle < 0) angle += TAU;
+                const inv = 0.0001 / Math.max(r * r, 1e-8);
+                return { fx: -y * inv, fy: x * inv, pot: 0.3 * (Math.PI - angle), singular: r < 0.006 };
+              }
+            },
+            {
+              id: "inverse-rotational-double",
+              name: "1/r rotational double",
+              aux: [{ label: "Line separation", min: 0, max: 100, value: 30 }],
+              nonGradient: true,
+              description: makeDescription(
+                "Two co-rotating vortices. The gap between them contains a shear layer where nearby particles split into different loops.",
+                [
+                  "Curl detectors make the vortex structure easy to see.",
+                  "The center between the lines can become slow even though the curl stays high.",
+                  "Increase separation to isolate each vortex."
+                ]
+              ),
+              eval(x, y) {
+                const sep = getAux(0) / 100;
+                const r1sq = Math.max((x - sep) ** 2 + y ** 2, 1e-8);
+                const r2sq = Math.max((x + sep) ** 2 + y ** 2, 1e-8);
+                return {
+                  fx: -0.0001 * ((y / r1sq) + (y / r2sq)),
+                  fy: 0.0001 * (((x - sep) / r1sq) + ((x + sep) / r2sq)),
+                  pot: 0,
+                  singular: r1sq < 3e-5 || r2sq < 3e-5
+                };
+              }
+            },
+            {
+              id: "inverse-rotational-double-ext",
+              name: "1/r rot double + ext",
+              aux: [
+                { label: "Line separation", min: 0, max: 100, value: 30 },
+                { label: "External strength", min: 0, max: 100, value: 7 },
+                { label: "External direction", min: 0, max: 100, value: 0 }
+              ],
+              nonGradient: true,
+              description: makeDescription(
+                "The double-vortex field plus a uniform background flow. The external field bends the streamline pattern into saddle-like separatrices.",
+                [
+                  "Change external direction to rotate the bias.",
+                  "Small background flow already breaks the symmetry.",
+                  "Streamlines show the topological change best."
+                ]
+              ),
+              eval(x, y) {
+                const sep = getAux(0) / 100;
+                const strength = getAux(1) / 6;
+                const theta = (getAux(2) * Math.PI) / 50;
+                const r1sq = Math.max((x - sep) ** 2 + y ** 2, 1e-8);
+                const r2sq = Math.max((x + sep) ** 2 + y ** 2, 1e-8);
+                let fx = -0.0001 * ((y / r1sq) + (y / r2sq));
+                let fy = 0.0001 * (((x - sep) / r1sq) + ((x + sep) / r2sq));
+                fx += 0.0003 * Math.cos(theta) * strength;
+                fy += 0.0003 * Math.sin(theta) * strength;
+                return { fx, fy, pot: 0, singular: r1sq < 3e-5 || r2sq < 3e-5 };
+              }
+            },
+            {
+              id: "inverse-rotational-dipole",
+              name: "1/r rotational dipole",
+              aux: [{ label: "Line separation", min: 0, max: 100, value: 30 }],
+              nonGradient: true,
+              description: makeDescription(
+                "Counter-rotating vortices. This is the simplest way to generate a dipole-like transport pattern from pure rotation.",
+                [
+                  "Particles can get trapped in one lobe or swept between them.",
+                  "Circulation over a big box can cancel while local curl remains strong.",
+                  "Compare with the co-rotating double vortex."
+                ]
+              ),
+              eval(x, y) {
+                const sep = getAux(0) / 100;
+                const r1sq = Math.max((x - sep) ** 2 + y ** 2, 1e-8);
+                const r2sq = Math.max((x + sep) ** 2 + y ** 2, 1e-8);
+                return {
+                  fx: -0.0001 * ((y / r1sq) - (y / r2sq)),
+                  fy: 0.0001 * (((x - sep) / r1sq) - ((x + sep) / r2sq)),
+                  pot: 0,
+                  singular: r1sq < 3e-5 || r2sq < 3e-5
+                };
+              }
+            },
+            {
+              id: "inverse-rotational-dipole-ext",
+              name: "1/r rot dipole + ext",
+              aux: [
+                { label: "Line separation", min: 0, max: 100, value: 30 },
+                { label: "External strength", min: 0, max: 100, value: 3 },
+                { label: "External direction", min: 0, max: 100, value: 25 }
+              ],
+              nonGradient: true,
+              description: makeDescription(
+                "Counter-rotating vortices in a biased background flow. The external field can turn a symmetric dipole into a transport channel.",
+                [
+                  "This preset is useful for testing line-integral intuition.",
+                  "Flux can stay modest while circulation changes sign locally.",
+                  "Reverse mode flips the transport direction immediately."
+                ]
+              ),
+              eval(x, y) {
+                const sep = getAux(0) / 100;
+                const strength = getAux(1) / 6;
+                const theta = (getAux(2) * Math.PI) / 50;
+                const r1sq = Math.max((x - sep) ** 2 + y ** 2, 1e-8);
+                const r2sq = Math.max((x + sep) ** 2 + y ** 2, 1e-8);
+                let fx = -0.0001 * ((y / r1sq) - (y / r2sq));
+                let fy = 0.0001 * (((x - sep) / r1sq) - ((x + sep) / r2sq));
+                fx += 0.0003 * Math.cos(theta) * strength;
+                fy += 0.0003 * Math.sin(theta) * strength;
+                return { fx, fy, pot: 0, singular: r1sq < 3e-5 || r2sq < 3e-5 };
+              }
+            },
+            {
+              id: "uniform-field",
+              name: "one direction",
+              aux: [{ label: "Theta", min: 0, max: 100, value: 0 }],
+              description: makeDescription(
+                "A uniform field at a chosen angle. This is the cleanest place to build intuition for projection, flux, and line integrals.",
+                [
+                  "Flux depends only on the rectangle's projected area against the field.",
+                  "Circulation is zero everywhere.",
+                  "Use this as a baseline before moving to curved fields."
+                ]
+              ),
+              eval(x, y) {
+                const theta = (getAux(0) * Math.PI) / 50;
+                const fx = 0.0003 * Math.cos(theta);
+                const fy = 0.0003 * Math.sin(theta);
+                return { fx, fy, pot: -0.4 * (x * Math.cos(theta) + y * Math.sin(theta)), singular: false };
+              }
+            },
+            {
+              id: "inverse-squared-sphere",
+              name: "1/r^2 sphere",
+              aux: [{ label: "Sphere size", min: 0, max: 100, value: 30 }],
+              description: makeDescription(
+                "A softened inverse-square radial field with a finite sphere core. Inside the sphere the surface becomes smooth instead of singular.",
+                [
+                  "The core regularizes both speed and height.",
+                  "This is useful when you want radial behavior without a sharp singularity.",
+                  "Increase the radius to see the interior become more harmonic."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.hypot(x, y);
+                const a = (getAux(0) + 1) / 110;
+                const rr = Math.max(r, a);
+                const alpha = 0.0003 / Math.max(rr * rr * rr, 1e-8);
+                const pot = 0.2 * (r > a ? -1 / Math.max(r, 1e-6) : -3 / (2 * a) + (r * r) / (2 * a * a * a));
+                return { fx: -x * alpha, fy: -y * alpha, pot, singular: r < 0.004 };
+              }
+            },
+            {
+              id: "const-radial",
+              name: "const radial",
+              description: makeDescription(
+                "A radial field with constant speed magnitude. The vectors point inward everywhere, but their length no longer depends on distance.",
+                [
+                  "Unlike inverse-square fields, there is no far-field decay.",
+                  "Equipotentials remain circular but spacing changes.",
+                  "Particle motion feels surprisingly uniform except near the center."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.hypot(x, y);
+                const q = 0.0006 / Math.max(r, 1e-8);
+                return { fx: -q * x, fy: -q * y, pot: r, singular: r < 0.005 };
+              }
+            },
+            {
+              id: "linear-radial",
+              name: "linear radial",
+              description: makeDescription(
+                "A linear sink. Speed grows linearly with radius, so the origin is the calmest point instead of the most singular.",
+                [
+                  "This is the 2-D analogue of a simple linear stable system.",
+                  "Trajectories contract exponentially.",
+                  "Surface height is quadratic."
+                ]
+              ),
+              eval(x, y) {
+                const k = 0.0009;
+                return { fx: -k * x, fy: -k * y, pot: x * x + y * y - 1, singular: false };
+              }
+            },
+            {
+              id: "constant-to-y-axis",
+              name: "constant to y axis",
+              description: makeDescription(
+                "A uniform pull toward the y-axis. The field direction flips sign across the axis while maintaining constant magnitude.",
+                [
+                  "Flux across vertical rectangles cancels symmetrically.",
+                  "The potential surface forms a V-shaped trough.",
+                  "This is a clean example of a non-smooth but still intuitive field."
+                ]
+              ),
+              eval(x, y) {
+                const alpha = 0.0004;
+                return { fx: x <= 0 ? alpha : -alpha, fy: 0, pot: Math.abs(x) - 1, singular: Math.abs(x) < 0.01 };
+              }
+            },
+            {
+              id: "linear-to-y-axis",
+              name: "linear to y axis",
+              description: makeDescription(
+                "A spring-like pull toward the y-axis. The farther from the axis, the stronger the restoring force.",
+                [
+                  "This is the smooth version of the V-shaped trough.",
+                  "Trajectories collapse horizontally but not vertically.",
+                  "The surface cross-section is parabolic."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.0009;
+                return { fx: -q * x, fy: 0, pot: x * x - 1, singular: false };
+              }
+            },
+            {
+              id: "linear-to-xy-axes",
+              name: "2-dimensional oscillator",
+              aux: [{ label: "X/Y ratio", min: 0, max: 100, value: 50 }],
+              description: makeDescription(
+                "A separable quadratic potential with different curvature along x and y. The slider changes the aspect ratio of the bowl.",
+                [
+                  "This is a good place to see anisotropic contraction.",
+                  "Equipotentials are ellipses.",
+                  "Force-mode particles reveal the difference between overdamped and inertial motion."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.sqrt((getAux(0) + 1) / 51);
+                const alpha = 0.0006;
+                return { fx: -alpha * r * x, fy: -alpha * y / r, pot: x * x * r + (y * y) / r - 1, singular: false };
+              }
+            },
+            {
+              id: "inverse-to-y-axis",
+              name: "inverse to y axis",
+              description: makeDescription(
+                "A one-dimensional inverse field aimed at the y-axis. The axis acts like a line singularity with no vertical component.",
+                [
+                  "Flux through rectangles crossing the axis is large.",
+                  "The singularity is purely horizontal.",
+                  "Try flat view to see the field concentrate toward x = 0."
+                ]
+              ),
+              eval(x, y) {
+                const xx = Math.abs(x) < 1e-4 ? Math.sign(x || 1) * 1e-4 : x;
+                const alpha = 0.0003;
+                return { fx: -alpha / xx, fy: 0, pot: -0.01 / (xx * xx), singular: Math.abs(x) < 0.01 };
+              }
+            },
+            {
+              id: "inverse-square-rotational",
+              name: "1/r^2 rotational",
+              nonGradient: true,
+              description: makeDescription(
+                "A stronger vortex that decays like 1/r^2 in speed rather than 1/r. The core dominates the motion much more strongly.",
+                [
+                  "Circulation becomes highly localized near the center.",
+                  "Outside the core, particles drift much less than in the 1/r vortex.",
+                  "Curl coloring makes the concentration obvious."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.hypot(x, y);
+                const inv = 0.0001 / Math.max(r * r * r, 1e-9);
+                return { fx: -y * inv, fy: x * inv, pot: 0, singular: r < 0.006 };
+              }
+            },
+            {
+              id: "linear-rotational",
+              name: "linear rotational",
+              nonGradient: true,
+              description: makeDescription(
+                "Rigid-body rotation. Every point spins with the same angular velocity, so vector length grows linearly with radius.",
+                [
+                  "Curl is uniform across the plane.",
+                  "Particles trace circles with radius-dependent speed.",
+                  "Unlike the singular vortices, the center is perfectly regular."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.0006;
+                return { fx: -q * y, fy: q * x, pot: 0, singular: false };
+              }
+            },
+            {
+              id: "constant-rotational",
+              name: "constant rotational",
+              nonGradient: true,
+              description: makeDescription(
+                "Tangential flow with constant speed magnitude. This is the rotational analogue of the constant radial field.",
+                [
+                  "Angular velocity increases as you approach the center.",
+                  "Circulation does not vanish even though speed is constant along circles.",
+                  "Trajectories bunch up near the origin."
+                ]
+              ),
+              eval(x, y) {
+                const r = Math.hypot(x, y);
+                const q = 0.0006 / Math.max(r, 1e-8);
+                return { fx: -q * y, fy: q * x, pot: 0, singular: r < 0.006 };
+              }
+            },
+            {
+              id: "fx-equals-y",
+              name: "(y,0)",
+              nonGradient: true,
+              description: makeDescription(
+                "A horizontal shear field where velocity depends linearly on y. The whole plane slides sideways in opposite directions above and below the x-axis.",
+                [
+                  "Curl is constant.",
+                  "Flux through horizontal rectangles is zero.",
+                  "Line integral depends strongly on the rectangle's height."
+                ]
+              ),
+              eval(x, y) {
+                return { fx: 0.0009 * y, fy: 0, pot: 0, singular: false };
+              }
+            },
+            {
+              id: "fx-equals-y2",
+              name: "(y^2,0)",
+              nonGradient: true,
+              description: makeDescription(
+                "A nonlinear shear where both the top and bottom halves move in the same x direction. The axis becomes the slow lane.",
+                [
+                  "Unlike the linear shear, symmetry no longer flips across y = 0.",
+                  "Curl changes sign with y.",
+                  "Force mode makes the shear particularly vivid."
+                ]
+              ),
+              eval(x, y) {
+                return { fx: 0.002 * y * y, fy: 0, pot: 0, singular: false };
+              }
+            },
+            {
+              id: "saddle",
+              name: "saddle",
+              description: makeDescription(
+                "A linear saddle with one contracting axis and one expanding axis. This is the standard local model for an unstable equilibrium.",
+                [
+                  "Look for trajectories that are attracted along one direction and repelled along another.",
+                  "Equipotentials are hyperbolic.",
+                  "A measurement box around the center shows zero circulation but non-trivial flux structure."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.001;
+                return { fx: -q * x, fy: 0.5 * q * y, pot: 2 * x * x - y * y, singular: false };
+              }
+            },
+            {
+              id: "rotation-expansion",
+              name: "rotation + expansion",
+              nonGradient: true,
+              description: makeDescription(
+                "A linear field that mixes radial growth with rotation. Nearby trajectories spiral outward instead of orbiting or collapsing.",
+                [
+                  "This is a minimal spiral source.",
+                  "Reverse mode turns it into a spiral sink.",
+                  "Curl and divergence are both present at once."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.0006;
+                return { fx: q * (x - y), fy: q * (x + y), pot: 0, singular: false };
+              }
+            },
+            {
+              id: "f4",
+              name: "(x^2-y,x+y^2)",
+              nonGradient: true,
+              description: makeDescription(
+                "A nonlinear polynomial field with competing shear and quadratic growth. It is useful for testing how quickly streamlines can bend away from linear intuition.",
+                [
+                  "Try vectors first, then particles.",
+                  "The field is not a gradient field.",
+                  "Small changes in initial position can separate quickly."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.0003;
+                return { fx: q * (x * x - y), fy: q * (x + y * y), pot: 0, singular: false };
+              }
+            },
+            {
+              id: "f5",
+              name: "(x+y^2,x^2-y)",
+              nonGradient: true,
+              description: makeDescription(
+                "A polynomial field with the nonlinear terms swapped. The geometry is similar to the previous preset, but the dominant bends change places.",
+                [
+                  "Compare its streamlines directly with the previous preset.",
+                  "The field highlights how sensitive phase portraits are to term placement.",
+                  "Force mode exaggerates the asymmetry."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.0003;
+                return { fx: q * (x + y * y), fy: q * (x * x - y), pot: 0, singular: false };
+              }
+            },
+            {
+              id: "f6",
+              name: "(x,x^2)",
+              nonGradient: true,
+              description: makeDescription(
+                "A simple asymmetric polynomial field. Horizontal motion is linear; vertical motion is always non-negative and quadratic in x.",
+                [
+                  "Particles bend upward regardless of the sign of x.",
+                  "The x-axis is not invariant because the y component never becomes negative.",
+                  "Use the vector view to see the strong directional bias."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.0006;
+                return { fx: q * x, fy: q * x * x, pot: 0, singular: false };
+              }
+            },
+            {
+              id: "u-equals-x2-plus-y",
+              name: "u=x^2+y",
+              description: makeDescription(
+                "A true gradient field descending the surface u = x^2 + y. The slope is linear in x and constant in y.",
+                [
+                  "Equipotentials are parabolas.",
+                  "Particles always drift downward in y.",
+                  "This is a clean user-defined-potential benchmark."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.0003;
+                return { fx: -2 * q * x, fy: -q, pot: x * x + y, singular: false };
+              }
+            },
+            {
+              id: "pendulum-potential",
+              name: "pendulum potential",
+              description: makeDescription(
+                "A periodic surface with alternating wells and ridges, like a two-dimensional pendulum lattice.",
+                [
+                  "The topology repeats across the domain.",
+                  "Equipotential contours reveal the saddle network between wells.",
+                  "Force mode can overshoot from one basin to the next."
+                ]
+              ),
+              eval(x, y) {
+                const q = 0.0006;
+                const xx = x * 3.1;
+                const yy = y * 3.1;
+                const cosx = Math.cos(xx);
+                const cosy = Math.cos(yy);
+                const sinx = Math.sin(xx);
+                const siny = Math.sin(yy);
+                return { fx: -q * sinx * cosy, fy: -q * cosx * siny, pot: -0.5 * cosx * cosy, singular: false };
+              }
+            },
+            {
+              id: "sin-r2-over-r2",
+              name: "sin(r2)/r2",
+              description: makeDescription(
+                "A radially oscillating potential with alternating rings of attraction and repulsion. It packs several basins and barriers into one compact preset.",
+                [
+                  "The ring structure is easiest to see in the surface view.",
+                  "Streamlines change direction as the radial derivative changes sign.",
+                  "This preset is useful for showing multiple equilibria."
+                ]
+              ),
+              eval(x, y) {
+                const r2 = 23 * (x * x + y * y) + 1e-8;
+                const sinr2 = Math.sin(r2);
+                const cosr2 = Math.cos(r2);
+                const vecR = (sinr2 / (r2 * r2) - cosr2 / r2) * 0.01;
+                return { fx: x * vecR, fy: y * vecR, pot: sinr2 / r2, singular: false };
+              }
+            },
+            {
+              id: "user-potential",
+              name: "user-defined potential",
+              customMode: "potential",
+              description: makeDescription(
+                "Enter a scalar potential V(x, y). The app differentiates it numerically to obtain the vector field.",
+                [
+                  "Try x*x + y*y for a bowl.",
+                  "Try sin(x) + cos(y) for a tiled landscape.",
+                  "Expressions use the same compact syntax as the original applet."
+                ]
+              ),
+              eval(x, y) {
+                const h = 1e-5;
+                const v0 = safeEval(compiledPotential, x, y);
+                const vx = v0 - safeEval(compiledPotential, x + h, y);
+                const vy = v0 - safeEval(compiledPotential, x, y + h);
+                return { fx: vx, fy: vy, pot: v0 * 0.01, singular: false };
+              }
+            },
+            {
+              id: "user-field",
+              name: "user-defined field",
+              customMode: "field",
+              nonGradient: true,
+              description: makeDescription(
+                "Enter Fx(x, y) and Fy(x, y) directly. This is the fastest way to prototype a custom planar vector field.",
+                [
+                  "Try x and y for an unstable source.",
+                  "Try -y and x for a linear vortex.",
+                  "You can still measure circulation and flux on your custom field."
+                ]
+              ),
+              eval(x, y) {
+                return {
+                  fx: 0.0002 * safeEval(compiledFieldX, x, y),
+                  fy: 0.0002 * safeEval(compiledFieldY, x, y),
+                  pot: 0,
+                  singular: false
+                };
+              }
+            }
+          ];
+          return presetsList;
+        }
+
+        function getFieldRaw(x, y) {
+          const preset = getActivePreset();
+          return preset.eval(x, y);
+        }
+
+        function getField(x, y) {
+          try {
+            state.parseError = "";
+            return getFieldRaw(x, y);
+          } catch (error) {
+            state.parseError = error?.message || "Parse error";
+            return { fx: 0, fy: 0, pot: 0, singular: false, invalid: true };
+          }
+        }
+
+        function getDisplayReverse() {
+          return state.reverse ? -1 : 1;
+        }
+
+        function projectPoint(x, y, z) {
+          if (getEffectiveFlat()) {
+            return {
+              x: ((x + 1) * state.dims.width) / 2,
+              y: ((1 - y) * state.dims.height) / 2,
+              depth: 0
+            };
+          }
+          const angle = state.viewAngle;
+          const realx = x * Math.cos(angle) + y * Math.sin(angle);
+          const realy = z - state.viewHeight;
+          const realz = y * Math.cos(angle) - x * Math.sin(angle) + state.viewDistance;
+          const scale = state.viewZoom * (state.dims.width / 4) * state.viewDistance;
+          const yoff = (scale * (state.viewHeight - 0)) / state.viewDistance;
+          return {
+            x: state.dims.width / 2 + (scale * realx) / realz,
+            y: state.dims.height / 2 - yoff - (scale * realy) / realz,
+            depth: realz
+          };
+        }
+
+        let grid = [];
+        let contours = [];
+
+        function rebuildField() {
+          grid = [];
+          const heightScale = getHeightScale();
+          for (let ix = 0; ix <= GRID_SIZE; ix += 1) {
+            const col = [];
+            const x = gridToDomain(ix);
+            for (let iy = 0; iy <= GRID_SIZE; iy += 1) {
+              const y = gridToDomain(iy);
+              const sample = getField(x, y);
+              const dxSample = getField(clamp(x + 1e-4, -1, 1), y);
+              const dySample = getField(x, clamp(y + 1e-4, -1, 1));
+              const div = ((dxSample.fx - sample.fx) + (dySample.fy - sample.fy)) / 1e-4;
+              const curl = ((dxSample.fy - sample.fy) - (dySample.fx - sample.fx)) / 1e-4;
+              col.push({
+                x,
+                y,
+                fx: sample.fx * getDisplayReverse(),
+                fy: sample.fy * getDisplayReverse(),
+                rawFx: sample.fx,
+                rawFy: sample.fy,
+                pot: sample.pot,
+                z: sample.pot * heightScale,
+                div: div * getDisplayReverse(),
+                curl: curl * getDisplayReverse(),
+                valid: !sample.invalid,
+                singular: !!sample.singular
+              });
+            }
+            grid.push(col);
+          }
+          computeNormals();
+          contours = buildContours();
+          state.functionDirty = false;
+          state.backgroundDirty = true;
+          state.streamlineCache = null;
+        }
+
+        function computeNormals() {
+          for (let ix = 0; ix < GRID_SIZE; ix += 1) {
+            for (let iy = 0; iy < GRID_SIZE; iy += 1) {
+              const ge = grid[ix][iy];
+              const dx = grid[ix + 1][iy].z - ge.z;
+              const dy = grid[ix][iy + 1].z - ge.z;
+              const zval = 2 / GRID_SIZE;
+              ge.norm = (dx + dy + zval) * (1 / 1.73) / Math.sqrt(dx * dx + dy * dy + zval * zval);
+            }
+          }
+        }
+
+        function computeColor(sample, brightness) {
+          const c = clamp(0.5 + 0.5 * brightness, 0, 1);
+          if (!sample.valid) return "rgba(22, 34, 76, 1)";
+          let value = 0;
+          let offset = 4;
+          let range = 10;
+          if (state.floorColor === "field") {
+            value = sample.fx * sample.fx + sample.fy * sample.fy;
+            offset = 10;
+            range = 16;
+          } else if (state.floorColor === "potential") {
+            value = sample.z;
+            offset = 1;
+            range = 2;
+          } else if (state.floorColor === "div") {
+            value = sample.div;
+            offset = 4;
+            range = 10;
+          } else if (state.floorColor === "curl") {
+            value = sample.curl;
+            offset = 4;
+            range = 10;
+          } else {
+            const gray = Math.round(255 * (0.28 + c * 0.24));
+            return `rgba(${gray}, ${gray}, ${gray}, 1)`;
+          }
+          value *= 2;
+          const red = value < 0 ? clamp((Math.log(-value + 1e-9) + offset) / range, 0, 1) : 0;
+          const green = value > 0 ? clamp((Math.log(value + 1e-9) + offset) / range, 0, 1) : 0;
+          const grayness = Math.max(0, 1 - (red + green)) * c;
+          const gray = 0.6;
+          const r = Math.round((c * red + gray * grayness) * 255);
+          const g = Math.round((c * green + gray * grayness) * 255);
+          const b = Math.round(gray * grayness * 255);
+          return `rgba(${r}, ${g}, ${b}, 1)`;
+        }
+
+        function drawBackground() {
+          const width = state.dims.width;
+          const height = state.dims.height;
+          backgroundCanvas.width = width;
+          backgroundCanvas.height = height;
+          bg.clearRect(0, 0, width, height);
+          bg.fillStyle = "#070d16";
+          bg.fillRect(0, 0, width, height);
+
+          if (getEffectiveFlat()) {
+            for (let ix = 0; ix < GRID_SIZE; ix += 1) {
+              for (let iy = 0; iy < GRID_SIZE; iy += 1) {
+                const sample = grid[ix][iy];
+                const p0 = projectPoint(sample.x, sample.y, sample.z);
+                const p1 = projectPoint(grid[ix + 1][iy].x, sample.y, grid[ix + 1][iy].z);
+                const p2 = projectPoint(grid[ix + 1][iy + 1].x, grid[ix][iy + 1].y, grid[ix + 1][iy + 1].z);
+                const p3 = projectPoint(sample.x, grid[ix][iy + 1].y, grid[ix][iy + 1].z);
+                bg.fillStyle = computeColor(sample, 0);
+                bg.beginPath();
+                bg.moveTo(p0.x, p0.y);
+                bg.lineTo(p1.x, p1.y);
+                bg.lineTo(p2.x, p2.y);
+                bg.lineTo(p3.x, p3.y);
+                bg.closePath();
+                bg.fill();
+              }
+            }
+          } else {
+            const cells = [];
+            for (let ix = 0; ix < GRID_SIZE; ix += 1) {
+              for (let iy = 0; iy < GRID_SIZE; iy += 1) {
+                const s00 = grid[ix][iy];
+                const s10 = grid[ix + 1][iy];
+                const s11 = grid[ix + 1][iy + 1];
+                const s01 = grid[ix][iy + 1];
+                const p0 = projectPoint(s00.x, s00.y, s00.z);
+                const p1 = projectPoint(s10.x, s10.y, s10.z);
+                const p2 = projectPoint(s11.x, s11.y, s11.z);
+                const p3 = projectPoint(s01.x, s01.y, s01.z);
+                const depth = (p0.depth + p1.depth + p2.depth + p3.depth) / 4;
+                cells.push({ sample: s00, depth, p0, p1, p2, p3 });
+              }
+            }
+            cells.sort((a, b) => b.depth - a.depth);
+            for (const cell of cells) {
+              bg.fillStyle = computeColor(cell.sample, cell.sample.norm ?? 0);
+              bg.beginPath();
+              bg.moveTo(cell.p0.x, cell.p0.y);
+              bg.lineTo(cell.p1.x, cell.p1.y);
+              bg.lineTo(cell.p2.x, cell.p2.y);
+              bg.lineTo(cell.p3.x, cell.p3.y);
+              bg.closePath();
+              bg.fill();
+            }
+          }
+
+          drawOverlays(bg);
+          state.backgroundDirty = false;
+        }
+
+        function drawOverlays(target) {
+          target.save();
+          target.lineWidth = 1;
+          target.strokeStyle = "rgba(224, 228, 234, 0.56)";
+
+          if (state.floorLines === "grid") {
+            for (let ix = 0; ix <= GRID_SIZE; ix += 5) {
+              target.beginPath();
+              for (let iy = 0; iy <= GRID_SIZE; iy += 1) {
+                const s = grid[ix][iy];
+                const p = projectPoint(s.x, s.y, s.z);
+                if (iy === 0) target.moveTo(p.x, p.y);
+                else target.lineTo(p.x, p.y);
+              }
+              target.stroke();
+            }
+            for (let iy = 0; iy <= GRID_SIZE; iy += 5) {
+              target.beginPath();
+              for (let ix = 0; ix <= GRID_SIZE; ix += 1) {
+                const s = grid[ix][iy];
+                const p = projectPoint(s.x, s.y, s.z);
+                if (ix === 0) target.moveTo(p.x, p.y);
+                else target.lineTo(p.x, p.y);
+              }
+              target.stroke();
+            }
+          } else if (state.floorLines === "equip" && !getActivePreset().nonGradient) {
+            target.strokeStyle = "rgba(228, 231, 238, 0.62)";
+            for (const segment of contours) {
+              target.beginPath();
+              target.moveTo(segment.a.x, segment.a.y);
+              target.lineTo(segment.b.x, segment.b.y);
+              target.stroke();
+            }
+          } else if (state.floorLines === "lines") {
+            target.strokeStyle = "rgba(255, 221, 178, 0.62)";
+            const streamlines = getStreamlines();
+            for (const path of streamlines) {
+              if (path.length < 2) continue;
+              target.beginPath();
+              target.moveTo(path[0].x, path[0].y);
+              for (let i = 1; i < path.length; i += 1) {
+                target.lineTo(path[i].x, path[i].y);
+              }
+              target.stroke();
+            }
+          }
+
+          target.restore();
+        }
+
+        function buildContours() {
+          const segments = [];
+          const levelStep = 0.125;
+          for (let ix = 0; ix < GRID_SIZE; ix += 1) {
+            for (let iy = 0; iy < GRID_SIZE; iy += 1) {
+              const corners = [
+                grid[ix][iy],
+                grid[ix + 1][iy],
+                grid[ix + 1][iy + 1],
+                grid[ix][iy + 1]
+              ];
+              const values = corners.map((corner) => corner.z);
+              const min = Math.max(-5, Math.min(...values));
+              const max = Math.min(5, Math.max(...values));
+              const start = Math.ceil(min / levelStep);
+              const end = Math.floor(max / levelStep);
+              for (let k = start; k <= end; k += 1) {
+                const level = k * levelStep;
+                const hits = [];
+                const edges = [
+                  [0, 1],
+                  [1, 2],
+                  [2, 3],
+                  [3, 0]
+                ];
+                for (const [a, b] of edges) {
+                  const va = values[a];
+                  const vb = values[b];
+                  if (va === vb) continue;
+                  if ((level < va && level < vb) || (level > va && level > vb)) continue;
+                  const t = (level - va) / (vb - va);
+                  const x = lerp(corners[a].x, corners[b].x, t);
+                  const y = lerp(corners[a].y, corners[b].y, t);
+                  const z = level;
+                  hits.push(projectPoint(x, y, z));
+                }
+                if (hits.length >= 2) {
+                  segments.push({ a: hits[0], b: hits[1] });
+                }
+              }
+            }
+          }
+          return segments;
+        }
+
+        function integrateVectorField(seedX, seedY, dir) {
+          const points = [];
+          let x = seedX;
+          let y = seedY;
+          for (let step = 0; step < 240; step += 1) {
+            if (x <= -1 || x >= 1 || y <= -1 || y >= 1) break;
+            const field = getField(x, y);
+            let fx = field.fx;
+            let fy = field.fy;
+            const mag = Math.hypot(fx, fy);
+            if (!Number.isFinite(mag) || mag < 1e-8) break;
+            fx /= mag;
+            fy /= mag;
+            x += fx * dir * 0.02;
+            y += fy * dir * 0.02;
+            points.push(projectPoint(x, y, getField(x, y).pot * getHeightScale()));
+          }
+          return points;
+        }
+
+        function getStreamlines() {
+          if (state.streamlineCache) return state.streamlineCache;
+          const paths = [];
+          for (let i = 0; i < STREAMLINE_SEEDS; i += 1) {
+            for (let j = 0; j < STREAMLINE_SEEDS; j += 1) {
+              const x = -0.96 + (i + 0.5) * (1.92 / STREAMLINE_SEEDS);
+              const y = -0.96 + (j + 0.5) * (1.92 / STREAMLINE_SEEDS);
+              const backward = integrateVectorField(x, y, -1).reverse();
+              const forward = integrateVectorField(x, y, 1);
+              const full = [...backward, projectPoint(x, y, getField(x, y).pot * getHeightScale()), ...forward];
+              if (full.length > 6) paths.push(full);
+            }
+          }
+          state.streamlineCache = paths;
+          return paths;
+        }
+
+        function getEffectiveFlat() {
+          const preset = getActivePreset();
+          return (
+            state.flatView ||
+            preset.nonGradient ||
+            state.display === "vectors" ||
+            state.display === "curlers" ||
+            state.mouseMode === "circulation" ||
+            state.mouseMode === "flux"
+          );
+        }
+
+        function resetParticles() {
+          clearDensity();
+          for (let i = 0; i < MAX_PARTICLES; i += 1) {
+            const p = particles[i];
+            if (i < state.particleCount) {
+              p.x = Math.random() * 2 - 1;
+              p.y = Math.random() * 2 - 1;
+              p.z = 0;
+              p.vx = 0;
+              p.vy = 0;
+              p.lifetime = i * 1.3;
+              p.theta = Math.random() * TAU;
+              addDensity(p);
+            } else {
+              p.lifetime = -100;
+            }
+          }
+        }
+
+        function clearDensity() {
+          for (let x = 0; x < DENSITY_GRID; x += 1) density[x].fill(0);
+        }
+
+        function addDensity(p) {
+          const ix = domainToDensityIndex(p.x);
+          const iy = domainToDensityIndex(p.y);
+          density[ix][iy] += 1;
+          return density[ix][iy];
+        }
+
+        function removeDensity(p) {
+          const ix = domainToDensityIndex(p.x);
+          const iy = domainToDensityIndex(p.y);
+          density[ix][iy] = Math.max(0, density[ix][iy] - 1);
+        }
+
+        function respawnParticle(p) {
+          let bestCount = Number.POSITIVE_INFINITY;
+          let bestX = 0;
+          let bestY = 0;
+          for (let ix = 0; ix < DENSITY_GRID; ix += 1) {
+            for (let iy = 0; iy < DENSITY_GRID; iy += 1) {
+              const count = density[ix][iy];
+              if (count <= bestCount) {
+                bestCount = count;
+                bestX = ix;
+                bestY = iy;
+              }
+            }
+          }
+          p.x = bestX * (2 / DENSITY_GRID) + Math.random() * (2 / DENSITY_GRID) - 1;
+          p.y = bestY * (2 / DENSITY_GRID) + Math.random() * (2 / DENSITY_GRID) - 1;
+          p.vx = 0;
+          p.vy = 0;
+          p.z = getField(p.x, p.y).pot * getHeightScale();
+          p.lifetime = 500;
+          p.theta = Math.random() * TAU;
+          addDensity(p);
+        }
+
+        function kickParticles() {
+          for (let i = 0; i < state.particleCount; i += 1) {
+            particles[i].vx += (Math.random() - 0.5) * 0.04;
+            particles[i].vy += (Math.random() - 0.5) * 0.04;
+          }
+        }
+
+        function advanceParticles(dt) {
+          const reverse = getDisplayReverse();
+          const mult = sliderExp(state.fieldStrengthSlider) * reverse;
+          let totalSpeed = 0;
+          let count = 0;
+          for (let i = 0; i < state.particleCount; i += 1) {
+            const p = particles[i];
+            removeDensity(p);
+            const sample = getField(p.x, p.y);
+            if (state.display === "force") {
+              p.vx += sample.fx * mult * dt * 0.12;
+              p.vy += sample.fy * mult * dt * 0.12;
+              p.x += p.vx * dt;
+              p.y += p.vy * dt;
+            } else {
+              p.x += sample.fx * mult * dt;
+              p.y += sample.fy * mult * dt;
+            }
+            p.z = sample.pot * getHeightScale();
+            p.lifetime -= dt * 40;
+            totalSpeed += Math.hypot(sample.fx * mult, sample.fy * mult);
+            count += 1;
+
+            const out = !Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x <= -1 || p.x >= 1 || p.y <= -1 || p.y >= 1;
+            if (out || p.lifetime <= 0 || sample.invalid) {
+              respawnParticle(p);
+            }
+            addDensity(p);
+          }
+          state.meanSpeed = count ? totalSpeed / count : 0;
+        }
+
+        function advanceCurlers(dt) {
+          const reverse = getDisplayReverse();
+          let totalSpeed = 0;
+          let count = 0;
+          for (let i = 0; i < state.particleCount; i += 5) {
+            const p = particles[i];
+            removeDensity(p);
+            const sample = getField(p.x, p.y);
+            p.x += sample.fx * sliderExp(state.fieldStrengthSlider) * reverse * dt;
+            p.y += sample.fy * sliderExp(state.fieldStrengthSlider) * reverse * dt;
+            p.z = sample.pot * getHeightScale();
+            p.theta += estimateCurl(p.x, p.y) * dt * 0.02;
+            p.lifetime -= dt * 30;
+            totalSpeed += Math.hypot(sample.fx, sample.fy);
+            count += 1;
+            const out = !Number.isFinite(p.x) || !Number.isFinite(p.y) || p.x <= -1 || p.x >= 1 || p.y <= -1 || p.y >= 1;
+            if (out || p.lifetime <= 0 || sample.invalid) {
+              respawnParticle(p);
+            }
+            addDensity(p);
+          }
+          state.meanSpeed = count ? totalSpeed / count : 0;
+        }
+
+        function estimateCurl(x, y) {
+          const dx = 1e-4;
+          const base = getField(x, y);
+          const sx = getField(clamp(x + dx, -1, 1), y);
+          const sy = getField(x, clamp(y + dx, -1, 1));
+          return ((sx.fy - base.fy) - (sy.fx - base.fx)) / dx;
+        }
+
+        function drawVectorArrow(target, x1, y1, x2, y2, size) {
+          target.beginPath();
+          target.moveTo(x1, y1);
+          target.lineTo(x2, y2);
+          target.stroke();
+          const dx = x2 - x1;
+          const dy = y2 - y1;
+          const len = Math.hypot(dx, dy);
+          if (len < size * 0.5) return;
+          const hx = dx / len;
+          const hy = dy / len;
+          target.beginPath();
+          target.moveTo(x2, y2);
+          target.lineTo(x2 - hx * size + hy * size * 0.65, y2 - hy * size - hx * size * 0.65);
+          target.lineTo(x2 - hx * size - hy * size * 0.65, y2 - hy * size + hx * size * 0.65);
+          target.closePath();
+          target.fill();
+        }
+
+        function drawVectors(target) {
+          const count = state.vectorDensity;
+          const mult = sliderExp(state.fieldStrengthSlider) * 60;
+          for (let ix = 0; ix < count; ix += 1) {
+            const x = ix * (2 / (count - 1)) - 1;
+            for (let iy = 0; iy < count; iy += 1) {
+              const y = iy * (2 / (count - 1)) - 1;
+              const sample = getField(x, y);
+              const mag = Math.hypot(sample.fx, sample.fy);
+              if (!Number.isFinite(mag) || mag < 1e-12) continue;
+              const dir = getDisplayReverse();
+              const nx = sample.fx / (mag * dir);
+              const ny = sample.fy / (mag * dir);
+              const span = 1 / (count - 1);
+              const p1 = projectPoint(x, y, sample.pot * getHeightScale());
+              const p2 = projectPoint(x + nx * span, y + ny * span, getField(x + nx * span, y + ny * span).pot * getHeightScale());
+              const c = clamp((mag * mult) / 2, 0, 1);
+              target.strokeStyle = `rgba(${Math.round(90 + c * 160)}, ${Math.round(160 + c * 70)}, ${Math.round(190 + c * 40)}, 0.94)`;
+              target.fillStyle = target.strokeStyle;
+              drawVectorArrow(target, p1.x, p1.y, p2.x, p2.y, 5);
+            }
+          }
+        }
+
+        function drawParticles(target) {
+          target.fillStyle = "rgba(255, 246, 233, 0.88)";
+          const step = state.display === "curlers" ? 5 : 1;
+          for (let i = 0; i < state.particleCount; i += step) {
+            const p = particles[i];
+            const point = projectPoint(p.x, p.y, p.z);
+            if (state.display === "curlers") {
+              const len = 8;
+              const ax = Math.cos(p.theta) * len;
+              const ay = Math.sin(p.theta) * len;
+              target.strokeStyle = "rgba(255, 180, 106, 0.9)";
+              target.beginPath();
+              target.moveTo(point.x - ax, point.y - ay);
+              target.lineTo(point.x + ax, point.y + ay);
+              target.moveTo(point.x - ay, point.y + ax);
+              target.lineTo(point.x + ay, point.y - ax);
+              target.stroke();
+            } else {
+              target.fillRect(point.x, point.y - 1, 2, 2);
+            }
+          }
+        }
+
+        function screenToDomain(px, py) {
+          return {
+            x: (px / state.dims.width) * 2 - 1,
+            y: 1 - (py / state.dims.height) * 2
+          };
+        }
+
+        function measureRectangle() {
+          if (!state.dragStart || !state.dragCurrent) return null;
+          const x1 = Math.min(state.dragStart.x, state.dragCurrent.x);
+          const y1 = Math.min(state.dragStart.y, state.dragCurrent.y);
+          const x2 = Math.max(state.dragStart.x, state.dragCurrent.x);
+          const y2 = Math.max(state.dragStart.y, state.dragCurrent.y);
+          if (Math.abs(x2 - x1) < 2 || Math.abs(y2 - y1) < 2) return null;
+          return { x1, y1, x2, y2 };
+        }
+
+        function drawMeasurement(target) {
+          const rect = measureRectangle();
+          if (!rect) return;
+          target.save();
+          target.strokeStyle = "rgba(255, 240, 197, 0.92)";
+          target.lineWidth = 1.5;
+          target.strokeRect(rect.x1, rect.y1, rect.x2 - rect.x1, rect.y2 - rect.y1);
+          target.restore();
+          const value = computeIntegral(rect, state.mouseMode === "circulation");
+          state.measurement = value;
+        }
+
+        function computeIntegral(rect, lineMode) {
+          const steps = 120;
+          const d0 = screenToDomain(rect.x1, rect.y1);
+          const d1 = screenToDomain(rect.x2, rect.y2);
+          const xMin = Math.min(d0.x, d1.x);
+          const xMax = Math.max(d0.x, d1.x);
+          const yMin = Math.min(d1.y, d0.y);
+          const yMax = Math.max(d0.y, d1.y);
+          let total = 0;
+
+          const integrateEdge = (xA, yA, xB, yB) => {
+            let sum = 0;
+            for (let i = 0; i <= steps; i += 1) {
+              const t = i / steps;
+              const x = lerp(xA, xB, t);
+              const y = lerp(yA, yB, t);
+              const field = getField(x, y);
+              const dx = (xB - xA) / steps;
+              const dy = (yB - yA) / steps;
+              const value = lineMode ? field.fx * dx + field.fy * dy : field.fx * dy - field.fy * dx;
+              const weight = i === 0 || i === steps ? 1 : i % 2 === 0 ? 2 : 4;
+              sum += value * weight;
+            }
+            return sum / 3;
+          };
+
+          total += integrateEdge(xMin, yMin, xMax, yMin);
+          total += integrateEdge(xMax, yMin, xMax, yMax);
+          total += integrateEdge(xMax, yMax, xMin, yMax);
+          total += integrateEdge(xMin, yMax, xMin, yMin);
+          return total * getDisplayReverse() * 1e5;
+        }
+
+        function render(now) {
+          requestAnimationFrame(render);
+          if (!state.lastFrame) state.lastFrame = now;
+          const dt = clamp((now - state.lastFrame) / 16.6667, 0.2, 2.2);
+          state.lastFrame = now;
+
+          resizeCanvasIfNeeded();
+          const needsFullRefresh = state.functionDirty || state.backgroundDirty;
+          if (state.functionDirty) rebuildField();
+          if (state.backgroundDirty) drawBackground();
+
+          const wantsTrails =
+            state.softTrails && (state.display === "velocity" || state.display === "force" || state.display === "curlers");
+          const redrawBackgroundOnly = state.display === "vectors" || state.display === "none" || needsFullRefresh;
+
+          ctx.globalAlpha = 1;
+          if (redrawBackgroundOnly || !wantsTrails) {
+            ctx.clearRect(0, 0, state.dims.width, state.dims.height);
+            ctx.drawImage(backgroundCanvas, 0, 0);
+          } else {
+            ctx.fillStyle = `rgba(7, 13, 22, ${SOFT_TRAIL_ALPHA})`;
+            ctx.fillRect(0, 0, state.dims.width, state.dims.height);
+            ctx.save();
+            ctx.globalCompositeOperation = "destination-over";
+            ctx.drawImage(backgroundCanvas, 0, 0);
+            ctx.restore();
+          }
+
+          if (!state.paused) {
+            if (state.display === "curlers") advanceCurlers(dt);
+            else if (state.display !== "vectors" && state.display !== "none") advanceParticles(dt);
+          }
+
+          if (state.display === "vectors") {
+            drawVectors(ctx);
+          } else if (state.display !== "none") {
+            drawParticles(ctx);
+          }
+
+          state.measurement = null;
+          if (state.mouseMode === "circulation" || state.mouseMode === "flux") {
+            drawMeasurement(ctx);
+          }
+
+          updateReadout();
+        }
+
+        function resizeCanvasIfNeeded() {
+          const rect = els.canvas.getBoundingClientRect();
+          const dpr = Math.max(1, window.devicePixelRatio || 1);
+          const width = Math.round(rect.width * dpr);
+          const height = Math.round(rect.height * dpr);
+          if (width === 0 || height === 0) return;
+          if (width !== els.canvas.width || height !== els.canvas.height) {
+            els.canvas.width = width;
+            els.canvas.height = height;
+            state.dims.width = width;
+            state.dims.height = height;
+            state.dims.dpr = dpr;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(1, 1);
+            state.backgroundDirty = true;
+          }
+        }
+
+        function updateRangeLabels() {
+          state.fieldStrengthSlider = Number(els.strengthRange.value);
+          state.particleCount = Number(els.particleRange.value);
+          state.vectorDensity = Number(els.vectorRange.value);
+          state.heightScaleSlider = Number(els.heightRange.value);
+          els.strengthValue.textContent = fmt(sliderExp(state.fieldStrengthSlider), 2);
+          els.particleValue.textContent = String(state.particleCount);
+          els.vectorValue.textContent = String(state.vectorDensity);
+          els.heightValue.textContent = fmt(getHeightScale(), 2);
+          els.kickButton.disabled = state.display !== "force";
+          els.kickButton.style.opacity = state.display === "force" ? "1" : "0.45";
+        }
+
+        function updatePresetUI() {
+          const preset = getActivePreset();
+          els.fieldDescription.textContent = preset.description.text;
+          els.hintA.textContent = preset.description.hints[0];
+          els.hintB.textContent = preset.description.hints[1];
+          els.hintC.textContent = preset.description.hints[2];
+          els.chipField.textContent = preset.name;
+          els.chipMode.textContent = `Display: ${els.displaySelect.options[els.displaySelect.selectedIndex].text}`;
+
+          els.auxFields.innerHTML = "";
+          if (preset.aux?.length) {
+            els.auxHelp.hidden = true;
+            for (let index = 0; index < preset.aux.length; index += 1) {
+              const aux = preset.aux[index];
+              if (typeof auxState[index] !== "number") auxState[index] = aux.value;
+              const wrapper = document.createElement("div");
+              wrapper.className = "field";
+              const row = document.createElement("div");
+              row.className = "range-row";
+              const label = document.createElement("label");
+              label.textContent = aux.label;
+              const value = document.createElement("span");
+              value.className = "range-value";
+              value.textContent = String(auxState[index]);
+              const slider = document.createElement("input");
+              slider.type = "range";
+              slider.min = String(aux.min);
+              slider.max = String(aux.max);
+              slider.value = String(auxState[index]);
+              slider.addEventListener("input", () => {
+                auxState[index] = Number(slider.value);
+                value.textContent = slider.value;
+                markFieldDirty();
+              });
+              row.append(label, value);
+              wrapper.append(row, slider);
+              els.auxFields.append(wrapper);
+            }
+          } else {
+            els.auxHelp.hidden = false;
+          }
+
+          const mode = currentExpressionMode();
+          els.expressionFields.hidden = !mode;
+          els.expressionHelp.hidden = !!mode;
+          els.potentialField.hidden = mode !== "potential";
+          els.fieldXWrap.hidden = mode !== "field";
+          els.fieldYWrap.hidden = mode !== "field";
+        }
+
+        function markFieldDirty(resetParticlesToo = false) {
+          state.functionDirty = true;
+          state.backgroundDirty = true;
+          if (resetParticlesToo) resetParticles();
+        }
+
+        function updateReadout() {
+          const center = getField(CENTER_SAMPLE.x, CENTER_SAMPLE.y);
+          const dx = 1e-4;
+          const sx = getField(dx, 0);
+          const sy = getField(0, dx);
+          const div = ((sx.fx - center.fx) + (sy.fy - center.fy)) / dx;
+          els.metricView.textContent = getEffectiveFlat() ? "flat" : "surface";
+          els.metricSpeed.textContent = fmt(state.meanSpeed, 4);
+          els.metricDiv.textContent = fmt(div, 3);
+
+          let message = "";
+          if (state.parseError) {
+            message = `<strong>Expression error:</strong> ${state.parseError}`;
+          } else if (state.measurement != null) {
+            message = `<strong>${state.mouseMode === "circulation" ? "Circulation" : "Flux"}:</strong> ${fmt(state.measurement, 3)} in applet-style scaled units.`;
+          } else if (state.mouseMode === "rotate") {
+            message = "<strong>Rotate mode:</strong> drag to change azimuth and camera height. Gradient fields reveal their potential as a surface.";
+          } else if (state.mouseMode === "zoom") {
+            message = "<strong>Zoom mode:</strong> drag horizontally to zoom. Wide views make field-line geometry easier to compare.";
+          } else {
+            message = `<strong>Measurement mode:</strong> drag a rectangle in flat view to compute ${state.mouseMode === "circulation" ? "circulation" : "flux"}.`;
+          }
+          els.statusBox.innerHTML = message;
+        }
+
+        function applyControlState() {
+          state.display = els.displaySelect.value;
+          state.floorColor = els.floorColorSelect.value;
+          state.floorLines = els.floorLineSelect.value;
+          state.mouseMode = els.mouseModeSelect.value;
+          state.flatView = els.flatToggle.checked;
+          state.paused = els.pausedToggle.checked;
+          state.reverse = els.reverseToggle.checked;
+          state.softTrails = els.trailToggle.checked;
+          state.selectedPresetId = els.functionSelect.value;
+          updateRangeLabels();
+          updatePresetUI();
+          state.backgroundDirty = true;
+        }
+
+        function syncCustomExpressions() {
+          try {
+            compiledPotential = compileExpression(els.potentialInput.value);
+            compiledFieldX = compileExpression(els.fieldXInput.value);
+            compiledFieldY = compileExpression(els.fieldYInput.value);
+            state.parseError = "";
+          } catch (error) {
+            state.parseError = error?.message || "Parse error";
+          }
+          markFieldDirty();
+        }
+
+        function attachEvents() {
+          [
+            els.functionSelect,
+            els.displaySelect,
+            els.floorColorSelect,
+            els.floorLineSelect,
+            els.mouseModeSelect,
+            els.flatToggle,
+            els.pausedToggle,
+            els.reverseToggle,
+            els.trailToggle,
+            els.strengthRange,
+            els.particleRange,
+            els.vectorRange,
+            els.heightRange
+          ].forEach((element) => {
+            element.addEventListener("input", () => {
+              const beforePreset = state.selectedPresetId;
+              applyControlState();
+              if (element === els.functionSelect || element === els.reverseToggle || element === els.heightRange) {
+                markFieldDirty(true);
+              } else if (element === els.displaySelect || element === els.particleRange) {
+                resetParticles();
+              } else if (
+                element === els.floorColorSelect ||
+                element === els.floorLineSelect ||
+                element === els.mouseModeSelect ||
+                element === els.flatToggle ||
+                element === els.vectorRange
+              ) {
+                state.backgroundDirty = true;
+              }
+              if (beforePreset !== state.selectedPresetId) {
+                const preset = getActivePreset();
+                if (preset.aux?.length) {
+                  preset.aux.forEach((aux, index) => {
+                    auxState[index] = aux.value;
+                  });
+                }
+              }
+            });
+          });
+
+          els.functionSelect.addEventListener("change", () => {
+            const preset = getActivePreset();
+            if (preset.aux?.length) {
+              preset.aux.forEach((aux, index) => {
+                auxState[index] = aux.value;
+              });
+            }
+            applyControlState();
+            markFieldDirty(true);
+          });
+
+          els.resetButton.addEventListener("click", () => resetParticles());
+          els.kickButton.addEventListener("click", () => kickParticles());
+          [els.potentialInput, els.fieldXInput, els.fieldYInput].forEach((input) => {
+            input.addEventListener("input", syncCustomExpressions);
+          });
+
+          els.canvas.addEventListener("pointerdown", (event) => {
+            const rect = els.canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) * state.dims.dpr;
+            const y = (event.clientY - rect.top) * state.dims.dpr;
+            state.isPointerDown = true;
+            state.dragStart = { x, y };
+            state.dragCurrent = { x, y };
+            state.dragViewAngleStart = state.viewAngle;
+            state.dragViewHeightStart = state.viewHeight;
+            state.dragViewZoomStart = state.viewZoom;
+            els.canvas.setPointerCapture(event.pointerId);
+          });
+
+          els.canvas.addEventListener("pointermove", (event) => {
+            if (!state.isPointerDown) return;
+            const rect = els.canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) * state.dims.dpr;
+            const y = (event.clientY - rect.top) * state.dims.dpr;
+            state.dragCurrent = { x, y };
+            if (state.mouseMode === "rotate" && !getEffectiveFlat()) {
+              state.viewAngle = state.dragViewAngleStart + (state.dragStart.x - x) / 180;
+              state.viewHeight = clamp(state.dragViewHeightStart + (y - state.dragStart.y) / 110, -7, 9);
+              state.backgroundDirty = true;
+            } else if (state.mouseMode === "zoom" && !getEffectiveFlat()) {
+              state.viewZoom = clamp(state.dragViewZoomStart + (x - state.dragStart.x) / 220, 0.25, 4.8);
+              state.backgroundDirty = true;
+            }
+          });
+
+          const clearPointer = () => {
+            state.isPointerDown = false;
+            state.dragStart = state.dragStart ? { ...state.dragStart } : null;
+          };
+          els.canvas.addEventListener("pointerup", clearPointer);
+          els.canvas.addEventListener("pointercancel", clearPointer);
+          window.addEventListener("resize", () => {
+            state.backgroundDirty = true;
+          });
+        }
+
+        applyControlState();
+        updateRangeLabels();
+        updatePresetUI();
+        resetParticles();
+        attachEvents();
+        requestAnimationFrame(render);
+      })();
+    </script>
+  </body>
+</html>

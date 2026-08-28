@@ -1,0 +1,504 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans, sans-serif); color: var(--color-text-primary); }
+h2.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+.explainer { max-width: 680px; }
+
+.section { margin: 0 0 2rem; }
+.section p { font-size: 14px; line-height: 1.7; color: var(--color-text-secondary); margin: 0 0 1rem; }
+.section p strong { color: var(--color-text-primary); font-weight: 500; }
+
+.scene-wrap { display: flex; gap: 24px; align-items: flex-start; }
+.canvas-col { flex: 0 0 auto; }
+.sidebar { flex: 1; display: flex; flex-direction: column; gap: 16px; }
+
+canvas { border-radius: 8px; display: block; background: #0d1117; }
+
+.ctrl-group { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 8px; padding: 12px 14px; }
+.ctrl-label { font-size: 12px; color: var(--color-text-secondary); margin-bottom: 8px; font-weight: 500; letter-spacing: 0.02em; }
+.ctrl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.ctrl-row:last-child { margin-bottom: 0; }
+.ctrl-name { font-size: 12px; color: var(--color-text-secondary); min-width: 100px; }
+.ctrl-val { font-size: 12px; font-weight: 500; min-width: 36px; text-align: right; color: var(--color-text-primary); }
+input[type=range] { flex: 1; }
+
+.mode-row { display: flex; gap: 8px; }
+.mode-btn {
+  flex: 1; padding: 7px 0; font-size: 12px; font-weight: 500;
+  border: 0.5px solid var(--color-border-secondary);
+  border-radius: 6px; cursor: pointer; background: transparent;
+  color: var(--color-text-secondary); transition: all .15s;
+}
+.mode-btn.active {
+  background: var(--color-background-primary);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-primary);
+}
+
+.readout { background: var(--color-background-secondary); border: 0.5px solid var(--color-border-tertiary); border-radius: 8px; padding: 12px 14px; }
+.readout-label { font-size: 11px; color: var(--color-text-tertiary); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+.readout-val { font-size: 22px; font-weight: 500; }
+.readout-val.excite { color: #4EB8FF; }
+.readout-val.inhibit { color: #FF7A5A; }
+.readout-val.firing { color: #7DEB7D; }
+.readout-val.suppress { color: #FF5A5A; }
+
+.bar-wrap { height: 6px; border-radius: 3px; background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); overflow: hidden; margin-top: 4px; }
+.bar-fill { height: 100%; border-radius: 3px; transition: width .2s; }
+
+.legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 4px; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--color-text-secondary); }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+.note { font-size: 12px; color: var(--color-text-tertiary); line-height: 1.5; border-left: 2px solid var(--color-border-secondary); padding-left: 10px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<h2 class="sr-only">Interactive explainer: On-center and off-center neurons in the lateral geniculate nucleus — explore how excitation and inhibition from cones, bipolar cells, and horizontal cells shape center-surround receptive fields.</h2>
+
+<div class="explainer">
+
+<div class="section">
+  <p>Your retina doesn't send raw pixel values to the brain. Before the signal ever leaves your eye, neurons perform a computation: they compare <strong>what's at a spot</strong> against <strong>what surrounds it</strong>. This is the center-surround receptive field.</p>
+</div>
+
+<div class="scene-wrap">
+  <div class="canvas-col">
+    <canvas id="c" width="360" height="420"></canvas>
+    <div class="legend" style="margin-top:8px">
+      <div class="legend-item"><div class="legend-dot" style="background:#4EB8FF"></div>Excitation</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#FF7A5A"></div>Inhibition</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#B8FF4E"></div>Center cone (stimulus)</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#FFD740"></div>Horizontal cell range</div>
+    </div>
+  </div>
+
+  <div class="sidebar">
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">Cell type</div>
+      <div class="mode-row">
+        <button class="mode-btn active" id="btn-on" onclick="setMode('on')">On-center</button>
+        <button class="mode-btn" id="btn-off" onclick="setMode('off')">Off-center</button>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">Stimulus</div>
+      <div class="ctrl-row">
+        <span class="ctrl-name">Spot diameter</span>
+        <input type="range" id="sl-stim" min="0" max="100" value="30" step="1" oninput="update()">
+        <span class="ctrl-val" id="v-stim">30%</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">Circuit weights</div>
+      <div class="ctrl-row">
+        <span class="ctrl-name">Cone → bipolar</span>
+        <input type="range" id="sl-cb" min="0" max="100" value="70" step="1" oninput="update()">
+        <span class="ctrl-val" id="v-cb">0.70</span>
+      </div>
+      <div class="ctrl-row">
+        <span class="ctrl-name">Horiz → bipolar</span>
+        <input type="range" id="sl-hb" min="0" max="100" value="55" step="1" oninput="update()">
+        <span class="ctrl-val" id="v-hb">0.55</span>
+      </div>
+    </div>
+
+    <div class="ctrl-group">
+      <div class="ctrl-label">Horizontal cell range</div>
+      <div class="ctrl-row">
+        <span class="ctrl-name">Radius (# cones)</span>
+        <input type="range" id="sl-hr" min="1" max="6" value="3" step="1" oninput="update()">
+        <span class="ctrl-val" id="v-hr">3</span>
+      </div>
+    </div>
+
+    <div class="readout">
+      <div style="display:flex;gap:10px">
+        <div style="flex:1">
+          <div class="readout-label">Center drive</div>
+          <div class="readout-val excite" id="ro-center">+0.70</div>
+        </div>
+        <div style="flex:1">
+          <div class="readout-label">Surround drive</div>
+          <div class="readout-val inhibit" id="ro-surround">−0.00</div>
+        </div>
+      </div>
+      <div style="margin-top:12px">
+        <div class="readout-label">LGN output</div>
+        <div class="readout-val firing" id="ro-lgn">Firing</div>
+        <div class="bar-wrap" style="margin-top:6px"><div class="bar-fill" id="bar-lgn" style="width:60%;background:#7DEB7D"></div></div>
+      </div>
+    </div>
+
+    <div class="note" id="note-text">
+      The center cone drives the bipolar cell directly. Adjust the spot to illuminate surround cones — horizontal cells will pull the response down.
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top:1.5rem">
+  <p>The key tension: the center cone sends a <strong style="color:#4EB8FF">direct excitatory</strong> signal to the bipolar cell. Surround cones activate the <strong style="color:#FFD740">horizontal cell</strong>, which feeds <strong style="color:#FF7A5A">laterally inhibitory</strong> input back onto the bipolar cell's dendrites — competing with the center signal. In an <strong>on-center</strong> cell, light in the center excites and light in the surround suppresses.</p>
+</div>
+
+</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+let mode = 'on';
+const W = 360, H = 420;
+
+const CONE_Y = 60;
+const HORIZ_Y = 155;
+const BIPOLAR_Y = 245;
+const LGN_Y = 365;
+
+const CONE_R = 13;
+const CONE_N = 7;
+const CONE_SPACING = 44;
+const CENTER_I = 3;
+
+function coneX(i) { return W/2 + (i - CENTER_I) * CONE_SPACING; }
+
+function getParams() {
+  const stimPct = +document.getElementById('sl-stim').value / 100;
+  const wCB = +document.getElementById('sl-cb').value / 100;
+  const wHB = +document.getElementById('sl-hb').value / 100;
+  const hRadius = +document.getElementById('sl-hr').value;
+  return { stimPct, wCB, wHB, hRadius };
+}
+
+function illuminated(i, stimPct, hRadius) {
+  const stimRadius = stimPct * (CONE_N / 2);
+  return Math.abs(i - CENTER_I) < stimRadius;
+}
+
+function draw() {
+  const { stimPct, wCB, wHB, hRadius } = getParams();
+  ctx.clearRect(0, 0, W, H);
+
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const bg = '#0d1117';
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  const stimRadius = stimPct * (CONE_N / 2);
+
+  // --- Horizontal cell range arc ---
+  const hcX = coneX(CENTER_I);
+  const hcRangeLeft = coneX(Math.max(0, CENTER_I - hRadius));
+  const hcRangeRight = coneX(Math.min(CONE_N - 1, CENTER_I + hRadius));
+  const hcWidth = hcRangeRight - hcRangeLeft + CONE_R * 2;
+
+  ctx.strokeStyle = 'rgba(255,215,64,0.25)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.rect(hcRangeLeft - CONE_R, CONE_Y - CONE_R - 4, hcWidth, HORIZ_Y - CONE_Y + CONE_R + 8);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = 'rgba(255,215,64,0.07)';
+  ctx.fillRect(hcRangeLeft - CONE_R, CONE_Y - CONE_R - 4, hcWidth, HORIZ_Y - CONE_Y + CONE_R + 8);
+
+  // Range label
+  ctx.fillStyle = 'rgba(255,215,64,0.55)';
+  ctx.font = '10px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
+  ctx.textAlign = 'center';
+  ctx.fillText('horizontal cell range', hcX, CONE_Y - CONE_R - 10);
+
+  // --- Stimulus spot ---
+  if (stimPct > 0) {
+    const sRad = stimRadius * CONE_SPACING;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(coneX(CENTER_I), CONE_Y - CONE_R - 30, Math.max(4, sRad), 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(180,255,100,0.12)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(180,255,100,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+    ctx.fillStyle = 'rgba(180,255,100,0.6)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('stimulus', coneX(CENTER_I), CONE_Y - CONE_R - 30 - Math.max(4,sRad) - 4);
+  }
+
+  // --- Cones ---
+  for (let i = 0; i < CONE_N; i++) {
+    const x = coneX(i);
+    const lit = illuminated(i, stimPct, hRadius);
+    const isCenter = i === CENTER_I;
+
+    // cone body (trapezoid-ish, simplified as rect)
+    ctx.beginPath();
+    ctx.moveTo(x - 8, CONE_Y - CONE_R);
+    ctx.lineTo(x + 8, CONE_Y - CONE_R);
+    ctx.lineTo(x + 5, CONE_Y + CONE_R);
+    ctx.lineTo(x - 5, CONE_Y + CONE_R);
+    ctx.closePath();
+
+    if (isCenter) {
+      ctx.fillStyle = lit ? '#B8FF4E' : 'rgba(184,255,78,0.25)';
+      ctx.strokeStyle = '#B8FF4E';
+    } else {
+      ctx.fillStyle = lit ? 'rgba(255,255,255,0.55)' : 'rgba(255,255,255,0.12)';
+      ctx.strokeStyle = lit ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.25)';
+    }
+    ctx.lineWidth = 1;
+    ctx.fill();
+    ctx.stroke();
+
+    // cone label
+    ctx.fillStyle = isCenter ? '#B8FF4E' : 'rgba(255,255,255,0.4)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(isCenter ? 'center' : 'C', x, CONE_Y + CONE_R + 11);
+
+    // center indicator arrow
+    if (isCenter) {
+      ctx.fillStyle = 'rgba(184,255,78,0.5)';
+      ctx.font = '9px sans-serif';
+      ctx.fillText('▼ receiving from', x, CONE_Y - CONE_R - 36 - (stimPct > 0 ? Math.max(4, stimRadius * CONE_SPACING) + 14 : 0));
+    }
+  }
+
+  // --- Row labels ---
+  const labelX = 18;
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.fillText('Cones', labelX, CONE_Y + 4);
+  ctx.fillText('Horiz.', labelX, HORIZ_Y + 4);
+  ctx.fillText('Bipolar', labelX, BIPOLAR_Y + 4);
+  ctx.fillText('LGN', labelX, LGN_Y + 4);
+
+  // --- Connections: cones → horizontal cell ---
+  const hcCx = coneX(CENTER_I);
+  for (let i = Math.max(0, CENTER_I - hRadius); i <= Math.min(CONE_N-1, CENTER_I + hRadius); i++) {
+    const x = coneX(i);
+    const lit = illuminated(i, stimPct, hRadius) && i !== CENTER_I;
+    const alpha = lit ? 0.55 : 0.12;
+    ctx.strokeStyle = `rgba(255,215,64,${alpha})`;
+    ctx.lineWidth = lit ? 1.5 : 0.8;
+    ctx.setLineDash([3,3]);
+    ctx.beginPath();
+    ctx.moveTo(x, CONE_Y + CONE_R);
+    ctx.lineTo(hcCx, HORIZ_Y - 12);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // --- Horizontal cell body ---
+  const hcLit = Array.from({length:CONE_N}).some((_, i) =>
+    i !== CENTER_I && illuminated(i, stimPct, hRadius) && Math.abs(i - CENTER_I) <= hRadius
+  );
+  ctx.beginPath();
+  ctx.ellipse(hcCx, HORIZ_Y, 38, 12, 0, 0, Math.PI*2);
+  ctx.fillStyle = hcLit ? 'rgba(255,215,64,0.3)' : 'rgba(255,215,64,0.1)';
+  ctx.strokeStyle = hcLit ? 'rgba(255,215,64,0.85)' : 'rgba(255,215,64,0.35)';
+  ctx.lineWidth = 1;
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = hcLit ? '#FFD740' : 'rgba(255,215,64,0.5)';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('HC', hcCx, HORIZ_Y + 3.5);
+
+  // --- Center cone → bipolar (direct excitatory) ---
+  const centerLit = illuminated(CENTER_I, stimPct, hRadius);
+  const excAlpha = centerLit ? 0.9 : 0.2;
+  ctx.strokeStyle = `rgba(78,184,255,${excAlpha})`;
+  ctx.lineWidth = centerLit ? 2 : 1;
+  ctx.beginPath();
+  ctx.moveTo(coneX(CENTER_I), CONE_Y + CONE_R);
+  ctx.lineTo(coneX(CENTER_I), BIPOLAR_Y - 14);
+  ctx.stroke();
+
+  // --- Horizontal cell → bipolar (lateral inhibition) ---
+  const inhAlpha = hcLit ? 0.9 : 0.15;
+  ctx.strokeStyle = `rgba(255,122,90,${inhAlpha})`;
+  ctx.lineWidth = hcLit ? 1.5 : 0.8;
+  ctx.setLineDash([5,3]);
+  ctx.beginPath();
+  ctx.moveTo(hcCx + 24, HORIZ_Y);
+  ctx.bezierCurveTo(hcCx + 60, HORIZ_Y + 30, hcCx + 50, BIPOLAR_Y - 40, hcCx + 14, BIPOLAR_Y - 14);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // inhibition symbol at bipolar
+  ctx.fillStyle = hcLit ? 'rgba(255,122,90,0.85)' : 'rgba(255,122,90,0.2)';
+  ctx.beginPath();
+  ctx.arc(hcCx + 14, BIPOLAR_Y - 14, 4, 0, Math.PI*2);
+  ctx.fill();
+
+  // --- Bipolar cell ---
+  const { netCenter, netSurround, net } = computeNet();
+  const bpFired = mode === 'on' ? net > 0.05 : net < -0.05;
+  ctx.beginPath();
+  ctx.ellipse(hcCx, BIPOLAR_Y, 16, 12, 0, 0, Math.PI*2);
+  ctx.fillStyle = bpFired ? (mode==='on' ? 'rgba(78,184,255,0.35)' : 'rgba(255,122,90,0.35)') : 'rgba(120,120,120,0.15)';
+  ctx.strokeStyle = bpFired ? (mode==='on' ? 'rgba(78,184,255,0.9)' : 'rgba(255,122,90,0.9)') : 'rgba(120,120,120,0.35)';
+  ctx.lineWidth = 1;
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = bpFired ? '#fff' : 'rgba(255,255,255,0.35)';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('BP', hcCx, BIPOLAR_Y + 3.5);
+
+  // --- Bipolar → LGN ---
+  const lgn_alpha = bpFired ? 0.85 : 0.15;
+  ctx.strokeStyle = `rgba(125,235,125,${lgn_alpha})`;
+  ctx.lineWidth = bpFired ? 2 : 0.8;
+  ctx.beginPath();
+  ctx.moveTo(hcCx, BIPOLAR_Y + 12);
+  ctx.lineTo(hcCx, LGN_Y - 20);
+  ctx.stroke();
+
+  // --- LGN cell ---
+  const lgn_net = computeLGN();
+  ctx.beginPath();
+  ctx.ellipse(hcCx, LGN_Y, 22, 16, 0, 0, Math.PI*2);
+  ctx.fillStyle = lgn_net > 0.05 ? 'rgba(125,235,125,0.3)' : lgn_net < -0.05 ? 'rgba(255,90,90,0.3)' : 'rgba(120,120,120,0.1)';
+  ctx.strokeStyle = lgn_net > 0.05 ? 'rgba(125,235,125,0.9)' : lgn_net < -0.05 ? 'rgba(255,90,90,0.9)' : 'rgba(120,120,120,0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = lgn_net > 0.05 ? '#7DEB7D' : lgn_net < -0.05 ? '#FF5A5A' : 'rgba(255,255,255,0.35)';
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('LGN', hcCx, LGN_Y + 3.5);
+
+  // LGN spike readout dots
+  if (lgn_net > 0.05) {
+    for (let d = 0; d < 3; d++) {
+      ctx.beginPath();
+      ctx.arc(hcCx - 18 + d*18, LGN_Y + 26, 2.5, 0, Math.PI*2);
+      ctx.fillStyle = 'rgba(125,235,125,0.7)';
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(125,235,125,0.55)';
+    ctx.font = '9px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('firing', hcCx, LGN_Y + 38);
+  }
+
+  // Excitation arrow label
+  ctx.save();
+  ctx.fillStyle = `rgba(78,184,255,${centerLit?0.7:0.2})`;
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('+exc', coneX(CENTER_I) + 5, (CONE_Y + CONE_R + BIPOLAR_Y - 14)/2);
+  ctx.restore();
+
+  // Inhibition label
+  ctx.save();
+  ctx.fillStyle = `rgba(255,122,90,${hcLit?0.7:0.15})`;
+  ctx.font = '9px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('−inh', hcCx + 55, HORIZ_Y + 45);
+  ctx.restore();
+}
+
+function computeNet() {
+  const { stimPct, wCB, wHB, hRadius } = getParams();
+  const centerLit = illuminated(CENTER_I, stimPct, hRadius);
+  const surroundLit = Array.from({length:CONE_N}).filter((_, i) =>
+    i !== CENTER_I && illuminated(i, stimPct, hRadius) && Math.abs(i - CENTER_I) <= hRadius
+  ).length;
+  const maxSurround = Math.min(CONE_N - 1, 2 * hRadius);
+  const surroundFrac = maxSurround > 0 ? surroundLit / maxSurround : 0;
+
+  let netCenter = centerLit ? wCB : 0;
+  let netSurround = surroundFrac * wHB;
+  let net = netCenter - netSurround;
+  if (mode === 'off') net = -netCenter + netSurround * 0.7;
+  return { netCenter, netSurround, net };
+}
+
+function computeLGN() {
+  const { net } = computeNet();
+  return net;
+}
+
+function update() {
+  const { stimPct, wCB, wHB, hRadius } = getParams();
+  document.getElementById('v-stim').textContent = Math.round(stimPct*100) + '%';
+  document.getElementById('v-cb').textContent = wCB.toFixed(2);
+  document.getElementById('v-hb').textContent = wHB.toFixed(2);
+  document.getElementById('v-hr').textContent = hRadius;
+
+  const { netCenter, netSurround, net } = computeNet();
+  const lgn = computeLGN();
+
+  document.getElementById('ro-center').textContent = '+' + netCenter.toFixed(2);
+  document.getElementById('ro-surround').textContent = '−' + netSurround.toFixed(2);
+
+  const el = document.getElementById('ro-lgn');
+  const bar = document.getElementById('bar-lgn');
+  const barPct = Math.max(0, Math.min(100, Math.round((lgn + 1) / 2 * 100)));
+
+  if (lgn > 0.05) {
+    el.textContent = 'Firing ↑';
+    el.className = 'readout-val firing';
+    bar.style.width = barPct + '%';
+    bar.style.background = '#7DEB7D';
+  } else if (lgn < -0.05) {
+    el.textContent = 'Suppressed ↓';
+    el.className = 'readout-val suppress';
+    bar.style.width = (100 - barPct) + '%';
+    bar.style.background = '#FF5A5A';
+  } else {
+    el.textContent = 'Silent';
+    el.className = 'readout-val';
+    el.style.color = 'var(--color-text-tertiary)';
+    bar.style.width = '0%';
+  }
+
+  // note
+  const noteEl = document.getElementById('note-text');
+  const centerLit = illuminated(CENTER_I, stimPct, hRadius);
+  const stimPctVal = +document.getElementById('sl-stim').value / 100;
+  if (stimPctVal < 0.05) {
+    noteEl.textContent = 'No stimulus. The cell sits near baseline.';
+  } else if (centerLit && netSurround < 0.08) {
+    noteEl.textContent = mode==='on'
+      ? 'Small spot — only center excited. Bipolar cell receives pure excitation → strong LGN response.'
+      : 'Small spot hits center only. Off-center cell is inhibited — light suppresses it.';
+  } else if (centerLit && netSurround >= 0.08) {
+    noteEl.textContent = mode==='on'
+      ? 'Surround engaged. Horizontal cells pull back on the bipolar cell — response weakens. This is center-surround antagonism.'
+      : 'Center + surround illuminated. The surround excitation partially overcomes center suppression in the off-center cell.';
+  } else if (!centerLit && netSurround >= 0.08) {
+    noteEl.textContent = mode==='on'
+      ? 'Annular stimulus — surround only. Horizontal cells dominate; bipolar is inhibited. LGN silent or suppressed.'
+      : 'Annular stimulus only. Off-center cell is strongly driven — surround stimulation is its preferred input.';
+  }
+
+  draw();
+}
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-on').classList.toggle('active', m==='on');
+  document.getElementById('btn-off').classList.toggle('active', m==='off');
+  update();
+}
+
+update();
+</script>
+</body>
+</html>

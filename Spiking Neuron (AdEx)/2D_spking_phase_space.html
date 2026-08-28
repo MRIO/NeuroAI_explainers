@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AdEx Phase Space Explorer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,sans-serif;background:#111118;color:#ddd;padding:12px}
+#wrap{display:flex;gap:12px;padding:10px 0;align-items:flex-start;flex-wrap:wrap}
+#left{flex:1;min-width:300px;display:flex;flex-direction:column;gap:8px}
+#right{width:270px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+canvas{display:block;width:100%;border:0.5px solid rgba(150,150,200,0.25);border-radius:6px}
+.card{background:#1e1e2a;border:0.5px solid rgba(150,150,200,0.18);border-radius:8px;padding:10px 12px}
+.clabel{font-size:11px;color:#888;margin-bottom:5px}
+.prow{display:flex;align-items:center;gap:6px;margin:3px 0}
+.plabel{font-size:12px;font-weight:500;min-width:26px}
+.prow input[type=range]{flex:1;accent-color:#8888cc}
+.pval{font-size:11px;min-width:36px;text-align:right;color:#888;font-variant-numeric:tabular-nums}
+.brow{display:flex;gap:6px;margin-top:6px}
+button{flex:1;font-size:12px;padding:5px 0;border:0.5px solid #555;border-radius:5px;background:transparent;color:#ccc;cursor:pointer}
+button:hover{background:#2a2a3a}
+#info{font-size:10px;color:#777;margin-top:6px;min-height:28px;line-height:1.5}
+.legtitle{font-size:11px;color:#888;margin-bottom:4px}
+.legrow{display:flex;align-items:center;gap:6px;font-size:11px;color:#888;margin:2px 0}
+.legdot{width:10px;height:3px;border-radius:2px;flex-shrink:0}
+.sep{font-size:10px;color:#666;margin:5px 0 2px;letter-spacing:0.04em}
+.knob-wrap{display:flex;align-items:center;gap:14px;margin:6px 0 2px}
+.knob-area{display:flex;flex-direction:column;align-items:center;gap:4px;flex-shrink:0}
+.knob-label{font-size:10px;color:#888;text-align:center}
+.knob-val{font-size:11px;font-weight:500;color:#ccc;text-align:center;font-variant-numeric:tabular-nums;min-width:44px}
+#knob-canvas{cursor:grab;border-radius:50%}
+#knob-canvas:active{cursor:grabbing}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div id="left">
+    <div class="clabel">Phase space — click to set initial condition, hover fixed points for eigenvectors</div>
+    <canvas id="pc" width="580" height="420"></canvas>
+    <div class="clabel">Time series</div>
+    <canvas id="tc" width="580" height="140"></canvas>
+  </div>
+  <div id="right">
+    <div class="card">
+      <div class="clabel">Model equations</div>
+      <div style="font-size:11px;line-height:1.9;color:#ccc">
+        <div>C·<b>V̇</b> = <span style="color:#88ddff">g<sub>L</sub></span>(<span style="color:#ffaa44">E<sub>L</sub></span>−V) + <span style="color:#88ddff">g<sub>L</sub></span><span style="color:#ffe066">ΔT</span>·e<sup>(V−<span style="color:#cc88ff">V<sub>T</sub></span>)/<span style="color:#ffe066">ΔT</span></sup> − W + <span style="color:#ff8844">I</span></div>
+        <div style="margin-top:2px"><span style="color:#4488ff">τ<sub>w</sub></span>·<b>Ẇ</b> = <span style="color:#00ffcc">a</span>(V−<span style="color:#ffaa44">E<sub>L</sub></span>) − W</div>
+        <div style="margin-top:2px;color:#666">reset: V→V<sub>r</sub>, W→W+<span style="color:#44aaff">d</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="clabel">Parameters</div>
+      <div class="sep">— membrane</div>
+      <div class="prow"><span class="plabel" style="color:#88ddff">g<sub>L</sub></span><input type="range" id="sl_gL" min="2" max="30" step="0.5" value="10"><span class="pval" id="vl_gL">10</span></div>
+      <div class="prow"><span class="plabel" style="color:#ffaa44">E<sub>L</sub></span><input type="range" id="sl_EL" min="-80" max="-50" step="1" value="-60"><span class="pval" id="vl_EL">-60</span></div>
+      <div class="prow"><span class="plabel" style="color:#ffe066">ΔT</span><input type="range" id="sl_dT" min="0.5" max="6" step="0.1" value="2"><span class="pval" id="vl_dT">2</span></div>
+      <div class="prow"><span class="plabel" style="color:#cc88ff">VT</span><input type="range" id="sl_VT" min="-65" max="-40" step="1" value="-50"><span class="pval" id="vl_VT">-50</span></div>
+      <div class="prow"><span class="plabel" style="color:#ff8844">I</span><input type="range" id="sl_I" min="-50" max="500" step="5" value="200"><span class="pval" id="vl_I">200</span></div>
+      <div class="sep">— adaptation</div>
+      <div class="prow"><span class="plabel" style="color:#00ffcc">a</span><input type="range" id="sl_a" min="0" max="4" step="0.05" value="0.5"><span class="pval" id="vl_a">0.5</span></div>
+      <div class="prow"><span class="plabel" style="color:#00ff88">b</span><input type="range" id="sl_b" min="0" max="300" step="5" value="50"><span class="pval" id="vl_b">50</span></div>
+      <div class="prow"><span class="plabel" style="color:#4488ff">τw</span><input type="range" id="sl_tw" min="10" max="300" step="5" value="100"><span class="pval" id="vl_tw">100</span></div>
+      <div class="sep">— reset</div>
+      <div class="prow"><span class="plabel" style="color:#ff5555">Vr</span><input type="range" id="sl_Vr" min="-85" max="-50" step="1" value="-65"><span class="pval" id="vl_Vr">-65</span></div>
+      <div class="prow"><span class="plabel" style="color:#44aaff">d</span><input type="range" id="sl_d" min="0" max="400" step="10" value="100"><span class="pval" id="vl_d">100</span></div>
+      <div class="sep">— trajectory</div>
+      <div class="knob-wrap">
+        <div class="knob-area">
+          <canvas id="knob-canvas" width="54" height="54"></canvas>
+          <div class="knob-label">tail length</div>
+          <div class="knob-val" id="knob-val">600</div>
+        </div>
+        <div style="font-size:11px;color:#777;line-height:1.6">Controls comet tail length in phase space and time window in the time series. Drag up/down to adjust.</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="legtitle">Legend</div>
+      <div class="legrow"><div class="legdot" style="background:#ff6644"></div>V-nullcline (dV/dt=0)</div>
+      <div class="legrow"><div class="legdot" style="background:#44bbff"></div>W-nullcline (dW/dt=0)</div>
+      <div class="legrow"><div class="legdot" style="background:#44ff88;height:10px;width:10px;border-radius:50%"></div>Stable fixed point</div>
+      <div class="legrow"><div class="legdot" style="background:#ff4444;height:10px;width:10px;border-radius:50%"></div>Unstable / saddle</div>
+      <div class="legrow"><div class="legdot" style="background:linear-gradient(90deg,#333,#fff)"></div>Trajectory (past→present)</div>
+      <div class="legrow">
+        <div style="width:12px;height:12px;flex-shrink:0;position:relative">
+          <div style="position:absolute;top:5px;left:0;width:12px;height:2px;background:#ffe033"></div>
+          <div style="position:absolute;top:0;left:5px;width:2px;height:12px;background:#ffe033"></div>
+        </div>
+        Last spike reset (V<sub>r</sub>, W+d)
+      </div>
+    </div>
+    <div class="card">
+      <div class="brow">
+        <button id="btn_run">⏸ Pause</button>
+        <button id="btn_rst">↺ Reset</button>
+      </div>
+      <div id="info">Hover a fixed point to inspect eigenvalues &amp; eigenvectors</div>
+    </div>
+  </div>
+</div>
+<script>
+const pc=document.getElementById('pc'),tc=document.getElementById('tc');
+const cx=pc.getContext('2d'),tx=tc.getContext('2d');
+const W=pc.width,H=pc.height,TW=tc.width,TH=tc.height;
+const C=200,Vspk=20,Vth_det=20;
+let p={gL:10,EL:-60,a:0.5,b:50,dT:2,tw:100,I:200,VT:-50,Vr:-65,d:100};
+const Vlo=-100,Vhi=20,Wlo=-100,Whi=300;
+let maxTail=600;
+let lastReset=null;
+
+function sx(v){return(v-Vlo)/(Vhi-Vlo)*W}
+function sy(w){return(1-(w-Wlo)/(Whi-Wlo))*H}
+function iv(x,y){return[x/W*(Vhi-Vlo)+Vlo,(1-y/H)*(Whi-Wlo)+Wlo]}
+function dVdt(v,w){return(p.gL*(p.EL-v)+p.gL*p.dT*Math.exp((v-p.VT)/p.dT)-w+p.I)/C}
+function dWdt(v,w){return(p.a*(v-p.EL)-w)/p.tw}
+
+function drawHeatmap(){
+  const img=cx.createImageData(W,H);const d=img.data;
+  for(let py=0;py<H;py++)for(let px=0;px<W;px++){
+    const [v,w]=iv(px,py);
+    const mag=Math.sqrt(dVdt(v,w)**2+dWdt(v,w)**2);
+    const t=Math.min(Math.log1p(mag)/Math.log1p(2500),1);
+    const i=(py*W+px)*4;
+    d[i]=Math.round(15+200*t*t);d[i+1]=Math.round(10+60*t*(1-t*0.5));
+    d[i+2]=Math.round(40+80*(1-t)*(1-t));d[i+3]=255;
+  }
+  cx.putImageData(img,0,0);
+}
+
+function drawVF(){
+  const nx=22,ny=16;cx.save();
+  for(let i=0;i<=nx;i++)for(let j=0;j<=ny;j++){
+    const v=Vlo+i/nx*(Vhi-Vlo),w=Wlo+j/ny*(Whi-Wlo);
+    const dv=dVdt(v,w),dw=dWdt(v,w),mag=Math.sqrt(dv*dv+dw*dw);
+    if(mag<0.01)continue;
+    const ox=sx(v),oy=sy(w),sc=22/Math.log1p(mag*0.3+1);
+    const dx=dv/mag*sc,dy=-dw/mag*sc;
+    cx.globalAlpha=0.75;cx.strokeStyle='#d0d0f0';cx.lineWidth=1.4;
+    cx.beginPath();cx.moveTo(ox-dx*0.35,oy-dy*0.35);cx.lineTo(ox+dx*0.65,oy+dy*0.65);cx.stroke();
+    const ang=Math.atan2(dy,dx);cx.fillStyle='#d0d0f0';
+    cx.save();cx.translate(ox+dx*0.65,oy+dy*0.65);cx.rotate(ang);
+    cx.beginPath();cx.moveTo(0,0);cx.lineTo(-7,3.5);cx.lineTo(-7,-3.5);cx.closePath();cx.fill();cx.restore();
+  }
+  cx.globalAlpha=1;cx.restore();
+}
+
+function drawNullclines(){
+  cx.save();cx.lineWidth=2.2;
+  cx.strokeStyle='#ff6644';cx.beginPath();let first=true;
+  for(let px=0;px<W;px++){
+    const v=Vlo+px/W*(Vhi-Vlo);
+    const w=p.gL*(p.EL-v)+p.gL*p.dT*Math.exp((v-p.VT)/p.dT)+p.I;
+    const y=sy(w);
+    if(y<-400||y>H+400){first=true;continue}
+    first?cx.moveTo(px,y):cx.lineTo(px,y);first=false;
+  }
+  cx.stroke();
+  cx.strokeStyle='#44bbff';cx.beginPath();
+  cx.moveTo(0,sy(p.a*(Vlo-p.EL)));cx.lineTo(W,sy(p.a*(Vhi-p.EL)));cx.stroke();
+  cx.font='11px sans-serif';
+  cx.fillStyle='#ff9977cc';cx.fillText('V-nullcline',6,16);
+  cx.fillStyle='#66ccffcc';cx.fillText('W-nullcline',6,30);
+  cx.restore();
+}
+
+function findFPs(){
+  const fps=[];
+  for(let i=0;i<W-1;i++){
+    const v1=Vlo+i/W*(Vhi-Vlo),v2=Vlo+(i+1)/W*(Vhi-Vlo);
+    const f1=p.gL*(p.EL-v1)+p.gL*p.dT*Math.exp((v1-p.VT)/p.dT)+p.I-p.a*(v1-p.EL);
+    const f2=p.gL*(p.EL-v2)+p.gL*p.dT*Math.exp((v2-p.VT)/p.dT)+p.I-p.a*(v2-p.EL);
+    if(f1*f2<0){
+      let v=(v1+v2)/2;
+      for(let k=0;k<50;k++){
+        const fv=p.gL*(p.EL-v)+p.gL*p.dT*Math.exp((v-p.VT)/p.dT)+p.I-p.a*(v-p.EL);
+        const dfv=-p.gL+p.gL*Math.exp((v-p.VT)/p.dT)-p.a;
+        if(Math.abs(dfv)<1e-12)break;const dv2=fv/dfv;v-=dv2;if(Math.abs(dv2)<1e-6)break;
+      }
+      if(v>=Vlo&&v<=Vhi){const w=p.a*(v-p.EL);if(!fps.some(f=>Math.abs(f.v-v)<1.5))fps.push({v,w});}
+    }
+  }
+  return fps;
+}
+
+function jacEig(v){
+  const J11=(-p.gL+p.gL*Math.exp((v-p.VT)/p.dT))/C;
+  const J12=-1/C,J21=p.a/p.tw,J22=-1/p.tw;
+  const tr=J11+J22,det=J11*J22-J12*J21,disc=tr*tr-4*det;
+  if(disc>=0){
+    const l1=(tr+Math.sqrt(disc))/2,l2=(tr-Math.sqrt(disc))/2;
+    function evec(l){const ex=J12,ey=l-J11;const n=Math.sqrt(ex*ex+ey*ey)||1;return[ex/n,ey/n];}
+    return{type:'real',l1,l2,e1:evec(l1),e2:evec(l2),stable:l1<0&&l2<0,saddle:l1*l2<0};
+  }
+  const re=tr/2,im=Math.sqrt(-disc)/2;return{type:'complex',re,im,stable:re<0};
+}
+
+let fps=[];
+function drawFPs(){
+  fps=findFPs();cx.save();
+  for(const fp of fps){
+    const eg=jacEig(fp.v);const ox=sx(fp.v),oy=sy(fp.w);
+    cx.beginPath();cx.arc(ox,oy,8,0,Math.PI*2);
+    cx.strokeStyle=eg.stable?'#44ff88':(eg.saddle?'#ffcc44':'#ff4444');
+    cx.lineWidth=2.2;cx.stroke();
+    cx.fillStyle=eg.stable?'rgba(68,255,136,0.18)':(eg.saddle?'rgba(255,204,68,0.18)':'rgba(255,68,68,0.18)');
+    cx.fill();fp._eg=eg;fp._sx=ox;fp._sy=oy;
+  }
+  cx.restore();
+}
+
+function drawResetMarker(){
+  if(!lastReset)return;
+  const ox=sx(lastReset[0]),oy=sy(lastReset[1]);
+  const s=8;
+  cx.save();
+  cx.strokeStyle='#ffe033';cx.lineWidth=2.2;cx.lineCap='round';
+  cx.beginPath();cx.moveTo(ox-s,oy);cx.lineTo(ox+s,oy);cx.stroke();
+  cx.beginPath();cx.moveTo(ox,oy-s);cx.lineTo(ox,oy+s);cx.stroke();
+  cx.restore();
+}
+
+let mouseX=null,mouseY=null;
+function drawHovered(){
+  if(mouseX===null)return;
+  let nearest=null,nearDist=35;
+  for(const fp of fps){const d=Math.hypot(mouseX-fp._sx,mouseY-fp._sy);if(d<nearDist){nearDist=d;nearest=fp;}}
+  if(!nearest)return;
+  const eg=nearest._eg,ox=nearest._sx,oy=nearest._sy;cx.save();
+  if(eg.type==='real'){
+    const scale=90;
+    [[eg.e1,'#ffe066'],[eg.e2,'#44ffdd']].forEach(([ev,col])=>{
+      const dvS=ev[0]*(W/(Vhi-Vlo)),dwS=-ev[1]*(H/(Whi-Wlo));
+      const m=Math.sqrt(dvS*dvS+dwS*dwS)||1;const dx=dvS/m*scale,dy=dwS/m*scale;
+      cx.strokeStyle=col;cx.lineWidth=2;cx.setLineDash([6,4]);
+      cx.beginPath();cx.moveTo(ox-dx,oy-dy);cx.lineTo(ox+dx,oy+dy);cx.stroke();cx.setLineDash([]);
+      for(const s of[1,-1]){
+        const ax=ox+s*dx,ay=oy+s*dy,ang=Math.atan2(s*dy,s*dx);cx.fillStyle=col;
+        cx.save();cx.translate(ax,ay);cx.rotate(ang);cx.beginPath();cx.moveTo(0,0);cx.lineTo(-9,4);cx.lineTo(-9,-4);cx.closePath();cx.fill();cx.restore();
+      }
+    });
+  }else{
+    cx.strokeStyle='#ffe066';cx.lineWidth=1.5;cx.setLineDash([4,3]);cx.beginPath();
+    for(let a=0;a<4*Math.PI;a+=0.08){const r=8+a*6;const px2=ox+r*Math.cos(a),py2=oy+r*Math.sin(a);a<0.1?cx.moveTo(px2,py2):cx.lineTo(px2,py2);}
+    cx.stroke();cx.setLineDash([]);
+  }
+  const lines=eg.type==='real'
+    ?['λ₁ = '+eg.l1.toFixed(3),'λ₂ = '+eg.l2.toFixed(3),eg.stable?'Stable node':eg.saddle?'Saddle point':'Unstable node']
+    :['λ = '+eg.re.toFixed(3)+' ± '+eg.im.toFixed(3)+'i',eg.stable?'Stable spiral':'Unstable spiral'];
+  const bw=138,bh=lines.length*16+12;
+  let bx=ox+14,by=oy-bh-6;
+  if(bx+bw>W-4)bx=ox-bw-14;if(by<4)by=oy+14;
+  cx.fillStyle='rgba(10,10,22,0.92)';cx.strokeStyle='rgba(200,200,255,0.28)';cx.lineWidth=0.5;
+  cx.beginPath();cx.roundRect(bx,by,bw,bh,5);cx.fill();cx.stroke();
+  cx.font='11px monospace';cx.fillStyle='#ddeeff';
+  lines.forEach((l,i)=>cx.fillText(l,bx+8,by+15+i*16));
+  document.getElementById('info').textContent=lines.join('  |  ');
+  cx.restore();
+}
+
+function drawAxes(){
+  cx.save();cx.strokeStyle='rgba(180,180,220,0.15)';cx.lineWidth=0.5;
+  cx.font='10px sans-serif';cx.fillStyle='rgba(180,180,200,0.5)';
+  for(let v=-100;v<=20;v+=20){const x=sx(v);cx.beginPath();cx.moveTo(x,0);cx.lineTo(x,H);cx.stroke();cx.fillText(v,x+2,H-4);}
+  for(let w=-100;w<=300;w+=50){const y=sy(w);cx.beginPath();cx.moveTo(0,y);cx.lineTo(W,y);cx.stroke();cx.fillText(w,2,y-3);}
+  cx.fillStyle='rgba(200,200,220,0.65)';cx.font='12px sans-serif';
+  cx.fillText('V (mV)',W-52,H-6);
+  cx.save();cx.translate(13,H/2);cx.rotate(-Math.PI/2);cx.fillText('W (pA)',0,0);cx.restore();cx.restore();
+}
+
+let simV=-70,simW=0;
+let traj=[],tsV=[],tsW=[];
+let running=true;
+const dt=0.05;
+
+function simStep(){
+  if(!running)return;
+  for(let k=0;k<4;k++){
+    const dv=dVdt(simV,simW),dw=dWdt(simV,simW);
+    simV+=dt*dv;simW+=dt*dw;
+    if(simV>Vth_det){
+      traj.push([Vspk,simW]);
+      const newW=simW+p.d;
+      lastReset=[p.Vr,newW];
+      simV=p.Vr;simW=newW;
+    }else traj.push([simV,simW]);
+    tsV.push(Math.min(simV,Vspk+2));tsW.push(simW);
+    if(traj.length>maxTail)traj.shift();
+    if(tsV.length>maxTail){tsV.shift();tsW.shift();}
+  }
+}
+
+function drawTraj(){
+  if(traj.length<2)return;cx.save();
+  for(let i=1;i<traj.length;i++){
+    const f=i/traj.length;
+    const x0=sx(traj[i-1][0]),y0=sy(traj[i-1][1]);
+    const x1=sx(traj[i][0]),y1=sy(traj[i][1]);
+    const g=Math.round(55+185*f);
+    cx.strokeStyle=`rgba(${g},${g},${Math.round(g*0.65+55)},${0.2+0.8*f})`;
+    cx.lineWidth=0.7+f*1.8;
+    cx.beginPath();cx.moveTo(x0,y0);cx.lineTo(x1,y1);cx.stroke();
+  }
+  if(traj.length>0){
+    const lx=sx(traj[traj.length-1][0]),ly=sy(traj[traj.length-1][1]);
+    cx.beginPath();cx.arc(lx,ly,5,0,Math.PI*2);cx.fillStyle='#ffffff';cx.fill();
+  }
+  cx.restore();
+}
+
+function drawTS(){
+  tx.clearRect(0,0,TW,TH);tx.fillStyle='#0d0d18';tx.fillRect(0,0,TW,TH);
+  if(tsV.length<2)return;
+  const half=TH/2-8;
+  tx.strokeStyle='rgba(180,180,220,0.1)';tx.lineWidth=0.5;
+  tx.beginPath();tx.moveTo(0,TH/2);tx.lineTo(TW,TH/2);tx.stroke();
+  tx.strokeStyle='#ff8855';tx.lineWidth=1.5;tx.beginPath();
+  for(let i=0;i<tsV.length;i++){
+    const x=i/(tsV.length-1)*TW;
+    const y=(1-(tsV[i]-(-100))/(20-(-100)))*(half-4)+2;
+    i===0?tx.moveTo(x,y):tx.lineTo(x,y);
+  }
+  tx.stroke();
+  tx.strokeStyle='#44aaff';tx.lineWidth=1.5;tx.beginPath();
+  for(let i=0;i<tsW.length;i++){
+    const x=i/(tsW.length-1)*TW;
+    const y=(1-(tsW[i]-(-100))/(300-(-100)))*(half-4)+TH/2+8;
+    i===0?tx.moveTo(x,y):tx.lineTo(x,y);
+  }
+  tx.stroke();
+  tx.font='11px sans-serif';
+  tx.fillStyle='#ff8855cc';tx.fillText('V (mV)',5,13);
+  tx.fillStyle='#44aaffcc';tx.fillText('W (pA)',5,TH/2+20);
+}
+
+function renderPhase(){
+  cx.clearRect(0,0,W,H);drawHeatmap();drawAxes();drawVF();drawNullclines();drawFPs();drawTraj();
+  drawResetMarker();
+  if(mouseX!==null)drawHovered();
+}
+
+function loop(){simStep();renderPhase();drawTS();requestAnimationFrame(loop);}
+
+function resetSim(){simV=p.EL-10;simW=0;traj=[];tsV=[];tsW=[];lastReset=null;}
+
+const sliders=[
+  ['sl_gL','vl_gL','gL'],['sl_EL','vl_EL','EL'],
+  ['sl_a','vl_a','a'],['sl_b','vl_b','b'],['sl_dT','vl_dT','dT'],
+  ['sl_tw','vl_tw','tw'],['sl_I','vl_I','I'],['sl_VT','vl_VT','VT'],
+  ['sl_Vr','vl_Vr','Vr'],['sl_d','vl_d','d']
+];
+sliders.forEach(([sid,vid,pn])=>{
+  const el=document.getElementById(sid);
+  document.getElementById(vid).textContent=el.value;
+  el.addEventListener('input',()=>{p[pn]=parseFloat(el.value);document.getElementById(vid).textContent=el.value;resetSim();});
+});
+
+document.getElementById('btn_run').addEventListener('click',function(){running=!running;this.textContent=running?'⏸ Pause':'▶ Run';});
+document.getElementById('btn_rst').addEventListener('click',resetSim);
+
+pc.addEventListener('mousemove',e=>{const r=pc.getBoundingClientRect();mouseX=(e.clientX-r.left)*W/r.width;mouseY=(e.clientY-r.top)*H/r.height;});
+pc.addEventListener('mouseleave',()=>{mouseX=null;mouseY=null;document.getElementById('info').textContent='Hover a fixed point to inspect eigenvalues & eigenvectors';});
+pc.addEventListener('click',e=>{
+  const r=pc.getBoundingClientRect();const x=(e.clientX-r.left)*W/r.width;const y=(e.clientY-r.top)*H/r.height;
+  const [v,w]=iv(x,y);simV=v;simW=w;traj=[[v,w]];tsV=[v];tsW=[w];lastReset=null;
+});
+
+const kc=document.getElementById('knob-canvas');
+const kx=kc.getContext('2d');
+const KW=54,KR=22,KCX=27,KCY=27;
+const K_MIN=50,K_MAX=2000;
+let knobAngle=0;let knobDragging=false,knobLastY=0;
+function tailFromAngle(a){const norm=(a+Math.PI*0.75)/(Math.PI*1.5);return Math.round(K_MIN+norm*(K_MAX-K_MIN));}
+function angleFromTail(t){const norm=(t-K_MIN)/(K_MAX-K_MIN);return norm*Math.PI*1.5-Math.PI*0.75;}
+knobAngle=angleFromTail(600);
+function drawKnob(){
+  kx.clearRect(0,0,KW,KW);
+  const startA=-Math.PI*0.75,endA=Math.PI*0.75;
+  kx.beginPath();kx.arc(KCX,KCY,KR+3,startA,endA);
+  kx.strokeStyle='#2a2a3a';kx.lineWidth=4;kx.lineCap='round';kx.stroke();
+  kx.beginPath();kx.arc(KCX,KCY,KR+3,startA,knobAngle);
+  kx.strokeStyle='#8888cc';kx.lineWidth=4;kx.lineCap='round';kx.stroke();
+  kx.beginPath();kx.arc(KCX,KCY,KR,0,Math.PI*2);kx.fillStyle='#22222e';kx.fill();
+  kx.beginPath();kx.arc(KCX,KCY,KR-3,0,Math.PI*2);kx.fillStyle='#3a3a4e';kx.fill();
+  const nx=KCX+Math.cos(knobAngle)*(KR-8),ny=KCY+Math.sin(knobAngle)*(KR-8);
+  kx.beginPath();kx.moveTo(KCX,KCY);kx.lineTo(nx,ny);kx.strokeStyle='#a0a0ff';kx.lineWidth=2.5;kx.lineCap='round';kx.stroke();
+  kx.beginPath();kx.arc(KCX,KCY,3,0,Math.PI*2);kx.fillStyle='#a0a0ff';kx.fill();
+}
+function clampKnob(a){return Math.max(-Math.PI*0.75,Math.min(Math.PI*0.75,a));}
+kc.addEventListener('mousedown',e=>{knobDragging=true;knobLastY=e.clientY;e.preventDefault();});
+window.addEventListener('mousemove',e=>{
+  if(!knobDragging)return;const dy=knobLastY-e.clientY;knobLastY=e.clientY;
+  knobAngle=clampKnob(knobAngle+dy*0.025);maxTail=tailFromAngle(knobAngle);
+  document.getElementById('knob-val').textContent=maxTail;drawKnob();
+});
+window.addEventListener('mouseup',()=>{knobDragging=false;});
+kc.addEventListener('touchstart',e=>{knobDragging=true;knobLastY=e.touches[0].clientY;e.preventDefault();},{passive:false});
+window.addEventListener('touchmove',e=>{
+  if(!knobDragging)return;const dy=knobLastY-e.touches[0].clientY;knobLastY=e.touches[0].clientY;
+  knobAngle=clampKnob(knobAngle+dy*0.025);maxTail=tailFromAngle(knobAngle);
+  document.getElementById('knob-val').textContent=maxTail;drawKnob();
+},{passive:false});
+window.addEventListener('touchend',()=>{knobDragging=false;});
+drawKnob();
+loop();
+</script>
+</body>
+</html>

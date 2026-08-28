@@ -1,0 +1,707 @@
+
+<!-- vibe coding for life -->
+<!-- https://chatgpt.com/share/6929a1d3-c014-8011-9e2e-60f41f07177d -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Neural Grid with Leak, Plasticity, Adjacency & Camera</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      margin: 0;
+    }
+    #left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    #right {
+      width: 380px;
+      padding: 16px;
+      box-sizing: border-box;
+      background: #181818;
+      border-left: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+    canvas {
+      border: 1px solid #333;
+      background: #000;
+    }
+    #adjContainer {
+      display: flex;
+      flex-direction: row;
+      gap: 8px;
+      align-items: center;
+    }
+    .control-group {
+      margin-bottom: 8px;
+    }
+    label {
+      font-size: 0.9rem;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    .small {
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+    button {
+      background: #333;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    button:hover {
+      background: #444;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #333;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <!-- Neural sheet -->
+    <canvas id="networkCanvas" width="500" height="500"></canvas>
+
+    <!-- Adjacency matrix + colorbar -->
+    <div id="adjContainer">
+      <canvas id="adjacencyCanvas" width="320" height="320"></canvas>
+      <canvas id="adjColorbar" width="40" height="320"></canvas>
+    </div>
+  </div>
+
+  <div id="right">
+    <h2>Neural Grid Controls</h2>
+
+    <!-- Walker controls -->
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="manualControl">
+        Manual stimulus control (use sliders)
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label for="sliderX">Stimulus X position</label>
+      <input type="range" id="sliderX" min="0" max="99" value="50">
+    </div>
+
+    <div class="control-group">
+      <label for="sliderY">Stimulus Y position</label>
+      <input type="range" id="sliderY" min="0" max="99" value="50">
+    </div>
+
+    <div class="control-group">
+      <label for="stimStrength">Stimulus strength (walker)</label>
+      <input type="range" id="stimStrength" min="0" max="2" step="0.01" value="0.8">
+      <div class="small">Gaussian bump centered at the walker.</div>
+    </div>
+
+    <!-- Leak -->
+    <div class="control-group">
+      <label for="leak">Leak (update fraction λ)</label>
+      <input type="range" id="leak" min="0" max="1" step="0.01" value="1.0">
+      <div class="small">
+        0 = frozen state, 1 = full tanh update (no leak), in-between = slower dynamics.
+      </div>
+    </div>
+
+    <!-- Local connectivity -->
+    <div class="control-group">
+      <label for="coupling">Local coupling gain (g_local)</label>
+      <input type="range" id="coupling" min="0" max="1.5" step="0.01" value="0.9">
+      <div class="small">Scales the local Gaussian recurrent kernel</div>
+    </div>
+
+    <!-- Random connectivity controls -->
+    <hr>
+
+    <div class="control-group">
+      <label for="randomProb">Random conn. probability</label>
+      <input type="range" id="randomProb" min="0" max="0.02" step="0.001" value="0.005">
+      <div class="small">
+        Approx. fraction of possible connections used per neuron (sparse). Higher = denser.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="randomGain">Random connectivity gain (g_random)</label>
+      <input type="range" id="randomGain" min="0" max="2.0" step="0.01" value="0.5">
+      <div class="small">
+        Global multiplier on the random weight matrix
+        (proxy for spectral radius → subcritical vs chaotic).
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="dalesRule" checked>
+        Enforce Dale's rule (E/I neurons)
+      </label>
+      <div class="small">
+        Each neuron is excitatory or inhibitory; outgoing random weights share one sign.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <button id="regenConn">Regenerate random connectivity</button>
+      <div class="small">
+        Re-samples random connectivity with current probability and Dale setting.
+      </div>
+    </div>
+
+    <!-- Plasticity controls -->
+    <hr>
+
+    <div class="control-group">
+      <label for="learningRate">Learning rate (η)</label>
+      <input type="range" id="learningRate" min="0" max="0.02" step="0.0005" value="0.002">
+      <div class="small">
+        Sejnowski covariance rule on random weights.
+        Set to 0 to disable plasticity.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="maWindow">Moving average window (steps)</label>
+      <input type="range" id="maWindow" min="1" max="2000" step="1" value="200">
+      <div class="small">
+        Larger window = slower-moving mean activity.
+        We use an exponential moving average with α = 1 / window.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="freezeWeights">
+        Freeze random weights (no learning)
+      </label>
+      <div class="small">
+        Overrides η without changing its value.
+      </div>
+    </div>
+
+    <!-- Camera input -->
+    <hr>
+    <h3>Camera input</h3>
+
+    <div class="control-group">
+      <button id="startCamera">Start camera</button>
+      <div class="small">
+        Browser will ask permission. Needs HTTPS or localhost.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="useCamera">
+        Use camera as input
+      </label>
+      <div class="small">
+        Subsampled luminance (100×100) drives extra input per neuron.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="cameraGain">Camera gain</label>
+      <input type="range" id="cameraGain" min="0" max="2" step="0.01" value="1.0">
+      <div class="small">
+        0 = camera ignored, higher = stronger camera drive.
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="control-group">
+      <label for="updateSpeed">Update speed</label>
+      <input type="range" id="updateSpeed" min="1" max="5" step="1" value="2">
+      <div class="small">Iterations per animation frame</div>
+    </div>
+
+    <p class="small">
+      - 100×100 tanh neurons<br>
+      - Leak + local Gaussian connectivity (radius ≈ 3)<br>
+      - Sparse random connectivity (E/I optional)<br>
+      - Sejnowski-style plasticity on random weights (with freeze)<br>
+      - Aggregated 100×100 adjacency matrix + colorbar<br>
+      - Walker + optional camera-driven input
+    </p>
+  </div>
+
+  <!-- Hidden video & sampling canvas for camera -->
+  <video id="cameraVideo" autoplay playsinline style="display:none"></video>
+  <canvas id="cameraSampleCanvas" width="100" height="100" style="display:none"></canvas>
+
+  <script>
+    // --- Model parameters ---
+    const N = 100;
+    const radius = 3;
+    const sigmaKernel = 2.0;
+    const sigmaStim = 2.0;
+    const canvasSize = 500;
+    const numNeurons = N * N;
+
+    // Adjacency visualization parameters
+    const ADJ_BINS = 100; // 100 x 100 aggregated adjacency matrix
+    const groupSize = Math.ceil(numNeurons / ADJ_BINS);
+    const groupIndex = new Int16Array(numNeurons);
+    for (let i = 0; i < numNeurons; i++) {
+      let g = Math.floor(i / groupSize);
+      if (g >= ADJ_BINS) g = ADJ_BINS - 1;
+      groupIndex[i] = g;
+    }
+    const adjMatrix = new Float32Array(ADJ_BINS * ADJ_BINS);
+
+    // --- DOM elements ---
+    const canvas = document.getElementById('networkCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const adjCanvas = document.getElementById('adjacencyCanvas');
+    const adjCtx = adjCanvas.getContext('2d');
+    const adjColorbarCanvas = document.getElementById('adjColorbar');
+    const adjColorCtx = adjColorbarCanvas.getContext('2d');
+
+    const sliderX = document.getElementById('sliderX');
+    const sliderY = document.getElementById('sliderY');
+    const stimStrengthSlider = document.getElementById('stimStrength');
+    const leakSlider = document.getElementById('leak');
+    const couplingSlider = document.getElementById('coupling');
+    const updateSpeedSlider = document.getElementById('updateSpeed');
+    const manualControlCheckbox = document.getElementById('manualControl');
+
+    const randomProbSlider = document.getElementById('randomProb');
+    const randomGainSlider = document.getElementById('randomGain');
+    const dalesRuleCheckbox = document.getElementById('dalesRule');
+    const regenButton = document.getElementById('regenConn');
+
+    const learningRateSlider = document.getElementById('learningRate');
+    const maWindowSlider = document.getElementById('maWindow');
+    const freezeWeightsCheckbox = document.getElementById('freezeWeights');
+
+    const startCameraButton = document.getElementById('startCamera');
+    const useCameraCheckbox = document.getElementById('useCamera');
+    const cameraGainSlider = document.getElementById('cameraGain');
+    const cameraVideo = document.getElementById('cameraVideo');
+    const cameraSampleCanvas = document.getElementById('cameraSampleCanvas');
+    const cameraSampleCtx = cameraSampleCanvas.getContext('2d');
+
+    // --- State ---
+    let state = new Float32Array(numNeurons);
+    let nextState = new Float32Array(numNeurons);
+    let meanActivity = new Float32Array(numNeurons); // <a_i>
+
+    for (let i = 0; i < numNeurons; i++) {
+      state[i] = (Math.random() - 0.5) * 0.1;
+      meanActivity[i] = 0.0;
+    }
+
+    // camera buffer holds gray [0,1] per neuron
+    let cameraBuffer = new Float32Array(numNeurons);
+    let cameraActive = false;
+
+    // Walker
+    let walker = { x: N / 2, y: N / 2 };
+
+    // --- Local Gaussian kernel ---
+    const kernel = [];
+    (function buildKernel() {
+      let sum = 0;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const r2 = dx * dx + dy * dy;
+          const val = Math.exp(-r2 / (2 * sigmaKernel * sigmaKernel));
+          kernel.push({ dx, dy, w: val });
+          sum += val;
+        }
+      }
+      for (const k of kernel) {
+        k.w /= sum;
+      }
+    })();
+
+    // --- Random connectivity (sparse) ---
+    let randomInConnections = [];
+    let neuronType = new Int8Array(numNeurons); // +1 E, -1 I (if Dale)
+
+    function regenerateRandomConnectivity() {
+      const prob = parseFloat(randomProbSlider.value);
+      const useDales = dalesRuleCheckbox.checked;
+
+      randomInConnections = new Array(numNeurons);
+      for (let i = 0; i < numNeurons; i++) {
+        randomInConnections[i] = [];
+      }
+
+      // 50/50 E/I (you can tune this if you like)
+      if (useDales) {
+        const excitatoryFraction = 0.5;
+        for (let i = 0; i < numNeurons; i++) {
+          neuronType[i] = (Math.random() < excitatoryFraction) ? 1 : -1;
+        }
+      } else {
+        for (let i = 0; i < numNeurons; i++) {
+          neuronType[i] = 0;
+        }
+      }
+
+      let k = Math.round(prob * numNeurons);
+      const maxK = 100; // performance cap
+      if (k > maxK) k = maxK;
+      if (k <= 0) {
+        console.log('Random connectivity: no connections (prob too low).');
+        return;
+      }
+
+      for (let pre = 0; pre < numNeurons; pre++) {
+        const sign = useDales ? (neuronType[pre] > 0 ? 1 : -1) : 1;
+        for (let c = 0; c < k; c++) {
+          const post = Math.floor(Math.random() * numNeurons);
+          const base = (Math.random() * 2 - 1); // [-1,1]
+          const w = useDales ? sign * Math.abs(base) : base;
+          randomInConnections[post].push({ pre, w });
+        }
+      }
+
+      console.log('Random connectivity regenerated.', 'prob=', prob.toFixed(3), 'k≈', k);
+    }
+
+    // --- Utility functions ---
+    function idx(x, y) {
+      return y * N + x;
+    }
+
+    function wrapIndex(x, N) {
+      if (x < 0) return x + N;
+      if (x >= N) return x - N;
+      return x;
+    }
+
+    function stepWalker() {
+      const dir = Math.floor(Math.random() * 4);
+      if (dir === 0) walker.x += 1;
+      else if (dir === 1) walker.x -= 1;
+      else if (dir === 2) walker.y += 1;
+      else walker.y -= 1;
+      walker.x = wrapIndex(walker.x, N);
+      walker.y = wrapIndex(walker.y, N);
+    }
+
+    // --- Moving average update ---
+    function updateMovingAverages() {
+      const window = Math.max(1, parseInt(maWindowSlider.value));
+      const alpha = 1.0 / window;
+      for (let i = 0; i < numNeurons; i++) {
+        const a = state[i];
+        const m = meanActivity[i];
+        meanActivity[i] = m + alpha * (a - m);
+      }
+    }
+
+    // --- Hebbian update (Sejnowski) ---
+    function hebbianUpdate() {
+      const eta = parseFloat(learningRateSlider.value);
+      if (eta === 0 || freezeWeightsCheckbox.checked) return;
+
+      const useDales = dalesRuleCheckbox.checked;
+
+      for (let post = 0; post < numNeurons; post++) {
+        const a_i = state[post];
+        const m_i = meanActivity[post];
+        const di = a_i - m_i;
+
+        const incoming = randomInConnections[post];
+        if (!incoming || incoming.length === 0) continue;
+
+        for (let e = 0; e < incoming.length; e++) {
+          const edge = incoming[e];
+          const pre = edge.pre;
+          const a_j = state[pre];
+          const m_j = meanActivity[pre];
+          const dj = a_j - m_j;
+
+          edge.w += eta * di * dj;
+
+          if (useDales && neuronType[pre] !== 0) {
+            const sign = neuronType[pre] >= 0 ? 1 : -1;
+            edge.w = sign * Math.abs(edge.w);
+          }
+        }
+      }
+    }
+
+    // --- Camera: start + subsample into cameraBuffer ---
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false
+        });
+        cameraVideo.srcObject = stream;
+        cameraActive = true;
+        console.log('Camera started');
+      } catch (err) {
+        console.error('Error starting camera:', err);
+      }
+    }
+
+    function updateCameraBuffer() {
+      if (!cameraActive || !useCameraCheckbox.checked) return;
+
+      // sample camera into NxN canvas
+      cameraSampleCanvas.width = N;
+      cameraSampleCanvas.height = N;
+      cameraSampleCtx.drawImage(cameraVideo, 0, 0, N, N);
+      const imgData = cameraSampleCtx.getImageData(0, 0, N, N).data;
+
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const pixIdx = (y * N + x) * 4;
+          const r = imgData[pixIdx];
+          const g = imgData[pixIdx + 1];
+          const b = imgData[pixIdx + 2];
+          const gray = (r + g + b) / (3 * 255); // 0..1
+          cameraBuffer[idx(x, y)] = gray;
+        }
+      }
+    }
+
+    // --- Network update ---
+    function updateNetwork() {
+      const couplingGain = parseFloat(couplingSlider.value);
+      const stimStrength = parseFloat(stimStrengthSlider.value);
+      const randomGain = parseFloat(randomGainSlider.value);
+      const leak = parseFloat(leakSlider.value);
+      const camGain = parseFloat(cameraGainSlider.value);
+
+      // Walker
+      if (manualControlCheckbox.checked) {
+        walker.x = parseInt(sliderX.value);
+        walker.y = parseInt(sliderY.value);
+      } else {
+        stepWalker();
+      }
+
+      // Camera buffer updated once per discrete-time step
+      updateCameraBuffer();
+
+      // 1) moving averages
+      updateMovingAverages();
+
+      // 2) Hebbian plasticity on random weights
+      hebbianUpdate();
+
+      // 3) state update
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const index = idx(x, y);
+          let input = 0.0;
+
+          // Local recurrent
+          for (let k = 0; k < kernel.length; k++) {
+            const dx = kernel[k].dx;
+            const dy = kernel[k].dy;
+            const w = kernel[k].w;
+            const xx = wrapIndex(x + dx, N);
+            const yy = wrapIndex(y + dy, N);
+            input += w * state[idx(xx, yy)];
+          }
+          input *= couplingGain;
+
+          // Random recurrent
+          const incoming = randomInConnections[index];
+          if (incoming && incoming.length > 0 && randomGain !== 0) {
+            let rInput = 0.0;
+            for (let e = 0; e < incoming.length; e++) {
+              const edge = incoming[e];
+              rInput += edge.w * state[edge.pre];
+            }
+            input += randomGain * rInput;
+          }
+
+          // Walker stimulus (Gaussian bump)
+          const dxw = x - walker.x;
+          const dyw = y - walker.y;
+          const r2 = dxw * dxw + dyw * dyw;
+          const stim = stimStrength * Math.exp(-r2 / (2 * sigmaStim * sigmaStim));
+          input += stim;
+
+          // Camera stimulus (luminance mapped to [-1,1])
+          if (cameraActive && useCameraCheckbox.checked && camGain !== 0) {
+            const gray = cameraBuffer[index]; // 0..1
+            const camCentered = (gray - 0.5) * 2.0; // -1..1
+            input += camGain * camCentered;
+          }
+
+          const nonlin = Math.tanh(input);
+          nextState[index] = (1.0 - leak) * state[index] + leak * nonlin;
+        }
+      }
+
+      const tmp = state;
+      state = nextState;
+      nextState = tmp;
+    }
+
+    // --- Visualization: neural sheet ---
+    function drawNetwork() {
+      const cellSize = canvasSize / N;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const v = state[idx(x, y)];
+          const t = (v + 1) / 2;
+          const r = Math.floor(255 * t);
+          const g = 0;
+          const b = Math.floor(255 * (1 - t));
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize + 1, cellSize + 1);
+        }
+      }
+
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        walker.x * cellSize,
+        walker.y * cellSize,
+        cellSize,
+        cellSize
+      );
+    }
+
+    // --- Visualization: adjacency matrix ---
+    function computeAdjacencyMatrix() {
+      adjMatrix.fill(0);
+      let maxAbs = 0;
+
+      for (let post = 0; post < numNeurons; post++) {
+        const gPost = groupIndex[post];
+        const incoming = randomInConnections[post];
+        if (!incoming || incoming.length === 0) continue;
+
+        for (let e = 0; e < incoming.length; e++) {
+          const edge = incoming[e];
+          const pre = edge.pre;
+          const gPre = groupIndex[pre];
+
+          const idxMat = gPost * ADJ_BINS + gPre;
+          adjMatrix[idxMat] += edge.w;
+          const a = Math.abs(adjMatrix[idxMat]);
+          if (a > maxAbs) maxAbs = a;
+        }
+      }
+
+      if (maxAbs < 1e-6) maxAbs = 1.0;
+      return maxAbs;
+    }
+
+    function drawAdjacency() {
+      const width = adjCanvas.width;
+      const height = adjCanvas.height;
+      const cellW = width / ADJ_BINS;
+      const cellH = height / ADJ_BINS;
+
+      const maxAbs = computeAdjacencyMatrix();
+
+      adjCtx.clearRect(0, 0, width, height);
+      adjCtx.imageSmoothingEnabled = false;
+
+      for (let row = 0; row < ADJ_BINS; row++) {
+        for (let col = 0; col < ADJ_BINS; col++) {
+          const w = adjMatrix[row * ADJ_BINS + col];
+          const norm = w / maxAbs;      // [-1,1]
+          const t = (norm + 1) / 2;     // [0,1]
+          const r = Math.floor(255 * t);
+          const g = 0;
+          const b = Math.floor(255 * (1 - t));
+
+          adjCtx.fillStyle = `rgb(${r},${g},${b})`;
+          adjCtx.fillRect(col * cellW, row * cellH, cellW + 1, cellH + 1);
+        }
+      }
+
+      adjCtx.strokeStyle = '#888';
+      adjCtx.lineWidth = 1;
+      adjCtx.strokeRect(0, 0, width, height);
+
+      drawAdjacencyColorbar(maxAbs);
+    }
+
+    function drawAdjacencyColorbar(maxAbs) {
+      const w = adjColorbarCanvas.width;
+      const h = adjColorbarCanvas.height;
+
+      adjColorCtx.clearRect(0, 0, w, h);
+
+      const grad = adjColorCtx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, 'rgb(255,0,0)');   // +max
+      grad.addColorStop(0.5, 'rgb(0,0,0)');   // 0
+      grad.addColorStop(1, 'rgb(0,0,255)');   // -max
+
+      adjColorCtx.fillStyle = grad;
+      adjColorCtx.fillRect(0, 0, w * 0.5, h);
+
+      adjColorCtx.fillStyle = '#eee';
+      adjColorCtx.font = '10px system-ui';
+      adjColorCtx.textAlign = 'left';
+
+      adjColorCtx.fillText(`+${maxAbs.toFixed(2)}`, w * 0.55, 10);
+      adjColorCtx.fillText('0', w * 0.55, h / 2 + 3);
+      adjColorCtx.fillText(`-${maxAbs.toFixed(2)}`, w * 0.55, h - 4);
+    }
+
+    // --- Animation loop ---
+    let frameCount = 0;
+    function loop() {
+      const updatesPerFrame = parseInt(updateSpeedSlider.value);
+      for (let i = 0; i < updatesPerFrame; i++) {
+        updateNetwork();
+      }
+      drawNetwork();
+
+      if (frameCount % 5 === 0) {
+        drawAdjacency();
+      }
+      frameCount++;
+      requestAnimationFrame(loop);
+    }
+
+    // --- Event listeners ---
+    regenButton.addEventListener('click', regenerateRandomConnectivity);
+    randomProbSlider.addEventListener('change', regenerateRandomConnectivity);
+    dalesRuleCheckbox.addEventListener('change', regenerateRandomConnectivity);
+    startCameraButton.addEventListener('click', startCamera);
+
+    // Init & go
+    regenerateRandomConnectivity();
+    drawAdjacency();
+    loop();
+  </script>
+</body>
+</html>

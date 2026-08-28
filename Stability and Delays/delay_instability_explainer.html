@@ -1,0 +1,1348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Why Delay Kills Stability</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]})"></script>
+<style>
+:root {
+  --bg: #0b0d17;
+  --bg2: #111424;
+  --bg3: #181d35;
+  --surface: #1e2444;
+  --border: #2a3060;
+  --text: #dde4f5;
+  --text-dim: #8892b8;
+  --blue: #5b9cf6;
+  --teal: #40d9c5;
+  --gold: #f5c842;
+  --red: #f06070;
+  --green: #58d68d;
+  --purple: #b07ef8;
+  --font: 'IBM Plex Sans', sans-serif;
+  --mono: 'IBM Plex Mono', monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.75;
+  overflow-x: hidden;
+}
+
+article {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 28px 120px;
+}
+
+/* ── Typography ── */
+h1 {
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin-bottom: 0.4em;
+}
+h2 {
+  font-size: 1.45rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 3.2rem 0 0.9rem;
+  color: var(--blue);
+}
+h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 1.8rem 0 0.5rem;
+  color: var(--teal);
+}
+p { margin-bottom: 1em; color: var(--text); }
+p + p { margin-top: 0; }
+
+.lede {
+  font-size: 1.18rem;
+  color: var(--text-dim);
+  font-style: italic;
+  margin: 0 0 2.4rem;
+  line-height: 1.6;
+}
+
+.katex-display { margin: 1.2em 0; }
+
+/* ── Hero ── */
+.hero {
+  min-height: 260px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 80px 0 44px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 0;
+}
+.hero-tag {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--teal);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 1.2rem;
+}
+
+/* ── Figure / Interactive boxes ── */
+figure {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 24px 22px 20px;
+  margin: 2rem 0;
+}
+figcaption {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  margin-top: 14px;
+  font-style: italic;
+}
+
+/* ── Sliders ── */
+.ctrl-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+.ctrl-label {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  min-width: 190px;
+}
+.ctrl-label span {
+  color: var(--gold);
+  font-weight: 500;
+}
+.slider-wrap {
+  flex: 1;
+  min-width: 140px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+}
+input[type=range] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 28px;
+  background: transparent;
+  cursor: grab;
+}
+input[type=range]:active { cursor: grabbing; }
+input[type=range]::-webkit-slider-runnable-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--blue);
+  margin-top: -7px;
+  box-shadow: 0 0 6px rgba(91,156,246,0.5);
+}
+input[type=range]::-moz-range-track {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+}
+input[type=range]::-moz-range-thumb {
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--blue);
+  border: none;
+  box-shadow: 0 0 6px rgba(91,156,246,0.5);
+}
+
+/* ── Canvas ── */
+canvas {
+  display: block;
+  width: 100%;
+  border-radius: 6px;
+}
+
+/* ── Stability badge ── */
+.stability-badge {
+  display: inline-block;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+.stable   { background: rgba(88,214,141,0.15); color: var(--green); border: 1px solid var(--green); }
+.unstable { background: rgba(240,96,112,0.15); color: var(--red);   border: 1px solid var(--red); }
+.critical { background: rgba(245,200,66,0.15); color: var(--gold);  border: 1px solid var(--gold); }
+
+/* ── Inline callout ── */
+.callout {
+  background: var(--bg3);
+  border-left: 3px solid var(--purple);
+  border-radius: 0 8px 8px 0;
+  padding: 14px 18px;
+  margin: 1.6rem 0;
+  font-size: 0.95rem;
+}
+.callout strong { color: var(--purple); }
+
+/* ── Complex plane canvas ── */
+.two-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 560px) { .two-panel { grid-template-columns: 1fr; } }
+
+.panel-label {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+/* ── Section divider ── */
+.divider {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 3.2rem 0;
+}
+
+/* ── Legend row ── */
+.legend {
+  display: flex;
+  gap: 18px;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  font-family: var(--mono);
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.legend-item { display: flex; align-items: center; gap: 6px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.line-swatch { width: 22px; height: 3px; flex-shrink: 0; border-radius: 2px; }
+
+/* ── Equation highlight box ── */
+.eq-box {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 14px 20px;
+  margin: 1.4rem 0;
+  text-align: center;
+}
+
+/* ── Root locus annotation ── */
+#roots-label {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  margin-top: 6px;
+  min-height: 1.4em;
+  text-align: center;
+}
+
+/* ── Play/Pause button ── */
+.btn {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  padding: 5px 14px;
+  border-radius: 5px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.btn:hover { border-color: var(--blue); background: var(--bg3); }
+.btn.active { border-color: var(--teal); color: var(--teal); }
+
+/* ── Step indicator ── */
+.step-area {
+  display: flex; align-items: center; gap: 12px; margin: 12px 0 6px;
+}
+.step-btn {
+  width: 32px; height: 32px; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-size: 1rem; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s;
+}
+.step-btn:hover { border-color: var(--teal); }
+.step-counter {
+  font-family: var(--mono); font-size: 0.82rem; color: var(--text-dim);
+}
+
+/* ── Scroll reveal ── */
+.reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.55s ease, transform 0.55s ease; }
+.reveal.visible { opacity: 1; transform: none; }
+
+</style>
+</head>
+<body>
+<article>
+
+<!-- ══════════════════════════════════════════════════════════
+     HERO
+════════════════════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-tag">Dynamical Systems · Delay-Differential Equations</div>
+  <h1>Why Delay Kills Stability</h1>
+  <p class="lede">
+    A system that stabilises itself perfectly can still oscillate wildly —
+    if it acts on information that is even slightly out of date.
+    Here is the formal mechanism, built from first principles.
+  </p>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════
+     §1  THE SIMPLEST STABLE SYSTEM
+════════════════════════════════════════════════════════════ -->
+<h2>§1 — Start with something that always works</h2>
+
+<p>
+  Consider the simplest negative-feedback system:
+</p>
+
+<div class="eq-box">
+  $\dot{x}(t) = -\alpha\, x(t), \quad \alpha > 0$
+</div>
+
+<p>
+  Whatever initial condition you give it, $x$ decays exponentially: $x(t) = x_0 e^{-\alpha t}$.
+  The equilibrium at zero is globally stable. Try it below — vary $\alpha$ and watch.
+</p>
+
+<figure>
+  <div class="ctrl-row">
+    <div class="ctrl-label">feedback gain α = <span id="lbl-alpha">1.50</span></div>
+    <div class="slider-wrap"><input type="range" id="sl-alpha" min="0.1" max="4" step="0.05" value="1.5"></div>
+  </div>
+  <canvas id="cvs-nodely" height="160"></canvas>
+  <figcaption>$x(t)=x_0 e^{-\alpha t}$. Stronger $\alpha$ — faster decay. No drama.</figcaption>
+</figure>
+
+<p>
+  The single eigenvalue is $s = -\alpha$, which sits firmly in the left half of the complex plane.
+  Distance from the imaginary axis $= \alpha$. Larger $\alpha$, safer.
+</p>
+
+<!-- ══════════════════════════════════════════════════════════
+     §2  INTRODUCE THE DELAY
+════════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2>§2 — Now add a delay</h2>
+
+<p>
+  Suppose the feedback mechanism can only act on $x$ as it was $\tau$ seconds ago.
+  The equation becomes:
+</p>
+
+<div class="eq-box">
+  $\dot{x}(t) = -\alpha\, x(t - \tau)$
+</div>
+
+<p>
+  The structure looks identical. The same negative sign, the same gain $\alpha$.
+  Yet something fundamentally different happens for large enough $\tau$.
+</p>
+
+<div class="callout">
+  <strong>Intuition check:</strong> if $x$ was positive a moment ago but has since swung negative,
+  the delayed feedback still pushes it negative — <em>in the wrong direction</em>.
+  A corrective force that arrives late can amplify rather than damp.
+</div>
+
+<p>
+  Drag the delay slider. Past a critical threshold the system starts to oscillate, then blow up.
+</p>
+
+<figure>
+  <div class="ctrl-row">
+    <div class="ctrl-label">feedback gain α = <span id="lbl-alpha2">1.50</span></div>
+    <div class="slider-wrap"><input type="range" id="sl-alpha2" min="0.1" max="4" step="0.05" value="1.5"></div>
+  </div>
+  <div class="ctrl-row">
+    <div class="ctrl-label">delay τ = <span id="lbl-tau">0.00</span> s &nbsp;
+      <span id="badge-stable" class="stability-badge stable">STABLE</span>
+    </div>
+    <div class="slider-wrap"><input type="range" id="sl-tau" min="0" max="3.2" step="0.02" value="0"></div>
+  </div>
+  <canvas id="cvs-delay" height="200"></canvas>
+  <div class="legend">
+    <div class="legend-item"><div class="line-swatch" style="background:var(--blue)"></div>x(t)</div>
+    <div class="legend-item"><div class="line-swatch" style="background:var(--gold); opacity:0.5"></div>critical τ</div>
+  </div>
+  <figcaption id="delay-caption">
+    Simulated using the method of steps (Euler on each delay interval).
+    Critical delay: $\tau_c = \pi / (2\alpha)$.
+  </figcaption>
+</figure>
+
+<!-- ══════════════════════════════════════════════════════════
+     §3  THE CHARACTERISTIC EQUATION
+════════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2>§3 — Where the eigenvalues went</h2>
+
+<p>
+  For the ODE $\dot{x} = -\alpha x$, we substituted $x = e^{st}$ and got
+  one equation, one root: $s = -\alpha$.
+</p>
+<p>
+  Try the same ansatz for the delayed system. Substituting $x(t) = e^{st}$ gives:
+</p>
+
+<div class="eq-box">
+  $s\,e^{st} = -\alpha\,e^{s(t-\tau)} = -\alpha\,e^{st}e^{-s\tau}$
+</div>
+
+<p>Cancel $e^{st}$ (never zero):</p>
+
+<div class="eq-box" style="border-color: var(--teal);">
+  $$s + \alpha\, e^{-s\tau} = 0 \qquad \text{(characteristic equation)}$$
+</div>
+
+<p>
+  This is a <em>transcendental</em> equation in $s \in \mathbb{C}$.
+  Unlike a polynomial, it has <strong>infinitely many roots</strong>.
+  That is the key structural difference — the delay inflates the
+  eigenvalue problem from finite to infinite dimension.
+</p>
+
+<div class="callout">
+  <strong>Why infinitely many?</strong> $e^{-s\tau}$ is an entire function with
+  infinitely many zeros when composed with the left-hand side. Intuitively,
+  a delay-differential equation carries memory of the whole past interval
+  $[t-\tau, t]$ — that is an infinite-dimensional state space.
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     §4  ROOTS CROSSING THE IMAGINARY AXIS
+════════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2>§4 — The crossing mechanism</h2>
+
+<p>
+  Stability requires <em>all</em> roots to have $\text{Re}(s) < 0$.
+  As $\tau$ grows, infinitely many roots shift. We ask: which root
+  crosses first, and when?
+</p>
+
+<h3>Find the critical delay analytically</h3>
+
+<p>
+  At the stability boundary, $\text{Re}(s) = 0$, so $s = i\omega$ for some real $\omega$.
+  Substitute into the characteristic equation:
+</p>
+
+<div class="eq-box">
+  $i\omega + \alpha\,e^{-i\omega\tau} = 0$
+</div>
+
+<p>Expand the exponential using Euler's formula:</p>
+
+<div class="eq-box">
+  $i\omega + \alpha(\cos\omega\tau - i\sin\omega\tau) = 0$
+</div>
+
+<p>Separate real and imaginary parts:</p>
+
+<div class="eq-box">
+  $$\text{Re}: \quad \alpha\cos\omega\tau = 0$$
+  $$\text{Im}: \quad \omega - \alpha\sin\omega\tau = 0$$
+</div>
+
+<p>
+  From the real part: $\cos\omega\tau = 0 \Rightarrow \omega\tau = \pi/2 + k\pi$.
+  The smallest positive solution is $\omega\tau = \pi/2$, giving $\omega = \alpha$
+  (check: $\alpha - \alpha\sin(\pi/2) = \alpha - \alpha = 0$ ✓).
+</p>
+
+<div class="eq-box" style="border-color: var(--gold);">
+  $$\boxed{\tau_c = \frac{\pi}{2\alpha}}$$
+</div>
+
+<p>
+  Below $\tau_c$: all roots in the left half-plane — system stable.
+  At $\tau_c$: a conjugate pair $s = \pm i\alpha$ hits the imaginary axis — <strong>Hopf bifurcation</strong>.
+  Above $\tau_c$: that pair crosses into the right half-plane — oscillatory instability.
+</p>
+
+<!-- ══════════════════════════════════════════════════════════
+     §5  INTERACTIVE ROOT LOCUS
+════════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2>§5 — Watch the roots move</h2>
+
+<p>
+  Below, the left panel shows the complex plane. Each dot is a root of
+  $s + \alpha e^{-s\tau} = 0$, computed numerically. The right panel
+  replays the time series. Drag $\tau$ and observe the leading root pair crossing.
+</p>
+
+<figure>
+  <div class="ctrl-row">
+    <div class="ctrl-label">α = <span id="lbl-alpha3">1.50</span></div>
+    <div class="slider-wrap"><input type="range" id="sl-alpha3" min="0.3" max="3" step="0.05" value="1.5"></div>
+  </div>
+  <div class="ctrl-row">
+    <div class="ctrl-label">τ = <span id="lbl-tau3">0.00</span> &nbsp;
+      <span id="badge3" class="stability-badge stable">STABLE</span>
+    </div>
+    <div class="slider-wrap"><input type="range" id="sl-tau3" min="0" max="3.5" step="0.02" value="0"></div>
+  </div>
+
+  <div class="two-panel" style="margin-top:14px;">
+    <div>
+      <div class="panel-label">Complex plane — roots of characteristic eq.</div>
+      <canvas id="cvs-roots" height="240"></canvas>
+    </div>
+    <div>
+      <div class="panel-label">Time series x(t)</div>
+      <canvas id="cvs-ts" height="240"></canvas>
+    </div>
+  </div>
+
+  <div id="roots-label">Drag τ to move the roots.</div>
+
+  <div class="legend" style="margin-top:12px;">
+    <div class="legend-item"><div class="dot" style="background:var(--blue)"></div>roots (Re&lt;0, stable)</div>
+    <div class="legend-item"><div class="dot" style="background:var(--red)"></div>roots (Re&gt;0, unstable)</div>
+    <div class="legend-item"><div class="dot" style="background:var(--gold)"></div>leading pair</div>
+    <div class="legend-item"><div class="line-swatch" style="background:var(--border)"></div>imaginary axis</div>
+  </div>
+  <figcaption>
+    Roots computed by Newton's method on a grid of starting points. Only roots with
+    $|\text{Im}(s)| &lt; 12$ shown. The leading (rightmost) pair is highlighted.
+  </figcaption>
+</figure>
+
+<!-- ══════════════════════════════════════════════════════════
+     §6  THE FULL PICTURE — STABILITY CHART
+════════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2>§6 — The stability map</h2>
+
+<p>
+  The critical curve $\tau_c = \pi/(2\alpha)$ partitions the $(\alpha, \tau)$ plane.
+  Points below the curve are stable; above are unstable.
+  Hover over the map — your cursor tells you whether that combination is safe.
+</p>
+
+<figure>
+  <canvas id="cvs-map" height="300" style="cursor:crosshair;"></canvas>
+  <div id="map-readout" style="font-family:var(--mono);font-size:0.8rem;color:var(--text-dim);margin-top:8px;min-height:1.2em;text-align:center;"></div>
+  <figcaption>
+    Stability map in $(\alpha,\tau)$ space. The boundary is $\tau = \pi/(2\alpha)$.
+  </figcaption>
+</figure>
+
+<!-- ══════════════════════════════════════════════════════════
+     §7  STEP-BY-STEP PROOF RECAP
+════════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2>§7 — The argument in four steps</h2>
+
+<p>Step through the logical chain that connects delay to instability:</p>
+
+<figure>
+  <div class="step-area">
+    <button class="step-btn" id="step-back">&#8592;</button>
+    <button class="step-btn" id="step-fwd">&#8594;</button>
+    <span class="step-counter" id="step-ctr">Step 1 / 4</span>
+  </div>
+  <canvas id="cvs-steps" height="210"></canvas>
+  <figcaption id="step-caption"></figcaption>
+</figure>
+
+<!-- ══════════════════════════════════════════════════════════
+     §8  SYNTHESIS
+════════════════════════════════════════════════════════════ -->
+<hr class="divider">
+<h2>§8 — What you now know</h2>
+
+<p>
+  The mechanism is fully explicit:
+</p>
+
+<p>
+  (1) Delay converts the finite-dimensional eigenvalue problem into an
+  infinite-dimensional transcendental one — infinitely many characteristic roots.
+</p>
+<p>
+  (2) As $\tau$ increases, the leading root pair $s = \sigma \pm i\omega$ migrates
+  rightward. The crossing speed $d\sigma/d\tau > 0$ at $\tau_c$ confirms this is
+  a genuine destabilisation, not an artefact.
+</p>
+<p>
+  (3) The critical delay is $\tau_c = \pi/(2\alpha)$: stronger feedback is both
+  stabilising (faster decay when acting) and fragile (smaller delay budget
+  before instability). This is the essential tension in every feedback-with-delay system,
+  from pupillary reflexes to internet congestion control.
+</p>
+
+<div class="callout" style="border-color: var(--teal);">
+  <strong>The take-away:</strong> it is not that delayed feedback is <em>bad</em> — it can still
+  stabilise when $\tau &lt; \tau_c$. The danger is that the delay budget shrinks as
+  $1/\alpha$. Faster, more aggressive feedback actually reduces the margin.
+  Tuning for speed without accounting for latency is a recipe for oscillation.
+</div>
+
+<p style="margin-top:2rem; color:var(--text-dim); font-size:0.88rem;">
+  System: $\dot{x} = -\alpha x(t-\tau)$, $x_0 = 1$, $x \equiv x_0$ on $[-\tau, 0]$.
+  Numerics: method of steps (Euler, $dt=0.01$).
+  Characteristic roots: Newton's method, 80 initial guesses on a grid.
+</p>
+
+</article>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//   UTILITIES
+// ══════════════════════════════════════════════════════════════
+
+function dpr() { return window.devicePixelRatio || 1; }
+
+function setupCanvas(id) {
+  const c = document.getElementById(id);
+  const rect = c.parentElement.getBoundingClientRect();
+  const w = Math.floor(rect.width) || 680;
+  const h = c.height; // logical
+  const r = dpr();
+  c.width  = w * r;
+  c.height = h * r;
+  c.style.width  = w + 'px';
+  c.style.height = h + 'px';
+  const ctx = c.getContext('2d');
+  ctx.scale(r, r);
+  return { ctx, w, h };
+}
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16);
+  const g = parseInt(hex.slice(3,5),16);
+  const b = parseInt(hex.slice(5,7),16);
+  return [r,g,b];
+}
+
+// CSS variable colours
+const C = {
+  bg:      '#0b0d17',
+  bg2:     '#111424',
+  surface: '#1e2444',
+  border:  '#2a3060',
+  text:    '#dde4f5',
+  dim:     '#8892b8',
+  blue:    '#5b9cf6',
+  teal:    '#40d9c5',
+  gold:    '#f5c842',
+  red:     '#f06070',
+  green:   '#58d68d',
+  purple:  '#b07ef8',
+};
+
+// ── Simulate DDE (method of steps, Euler) ──────────────────
+function simulateDDE(alpha, tau, x0=1, dt=0.01, T=12) {
+  const N = Math.round(T / dt);
+  const D = Math.max(1, Math.round(tau / dt));
+  const xs = new Float64Array(N + D + 1).fill(x0);
+  // history: xs[0..D-1] = x0 (constant history)
+  for (let k = D; k < N + D; k++) {
+    const xd = xs[k - D]; // x(t - tau)
+    xs[k+1] = xs[k] - alpha * xd * dt;
+    // clamp to prevent runaway
+    if (xs[k+1] > 8)  xs[k+1] = 8;
+    if (xs[k+1] < -8) xs[k+1] = -8;
+  }
+  const ts = [], xsOut = [];
+  for (let k = 0; k <= N; k++) {
+    ts.push((k * dt));
+    xsOut.push(xs[k + D]);
+  }
+  return { ts, xs: xsOut };
+}
+
+// ── Draw axes ──────────────────────────────────────────────
+function drawTimeAxes(ctx, w, h, xRange, yRange) {
+  ctx.save();
+  ctx.strokeStyle = C.border;
+  ctx.lineWidth = 1;
+  // zero line
+  const y0 = h/2 + (0 - (yRange[0]+yRange[1])/2) / (yRange[1]-yRange[0]) * h;
+  ctx.beginPath(); ctx.moveTo(0, y0); ctx.lineTo(w, y0); ctx.stroke();
+  ctx.restore();
+}
+
+function mapToCanvas(t, x, w, h, tMax, yMax) {
+  return {
+    cx: t / tMax * w,
+    cy: h/2 - x / yMax * (h/2 - 16),
+  };
+}
+
+function drawTimeSeries(ctx, w, h, ts, xs, color, tMax, yMax) {
+  if (!xs.length) return;
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < ts.length; i++) {
+    const {cx, cy} = mapToCanvas(ts[i], xs[i], w, h, tMax, yMax);
+    if (i === 0) ctx.moveTo(cx, cy); else ctx.lineTo(cx, cy);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+// ══════════════════════════════════════════════════════════════
+//   §1  NO-DELAY CANVAS
+// ══════════════════════════════════════════════════════════════
+
+let nd = null;
+function initNoDelay() {
+  nd = setupCanvas('cvs-nodely');
+}
+
+function drawNoDelay(alpha) {
+  if (!nd) return;
+  const { ctx, w, h } = nd;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = C.bg2;
+  ctx.fillRect(0, 0, w, h);
+
+  const T = 10, dt = 0.01;
+  const N = Math.round(T / dt);
+  const ts = [], xs = [];
+  let x = 1;
+  for (let k = 0; k <= N; k++) {
+    ts.push(k * dt);
+    xs.push(x);
+    x = x - alpha * x * dt;
+  }
+
+  drawTimeAxes(ctx, w, h, [0, T], [-1.2, 1.2]);
+  // label
+  ctx.fillStyle = C.dim;
+  ctx.font = '11px IBM Plex Mono';
+  ctx.fillText('x₀ = 1', 6, 20);
+  ctx.fillText(`τ = 0 (no delay)`, 6, 34);
+
+  drawTimeSeries(ctx, w, h, ts, xs, C.blue, T, 1.2);
+}
+
+document.getElementById('sl-alpha').addEventListener('input', function() {
+  const v = parseFloat(this.value);
+  document.getElementById('lbl-alpha').textContent = v.toFixed(2);
+  drawNoDelay(v);
+});
+
+// ══════════════════════════════════════════════════════════════
+//   §2  DELAY CANVAS
+// ══════════════════════════════════════════════════════════════
+
+let dc = null;
+function initDelay() { dc = setupCanvas('cvs-delay'); }
+
+function drawDelay(alpha, tau) {
+  if (!dc) return;
+  const { ctx, w, h } = dc;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = C.bg2;
+  ctx.fillRect(0, 0, w, h);
+
+  const tauc = Math.PI / (2 * alpha);
+  const T = 14;
+  const { ts, xs } = simulateDDE(alpha, tau, 1, 0.01, T);
+
+  // critical τ marker on plot (vertical line? no — annotate text)
+  drawTimeAxes(ctx, w, h, [0, T], [-8, 8]);
+
+  // draw τ_c annotation
+  ctx.save();
+  ctx.font = '11px IBM Plex Mono';
+  ctx.fillStyle = C.gold;
+  ctx.fillText(`τ_c = π/(2α) = ${tauc.toFixed(3)}`, 6, 18);
+  ctx.fillStyle = C.dim;
+  ctx.fillText(`τ = ${tau.toFixed(3)}`, 6, 32);
+  ctx.restore();
+
+  drawTimeSeries(ctx, w, h, ts, xs, C.blue, T, 8);
+
+  // Stability badge
+  const badge = document.getElementById('badge-stable');
+  if (tau < tauc * 0.98) {
+    badge.className = 'stability-badge stable'; badge.textContent = 'STABLE';
+  } else if (tau < tauc * 1.04) {
+    badge.className = 'stability-badge critical'; badge.textContent = 'CRITICAL';
+  } else {
+    badge.className = 'stability-badge unstable'; badge.textContent = 'UNSTABLE';
+  }
+}
+
+document.getElementById('sl-alpha2').addEventListener('input', function() {
+  const alpha = parseFloat(this.value);
+  const tau   = parseFloat(document.getElementById('sl-tau').value);
+  document.getElementById('lbl-alpha2').textContent = alpha.toFixed(2);
+  drawDelay(alpha, tau);
+});
+document.getElementById('sl-tau').addEventListener('input', function() {
+  const alpha = parseFloat(document.getElementById('sl-alpha2').value);
+  const tau   = parseFloat(this.value);
+  document.getElementById('lbl-tau').textContent = tau.toFixed(2);
+  drawDelay(alpha, tau);
+});
+
+// ══════════════════════════════════════════════════════════════
+//   CHARACTERISTIC ROOT FINDER
+//   s + α e^{-sτ} = 0  →  f(s)=0
+//   Newton on Re & Im separately
+// ══════════════════════════════════════════════════════════════
+
+function findRoots(alpha, tau, maxRoots=22) {
+  // f(s) = s + alpha * exp(-s*tau)
+  // df/ds = 1 - alpha*tau*exp(-s*tau)
+  function fReal(sr, si) {
+    // f = sr + alpha*exp(-sr*tau)*cos(si*tau) + i*(si - alpha*exp(-sr*tau)*sin(si*tau))
+    const mag = alpha * Math.exp(-sr * tau);
+    return sr + mag * Math.cos(si * tau);
+  }
+  function fImag(sr, si) {
+    const mag = alpha * Math.exp(-sr * tau);
+    return si - mag * Math.sin(si * tau);
+  }
+  // Jacobian: [[dfr/dsr, dfr/dsi],[dfi/dsr,dfi/dsi]]
+  function jacobian(sr, si) {
+    const e = Math.exp(-sr * tau);
+    const cosT = Math.cos(si * tau);
+    const sinT = Math.sin(si * tau);
+    const a00 = 1 - alpha * tau * e * cosT;
+    const a01 =   - alpha * tau * e * (-sinT) * (-1); // actually + alpha*tau*e*sinT... let me redo
+    // dfr/dsr = 1 + alpha*(-tau)*e*cosT
+    const J00 = 1 - alpha * tau * e * cosT;
+    // dfr/dsi = alpha*e*(-tau*(-sinT)) = alpha*e*tau*sinT... wait:
+    // dfr/dsi = d/dsi [sr + alpha*e^{-sr*tau}*cos(si*tau)]
+    //         = alpha*e^{-sr*tau}*(-sin(si*tau))*tau
+    const J01 = -alpha * e * tau * sinT;
+    // dfi/dsr = d/dsr [si - alpha*e^{-sr*tau}*sin(si*tau)]
+    //         = -alpha*(-tau)*e^{-sr*tau}*sin(si*tau) = alpha*tau*e*sinT
+    const J10 = alpha * tau * e * sinT;
+    // dfi/dsi = 1 - alpha*e^{-sr*tau}*cos(si*tau)*tau
+    const J11 = 1 - alpha * e * tau * cosT;
+    return [J00, J01, J10, J11];
+  }
+  function newton(sr0, si0) {
+    let sr = sr0, si = si0;
+    for (let iter = 0; iter < 40; iter++) {
+      const fr = fReal(sr, si);
+      const fi = fImag(sr, si);
+      if (Math.abs(fr) + Math.abs(fi) < 1e-10) break;
+      const [a, b, c, d_] = jacobian(sr, si);
+      const det = a*d_ - b*c;
+      if (Math.abs(det) < 1e-14) break;
+      sr -= (d_*fr - b*fi) / det;
+      si -= (a*fi - c*fr) / det;
+    }
+    return { sr, si };
+  }
+
+  const roots = [];
+  const seen = [];
+  function isDup(sr, si) {
+    return seen.some(s => Math.abs(s[0]-sr)<0.05 && Math.abs(s[1]-si)<0.05);
+  }
+
+  // Grid of starting points
+  const srs = [-4,-3,-2,-1.5,-1,-0.5,0,0.5,1];
+  const sis = [];
+  for (let k = -10; k <= 10; k += 0.5) sis.push(k * Math.PI / (tau || 0.01));
+
+  // Also add targeted starts near expected roots
+  const tauc = Math.PI / (2 * alpha);
+  for (let k = 0; k < 8; k++) {
+    const si_expect = (2*k+1)*Math.PI/(2*(tau||0.001));
+    sis.push(si_expect);
+    sis.push(-si_expect);
+  }
+
+  for (const sr0 of srs) {
+    for (const si0 of sis) {
+      if (Math.abs(si0) > 25) continue;
+      const {sr, si} = newton(sr0, si0);
+      if (!isFinite(sr) || !isFinite(si)) continue;
+      if (Math.abs(fReal(sr,si)) + Math.abs(fImag(sr,si)) > 0.01) continue;
+      if (Math.abs(si) > 20) continue;
+      if (!isDup(sr,si)) {
+        seen.push([sr,si]);
+        roots.push({sr, si});
+      }
+      if (roots.length >= maxRoots) break;
+    }
+    if (roots.length >= maxRoots) break;
+  }
+
+  return roots;
+}
+
+// ══════════════════════════════════════════════════════════════
+//   §5  ROOT LOCUS + TIME SERIES
+// ══════════════════════════════════════════════════════════════
+
+let rl = null, ts5 = null;
+function initRootLocus() {
+  rl  = setupCanvas('cvs-roots');
+  ts5 = setupCanvas('cvs-ts');
+}
+
+function drawRootLocus(alpha, tau) {
+  if (!rl) return;
+  const { ctx, w, h } = rl;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = C.bg2;
+  ctx.fillRect(0, 0, w, h);
+
+  // Axes
+  const xMin = -5, xMax = 2.5, yMin = -12, yMax = 12;
+  function toC(sr, si) {
+    return {
+      cx: (sr - xMin) / (xMax - xMin) * w,
+      cy: h - (si - yMin) / (yMax - yMin) * h,
+    };
+  }
+
+  // Imaginary axis
+  const {cx: ax} = toC(0, 0);
+  ctx.save();
+  ctx.strokeStyle = C.border;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(ax, 0); ctx.lineTo(ax, h); ctx.stroke();
+  // Real axis
+  const {cy: ay} = toC(0, 0);
+  ctx.beginPath(); ctx.moveTo(0, ay); ctx.lineTo(w, ay); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Axis labels
+  ctx.save();
+  ctx.font = '10px IBM Plex Mono';
+  ctx.fillStyle = C.dim;
+  ctx.fillText('Re(s)', w - 34, ay - 6);
+  ctx.fillText('Im(s)', ax + 4, 12);
+  ctx.restore();
+
+  const roots = findRoots(alpha, tau);
+  // Find leading root (max Re)
+  let leadIdx = 0;
+  roots.forEach((r, i) => { if (r.sr > roots[leadIdx].sr) leadIdx = i; });
+  const lead = roots[leadIdx];
+
+  roots.forEach((r, i) => {
+    const {cx, cy} = toC(r.sr, r.si);
+    if (cx < 0 || cx > w || cy < 0 || cy > h) return;
+
+    const isLead = (Math.abs(r.sr - lead.sr) < 0.1 &&
+                    (Math.abs(r.si - lead.si) < 0.1 || Math.abs(r.si + lead.si) < 0.1));
+    const color = isLead ? C.gold : (r.sr > 0 ? C.red : C.blue);
+    const rad   = isLead ? 7 : 5;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, rad, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = isLead ? 1 : 0.75;
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // Annotation
+  const label = document.getElementById('roots-label');
+  const tauc = Math.PI / (2 * alpha);
+  if (lead) {
+    const status = lead.sr < -0.01 ? '← stable' : lead.sr > 0.01 ? '→ UNSTABLE' : '≈ critical';
+    label.textContent = `Leading root: Re(s) = ${lead.sr.toFixed(3)}, Im(s) = ${lead.si.toFixed(3)}  ${status}`;
+  }
+
+  // Time series panel
+  drawRLTimeSeries(alpha, tau);
+}
+
+function drawRLTimeSeries(alpha, tau) {
+  if (!ts5) return;
+  const { ctx, w, h } = ts5;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = C.bg2;
+  ctx.fillRect(0, 0, w, h);
+
+  const T = 14;
+  const { ts, xs } = simulateDDE(alpha, tau, 1, 0.01, T);
+  drawTimeAxes(ctx, w, h, [0, T], [-8, 8]);
+
+  const tauc = Math.PI / (2 * alpha);
+  const color = tau > tauc * 1.03 ? C.red : tau > tauc * 0.97 ? C.gold : C.blue;
+  drawTimeSeries(ctx, w, h, ts, xs, color, T, 8);
+
+  // τ_c label
+  ctx.fillStyle = C.dim;
+  ctx.font = '10px IBM Plex Mono';
+  ctx.fillText(`τ_c=${tauc.toFixed(3)}`, 6, 14);
+
+  // badge
+  const badge3 = document.getElementById('badge3');
+  if (tau < tauc * 0.97) {
+    badge3.className='stability-badge stable'; badge3.textContent='STABLE';
+  } else if (tau < tauc * 1.04) {
+    badge3.className='stability-badge critical'; badge3.textContent='CRITICAL';
+  } else {
+    badge3.className='stability-badge unstable'; badge3.textContent='UNSTABLE';
+  }
+}
+
+document.getElementById('sl-alpha3').addEventListener('input', function() {
+  const alpha = parseFloat(this.value);
+  const tau   = parseFloat(document.getElementById('sl-tau3').value);
+  document.getElementById('lbl-alpha3').textContent = alpha.toFixed(2);
+  drawRootLocus(alpha, tau);
+});
+document.getElementById('sl-tau3').addEventListener('input', function() {
+  const alpha = parseFloat(document.getElementById('sl-alpha3').value);
+  const tau   = parseFloat(this.value);
+  document.getElementById('lbl-tau3').textContent = tau.toFixed(2);
+  drawRootLocus(alpha, tau);
+});
+
+// ══════════════════════════════════════════════════════════════
+//   §6  STABILITY MAP
+// ══════════════════════════════════════════════════════════════
+
+let sm = null;
+function initStabilityMap() {
+  sm = setupCanvas('cvs-map');
+  drawStabilityMap();
+}
+
+function drawStabilityMap() {
+  if (!sm) return;
+  const { ctx, w, h } = sm;
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = C.bg2;
+  ctx.fillRect(0, 0, w, h);
+
+  const alphaMin = 0.1, alphaMax = 4;
+  const tauMin   = 0,   tauMax   = 4;
+
+  // Rasterise stability regions
+  const iw = ctx.canvas.width / dpr() | 0;
+  const ih = ctx.canvas.height / dpr() | 0;
+  const imgData = ctx.createImageData(iw, ih);
+  const d = imgData.data;
+
+  for (let px = 0; px < iw; px++) {
+    for (let py = 0; py < ih; py++) {
+      const alpha = alphaMin + (px / iw) * (alphaMax - alphaMin);
+      const tau   = tauMax   - (py / ih) * (tauMax - tauMin);
+      const tauc  = Math.PI / (2 * alpha);
+      const stable = tau < tauc;
+      const idx = (py * iw + px) * 4;
+      if (stable) {
+        // deep teal-ish
+        d[idx]   = 16;
+        d[idx+1] = 60;
+        d[idx+2] = 55;
+        d[idx+3] = 200;
+      } else {
+        // deep red
+        d[idx]   = 60;
+        d[idx+1] = 16;
+        d[idx+2] = 20;
+        d[idx+3] = 200;
+      }
+    }
+  }
+  ctx.putImageData(imgData, 0, 0);
+
+  // Draw critical curve
+  ctx.save();
+  ctx.strokeStyle = C.gold;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  let first = true;
+  for (let px = 0; px < iw; px++) {
+    const alpha = alphaMin + (px / iw) * (alphaMax - alphaMin);
+    const tauc  = Math.PI / (2 * alpha);
+    const py    = (1 - (tauc - tauMin) / (tauMax - tauMin)) * ih;
+    if (py < 0 || py > ih) { first = true; continue; }
+    if (first) { ctx.moveTo(px, py); first = false; } else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // Labels
+  ctx.save();
+  ctx.font = '12px IBM Plex Mono';
+  ctx.fillStyle = C.teal;
+  ctx.fillText('STABLE', 16, h - 20);
+  ctx.fillStyle = C.red;
+  ctx.fillText('UNSTABLE', 16, 20);
+  ctx.fillStyle = C.gold;
+  ctx.fillText('τ = π/(2α)', iw * 0.62, ih * 0.35);
+
+  // Axis labels
+  ctx.fillStyle = C.dim;
+  ctx.fillText('α →', w - 30, h - 6);
+  ctx.save();
+  ctx.translate(12, h/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillText('τ →', 0, 0);
+  ctx.restore();
+  ctx.restore();
+
+  // Hover
+  const cvs = document.getElementById('cvs-map');
+  cvs.onmousemove = function(e) {
+    const rect = cvs.getBoundingClientRect();
+    const px = e.clientX - rect.left;
+    const py = e.clientY - rect.top;
+    const alpha = alphaMin + (px / w) * (alphaMax - alphaMin);
+    const tau   = tauMax   - (py / h) * (tauMax - tauMin);
+    const tauc  = Math.PI / (2 * alpha);
+    const status = tau < tauc ? '✓ stable' : '✗ unstable';
+    document.getElementById('map-readout').textContent =
+      `α = ${alpha.toFixed(2)}, τ = ${tau.toFixed(2)}, τ_c = ${tauc.toFixed(3)}  →  ${status}`;
+  };
+}
+
+// ══════════════════════════════════════════════════════════════
+//   §7  STEP-THROUGH PROOF
+// ══════════════════════════════════════════════════════════════
+
+const STEPS = [
+  {
+    draw(ctx, w, h) {
+      ctx.fillStyle = C.bg2; ctx.fillRect(0,0,w,h);
+      // Step 1: ODE eigenvalue
+      ctx.save();
+      ctx.font = 'bold 15px IBM Plex Mono';
+      ctx.fillStyle = C.blue;
+      ctx.fillText('Step 1 — ODE eigenvalue problem', 18, 34);
+
+      ctx.font = '13px IBM Plex Mono';
+      ctx.fillStyle = C.text;
+      ctx.fillText('Ansatz: x(t) = e^{st}', 18, 70);
+      ctx.fillText('Substitute into ẋ = -αx:', 18, 92);
+      ctx.fillText('s·e^{st} = -α·e^{st}', 18, 118);
+
+      ctx.fillStyle = C.gold;
+      ctx.fillText('→  s = -α   (one root, always < 0)', 18, 148);
+
+      // draw complex plane
+      drawMiniPlane(ctx, w*0.62, h*0.12, w*0.34, h*0.82, [[-1.5, 0]], C.blue);
+      ctx.restore();
+    },
+    caption: 'The ODE has exactly one eigenvalue: s = −α. It always sits in the left half-plane. One root, always stable.'
+  },
+  {
+    draw(ctx, w, h) {
+      ctx.fillStyle = C.bg2; ctx.fillRect(0,0,w,h);
+      ctx.save();
+      ctx.font = 'bold 15px IBM Plex Mono';
+      ctx.fillStyle = C.teal;
+      ctx.fillText('Step 2 — DDE ansatz (same trick)', 18, 34);
+
+      ctx.font = '13px IBM Plex Mono';
+      ctx.fillStyle = C.text;
+      ctx.fillText('x(t) = e^{st}, x(t-τ) = e^{s(t-τ)} = e^{st}·e^{-sτ}', 18, 68);
+      ctx.fillText('Substitute into ẋ = -α·x(t-τ):', 18, 92);
+      ctx.fillText('s·e^{st} = -α·e^{st}·e^{-sτ}', 18, 118);
+
+      ctx.fillStyle = C.gold;
+      ctx.fillText('→  s + α·e^{-sτ} = 0', 18, 148);
+
+      ctx.fillStyle = C.dim;
+      ctx.font = '12px IBM Plex Mono';
+      ctx.fillText('transcendental — infinitely many roots!', 18, 174);
+      ctx.restore();
+    },
+    caption: 'Same ansatz, but e^{−sτ} is transcendental. The characteristic equation now has infinitely many complex roots.'
+  },
+  {
+    draw(ctx, w, h) {
+      ctx.fillStyle = C.bg2; ctx.fillRect(0,0,w,h);
+      ctx.save();
+      ctx.font = 'bold 15px IBM Plex Mono';
+      ctx.fillStyle = C.purple;
+      ctx.fillText('Step 3 — Seek the crossing: s = iω', 18, 34);
+
+      ctx.font = '13px IBM Plex Mono';
+      ctx.fillStyle = C.text;
+      ctx.fillText('Set s = iω (purely imaginary):', 18, 66);
+      ctx.fillText('iω + α·e^{-iωτ} = 0', 18, 88);
+      ctx.fillText('iω + α(cos ωτ − i sin ωτ) = 0', 18, 112);
+
+      ctx.fillStyle = C.teal;
+      ctx.fillText('Re: α cos ωτ = 0   →   ωτ = π/2', 18, 140);
+      ctx.fillText('Im: ω − α sin ωτ = 0   →   ω = α', 18, 162);
+
+      ctx.fillStyle = C.gold;
+      ctx.font = 'bold 13px IBM Plex Mono';
+      ctx.fillText('→  τ_c = π/(2α)', 18, 192);
+      ctx.restore();
+    },
+    caption: 'Set s = iω and separate real/imaginary parts. Both equations are satisfied simultaneously only at τ = π/(2α).'
+  },
+  {
+    draw(ctx, w, h) {
+      ctx.fillStyle = C.bg2; ctx.fillRect(0,0,w,h);
+      ctx.save();
+      ctx.font = 'bold 15px IBM Plex Mono';
+      ctx.fillStyle = C.red;
+      ctx.fillText('Step 4 — The crossing is destabilising', 18, 34);
+
+      ctx.font = '13px IBM Plex Mono';
+      ctx.fillStyle = C.text;
+      ctx.fillText('Write s(τ) = σ(τ) + iω(τ).', 18, 66);
+      ctx.fillText('Differentiate char. eq. implicitly:', 18, 88);
+      ctx.fillText('ds/dτ = α s e^{-sτ} / (1 + ατe^{-sτ})', 18, 112);
+
+      ctx.fillStyle = C.teal;
+      ctx.fillText('Evaluate dσ/dτ at τ = τ_c:', 18, 140);
+
+      ctx.fillStyle = C.gold;
+      ctx.font = 'bold 13px IBM Plex Mono';
+      ctx.fillText('dσ/dτ|_{τ_c} = α²/(1+α²τ_c²) > 0', 18, 170);
+
+      ctx.fillStyle = C.red;
+      ctx.font = '12px IBM Plex Mono';
+      ctx.fillText('Root crosses LEFT → RIGHT: genuine Hopf bifurcation.', 18, 198);
+      ctx.restore();
+    },
+    caption: 'The transversality condition dσ/dτ > 0 confirms the crossing is genuine: the system goes from stable to unstable, not back again.'
+  },
+];
+
+let step = 0;
+let stepsCanvas = null;
+
+function initSteps() {
+  stepsCanvas = setupCanvas('cvs-steps');
+  drawStep();
+}
+
+function drawMiniPlane(ctx, x, y, pw, ph, dots, color) {
+  // small complex plane diagram
+  ctx.save();
+  ctx.strokeStyle = C.border;
+  ctx.lineWidth = 1;
+  // box
+  ctx.strokeRect(x, y, pw, ph);
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(x+1, y+1, pw-2, ph-2);
+  // axes
+  const mx = x + pw/2, my = y + ph/2;
+  ctx.beginPath(); ctx.moveTo(x+4, my); ctx.lineTo(x+pw-4, my); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx, y+4); ctx.lineTo(mx, y+ph-4); ctx.stroke();
+  // imag axis highlight
+  ctx.strokeStyle = C.border; ctx.lineWidth=1.5; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(mx, y+4); ctx.lineTo(mx, y+ph-4); ctx.stroke();
+  ctx.setLineDash([]);
+  // labels
+  ctx.font = '9px IBM Plex Mono'; ctx.fillStyle = C.dim;
+  ctx.fillText('Re', x+pw-18, my-3);
+  ctx.fillText('Im', mx+2, y+11);
+
+  dots.forEach(([sr, si]) => {
+    const cx2 = mx + sr * pw * 0.22;
+    const cy2 = my - si * ph * 0.12;
+    ctx.beginPath(); ctx.arc(cx2, cy2, 5, 0, Math.PI*2);
+    ctx.fillStyle = color; ctx.fill();
+  });
+  ctx.restore();
+}
+
+function drawStep() {
+  if (!stepsCanvas) return;
+  const { ctx, w, h } = stepsCanvas;
+  STEPS[step].draw(ctx, w, h);
+  document.getElementById('step-ctr').textContent = `Step ${step+1} / ${STEPS.length}`;
+  document.getElementById('step-caption').textContent = STEPS[step].caption;
+}
+
+document.getElementById('step-fwd').addEventListener('click', () => {
+  step = (step + 1) % STEPS.length; drawStep();
+});
+document.getElementById('step-back').addEventListener('click', () => {
+  step = (step - 1 + STEPS.length) % STEPS.length; drawStep();
+});
+
+// ══════════════════════════════════════════════════════════════
+//   SCROLL REVEAL
+// ══════════════════════════════════════════════════════════════
+
+function setupReveal() {
+  document.querySelectorAll('figure, h2, .callout, .eq-box').forEach(el => {
+    el.classList.add('reveal');
+  });
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+}
+
+// ══════════════════════════════════════════════════════════════
+//   INIT
+// ══════════════════════════════════════════════════════════════
+
+window.addEventListener('DOMContentLoaded', () => {
+  setupReveal();
+
+  // Wait a tick for layout
+  requestAnimationFrame(() => {
+    initNoDelay();
+    drawNoDelay(1.5);
+
+    initDelay();
+    drawDelay(1.5, 0);
+
+    initRootLocus();
+    drawRootLocus(1.5, 0);
+
+    initStabilityMap();
+    initSteps();
+  });
+});
+
+window.addEventListener('resize', () => {
+  initNoDelay(); drawNoDelay(parseFloat(document.getElementById('sl-alpha').value));
+  initDelay();   drawDelay(parseFloat(document.getElementById('sl-alpha2').value),
+                           parseFloat(document.getElementById('sl-tau').value));
+  initRootLocus(); drawRootLocus(parseFloat(document.getElementById('sl-alpha3').value),
+                                 parseFloat(document.getElementById('sl-tau3').value));
+  initStabilityMap();
+  initSteps();
+});
+</script>
+</body>
+</html>

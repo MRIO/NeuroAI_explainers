@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Propagation Demos: Ring + Feedforward</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #0b0f14; color: #e8eef7; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+    #wrap { display: flex; flex-direction: column; height: 100%; }
+    header {
+      padding: 10px 14px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      flex-wrap: wrap;
+    }
+    header .title { font-weight: 700; letter-spacing: 0.2px; }
+    header .spacer { flex: 1; }
+    button, input[type="range"], select {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #e8eef7;
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+    }
+    button:hover, select:hover { background: rgba(255,255,255,0.09); }
+    .pill { padding: 6px 10px; border-radius: 999px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+    #canvas { width: 100%; height: 100%; display: block; }
+    footer {
+      padding: 8px 14px;
+      font-size: 12px;
+      color: rgba(232,238,247,0.72);
+      border-top: 1px solid rgba(255,255,255,0.08);
+    }
+    code { color: #cfe7ff; }
+    label { display: flex; align-items: center; gap: 8px; }
+  </style>
+</head>
+<body>
+<div id="wrap">
+  <header>
+    <div class="title">Matrix–Vector ↔ Graph Propagation</div>
+    <div class="pill" id="status">t = 0</div>
+    <label>
+      Graph
+      <select id="graphMode">
+        <option value="ring">Ring (9 nodes)</option>
+        <option value="ff">Feedforward (1–2–3–4–5 layers, 15 nodes)</option>
+      </select>
+    </label>
+    <div class="spacer"></div>
+    <label>
+      Speed
+      <input id="speed" type="range" min="0.3" max="2.5" step="0.1" value="1.2" />
+    </label>
+    <button id="pause">Pause</button>
+    <button id="step">Step</button>
+    <button id="reset">Reset</button>
+  </header>
+
+  <canvas id="canvas"></canvas>
+
+  <footer>
+    Convention: <code>a<sub>ij</sub> = 1 ⇒ j → i</code> (column = source, row = target). We compute <code>y = A s</code> then update <code>s ← 𝟙[y ≥ 1]</code>.
+  </footer>
+</div>
+
+<script>
+(() => {
+  // ============================================================
+  // Graph builders
+  // ============================================================
+  function makeRing9() {
+    const N = 9;
+    const A = Array.from({length:N}, () => Array(N).fill(0));
+    for (let j=0; j<N; j++) {
+      const i = (j+1) % N; // j -> i
+      A[i][j] = 1;
+    }
+    const layout = (panel) => {
+      // circular node positions inside right panel
+      const cx = panel.x + panel.w/2;
+      const cy = panel.y + panel.h/2 + 14;
+      const R = Math.min(panel.w, panel.h) * 0.33;
+      const pts = [];
+      for (let k=0; k<N; k++) {
+        const ang = -Math.PI/2 + (k * 2*Math.PI / N);
+        pts.push({ x: cx + R*Math.cos(ang), y: cy + R*Math.sin(ang) });
+      }
+      // edges: k -> k+1
+      const edges = [];
+      for (let k=0; k<N; k++) edges.push({ from:k, to:(k+1)%N });
+      return { pts, edges };
+    };
+    return { name: "Ring (9)", N, A, layout };
+  }
+
+  function makeFeedforward12345() {
+    // Layers: 1,2,3,4,5 => total 15 nodes
+    const sizes = [1,2,3,4,5];
+    const offsets = [];
+    let total = 0;
+    for (const s of sizes) { offsets.push(total); total += s; }
+    const N = total;
+
+    const A = Array.from({length:N}, () => Array(N).fill(0));
+
+    // Fully connect layer L -> L+1 (directed forward)
+    for (let L=0; L<sizes.length-1; L++) {
+      const fromStart = offsets[L];
+      const toStart   = offsets[L+1];
+      for (let a=0; a<sizes[L]; a++) {
+        const j = fromStart + a; // source
+        for (let b=0; b<sizes[L+1]; b++) {
+          const i = toStart + b; // target
+          A[i][j] = 1;           // j -> i
+        }
+      }
+    }
+
+    const layout = (panel) => {
+      // Top-to-bottom layers in right panel
+      const cx = panel.x + panel.w/2;
+      const top = panel.y + 70;
+      const bottom = panel.y + panel.h - 60;
+      const layerGap = (bottom - top) / (sizes.length - 1);
+
+      const pts = Array(N);
+      for (let L=0; L<sizes.length; L++) {
+        const y = top + L*layerGap;
+        const count = sizes[L];
+        const spread = Math.min(panel.w*0.75, 340);
+        for (let k=0; k<count; k++) {
+          const x = cx + (count===1 ? 0 : (k/(count-1) - 0.5) * spread);
+          pts[offsets[L] + k] = { x, y };
+        }
+      }
+
+      // edges from A (store for drawing)
+      const edges = [];
+      for (let i=0; i<N; i++) {
+        for (let j=0; j<N; j++) {
+          if (A[i][j] === 1) edges.push({ from:j, to:i });
+        }
+      }
+      return { pts, edges };
+    };
+
+    return { name: "Feedforward (1–2–3–4–5)", N, A, layout };
+  }
+
+  const GRAPHS = {
+    ring: makeRing9(),
+    ff: makeFeedforward12345(),
+  };
+
+  // ============================================================
+  // State
+  // ============================================================
+  let mode = "ring";
+  let G = GRAPHS[mode];
+
+  let s = [];
+  let y = [];
+  let t = 0;
+
+  function initState() {
+    s = Array(G.N).fill(0);
+    s[0] = 1;                 // node 1 active only
+    y = Array(G.N).fill(0);
+    t = 0;
+    resetStepMachine();
+    statusEl.textContent = "t = 0";
+  }
+
+  // ============================================================
+  // Animation machine: row-by-row + pulse
+  // ============================================================
+  let paused = false;
+  let speed = 1.2;
+
+  let phase = "row";          // "row" or "commit"
+  let rowIndex = 0;
+  let phaseProgress = 0;
+  let activePulse = null;     // {from,to,progress}
+
+  function resetStepMachine() {
+    phase = "row";
+    rowIndex = 0;
+    phaseProgress = 0;
+    activePulse = null;
+  }
+
+  function computeY() {
+    const out = Array(G.N).fill(0);
+    for (let i=0; i<G.N; i++) {
+      let sum = 0;
+      for (let j=0; j<G.N; j++) sum += G.A[i][j] * s[j];
+      out[i] = sum;
+    }
+    return out;
+  }
+
+  function threshold(vec) {
+    return vec.map(v => (v >= 1 ? 1 : 0));
+  }
+
+  function pickPulseForRow(i) {
+    // pick the first active contributing source j for this row (if any)
+    for (let j=0; j<G.N; j++) {
+      if (G.A[i][j] === 1 && s[j] === 1) return j;
+    }
+    return null;
+  }
+
+  function commitRow(i) {
+    // Commit y_i = sum_j a_ij s_j (but only commit one row at a time visually)
+    let sum = 0;
+    for (let j=0; j<G.N; j++) sum += G.A[i][j] * s[j];
+    y[i] = sum;
+  }
+
+  function advanceRowMachine(dt) {
+    const uInc = dt * speed;
+
+    if (phase === "row") {
+      phaseProgress += uInc * 0.9;
+
+      if (!activePulse) {
+        const j = pickPulseForRow(rowIndex);
+        if (j !== null) activePulse = { from: j, to: rowIndex, progress: 0 };
+      }
+      if (activePulse) activePulse.progress = Math.min(1, phaseProgress);
+
+      if (phaseProgress >= 1) {
+        phase = "commit";
+        phaseProgress = 0;
+        activePulse = null;
+      }
+      return;
+    }
+
+    if (phase === "commit") {
+      phaseProgress += uInc * 1.6;
+      if (phaseProgress >= 1) {
+        commitRow(rowIndex);
+        rowIndex++;
+        phaseProgress = 0;
+        phase = "row";
+
+        if (rowIndex >= G.N) {
+          // end of sweep: compute full y, then update s
+          const yFull = computeY();
+          y = yFull.slice();
+          s = threshold(yFull);
+
+          t += 1;
+          statusEl.textContent = `t = ${t}`;
+          resetStepMachine();
+        }
+      }
+      return;
+    }
+  }
+
+  function runOneFullStep() {
+    const targetT = t + 1;
+    let safety = 0;
+    while (t < targetT && safety < 8000) {
+      advanceRowMachine(0.02);
+      safety++;
+    }
+  }
+
+  // ============================================================
+  // Canvas + drawing
+  // ============================================================
+  const canvas = document.getElementById("canvas");
+  const ctx = canvas.getContext("2d");
+
+  function resize() {
+    const dpr = Math.max(1, window.devicePixelRatio || 1);
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  function clear() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function roundRect(x, y, w, h, r) {
+    const rr = Math.min(r, w/2, h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr, y);
+    ctx.arcTo(x+w, y, x+w, y+h, rr);
+    ctx.arcTo(x+w, y+h, x, y+h, rr);
+    ctx.arcTo(x, y+h, x, y, rr);
+    ctx.arcTo(x, y, x+w, y, rr);
+    ctx.closePath();
+  }
+
+  function drawText(text, x, y, size=14, color="rgba(232,238,247,0.9)", align="center") {
+    ctx.fillStyle = color;
+    ctx.font = `${size}px system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`;
+    ctx.textAlign = align;
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x, y);
+  }
+
+  function lerp(a,b,u){ return a + (b-a)*u; }
+
+  function layout() {
+    const w = canvas.getBoundingClientRect().width;
+    const h = canvas.getBoundingClientRect().height;
+    const pad = 18;
+    const midX = w / 2;
+    const left = { x: pad, y: pad, w: midX - pad*1.3, h: h - pad*2 };
+    const right = { x: midX + pad*0.3, y: pad, w: w - (midX + pad*0.3) - pad, h: h - pad*2 };
+    return { w, h, left, right, midX };
+  }
+
+  // --- Left panel: matrix view (row highlight + whole s + y_i receiver)
+  function drawMatrixPanel(panel) {
+    ctx.fillStyle = "rgba(255,255,255,0.03)";
+    roundRect(panel.x, panel.y, panel.w, panel.h, 16);
+    ctx.fill();
+
+    drawText(`y = A s  (row-by-row) — ${G.name}`, panel.x + panel.w/2, panel.y + 22, 15, "rgba(232,238,247,0.95)");
+
+    const top = panel.y + 52;
+
+    // Cell size: adapt to N (keep readable)
+    const maxCell = 24;
+    const minCell = 10;
+    const cell = Math.max(minCell, Math.min(maxCell, Math.floor((panel.w - 140) / (G.N + 2))));
+
+    const Ax = panel.x + 46;
+    const Ay = top;
+
+    const isRowPhase = (phase === "row" || phase === "commit");
+
+    const baseCell = "rgba(255,255,255,0.05)";
+    const rowHL = "rgba(255, 210, 80, 0.16)";
+    const sHL = "rgba(255, 210, 80, 0.10)";
+    const yHL = "rgba(120, 220, 255, 0.16)";
+
+    // A label
+    drawText("A", panel.x + 24, Ay + (G.N*cell)/2, 18, "rgba(232,238,247,0.85)");
+
+    // Draw A
+    for (let i=0; i<G.N; i++) {
+      const highlightRow = isRowPhase && (i === rowIndex);
+      for (let j=0; j<G.N; j++) {
+        const x = Ax + j*cell;
+        const y0 = Ay + i*cell;
+        ctx.fillStyle = highlightRow ? rowHL : baseCell;
+        ctx.fillRect(x, y0, cell-1, cell-1);
+
+        const v = G.A[i][j];
+        const c = v ? "rgba(232,238,247,0.92)" : "rgba(232,238,247,0.22)";
+        drawText(String(v), x + cell/2, y0 + cell/2, 11, c);
+      }
+    }
+
+    // Indices (only if it fits)
+    if (cell >= 14) {
+      for (let i=0; i<G.N; i++) {
+        drawText(String(i+1), Ax - 8, Ay + i*cell + cell/2, 10, "rgba(232,238,247,0.55)", "right");
+        drawText(String(i+1), Ax + i*cell + cell/2, Ay - 10, 10, "rgba(232,238,247,0.55)");
+      }
+    }
+
+    // s vector
+    const sx = Ax + G.N*cell + 26;
+    const sy = Ay;
+    drawText("s", sx + 8, sy + (G.N*cell)/2, 18, "rgba(232,238,247,0.85)");
+
+    if (isRowPhase) {
+      ctx.fillStyle = sHL;
+      ctx.fillRect(sx + 20, sy - 1, cell + 10, G.N*cell + 2);
+    }
+
+    for (let i=0; i<G.N; i++) {
+      const x = sx + 26;
+      const y0 = sy + i*cell;
+      ctx.fillStyle = baseCell;
+      ctx.fillRect(x, y0, cell-1, cell-1);
+
+      const c = s[i] ? "rgba(232,238,247,0.95)" : "rgba(232,238,247,0.35)";
+      drawText(String(s[i]), x + cell/2, y0 + cell/2, 11, c);
+    }
+
+    // y vector
+    const yx = sx + 26 + cell + 24;
+    const yy = Ay;
+    drawText("y", yx + 8, yy + (G.N*cell)/2, 18, "rgba(232,238,247,0.85)");
+
+    for (let i=0; i<G.N; i++) {
+      const x = yx + 26;
+      const y0 = yy + i*cell;
+      const highlightYi = isRowPhase && (i === rowIndex);
+      ctx.fillStyle = highlightYi ? yHL : baseCell;
+      ctx.fillRect(x, y0, cell-1, cell-1);
+
+      const c = (y[i] > 0) ? "rgba(232,238,247,0.95)" : "rgba(232,238,247,0.35)";
+      drawText(String(y[i]), x + cell/2, y0 + cell/2, 11, c);
+    }
+
+    // Bottom notes
+    const noteY = Ay + G.N*cell + 26;
+    const note1 = "Highlight: row i in A, whole s, and receiver y_i";
+    const note2 = "Update after full sweep: s ← 𝟙[y ≥ 1]";
+    drawText(note1, panel.x + 18, noteY, 12, "rgba(232,238,247,0.70)", "left");
+    drawText(note2, panel.x + 18, noteY + 18, 12, "rgba(232,238,247,0.60)", "left");
+  }
+
+  // --- Right panel: graph view
+  function drawGraphPanel(panel) {
+    ctx.fillStyle = "rgba(255,255,255,0.03)";
+    roundRect(panel.x, panel.y, panel.w, panel.h, 16);
+    ctx.fill();
+
+    drawText(`Propagation — ${G.name}`, panel.x + panel.w/2, panel.y + 22, 16, "rgba(232,238,247,0.95)");
+
+    const { pts, edges } = G.layout(panel);
+
+    // edges
+    ctx.lineWidth = 2;
+    for (const e of edges) {
+      const a = pts[e.from];
+      const b = pts[e.to];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      const pad = 18;
+      const x1 = a.x + ux*pad, y1 = a.y + uy*pad;
+      const x2 = b.x - ux*pad, y2 = b.y - uy*pad;
+
+      ctx.strokeStyle = "rgba(232,238,247,0.25)";
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // arrowhead
+      const ah = 10, aw = 6;
+      const px = -uy, py = ux;
+      ctx.fillStyle = "rgba(232,238,247,0.25)";
+      ctx.beginPath();
+      ctx.moveTo(x2, y2);
+      ctx.lineTo(x2 - ux*ah + px*aw, y2 - uy*ah + py*aw);
+      ctx.lineTo(x2 - ux*ah - px*aw, y2 - uy*ah - py*aw);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // nodes
+    for (let k=0; k<G.N; k++) {
+      const p = pts[k];
+      const bit = s[k];
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 17, 0, Math.PI*2);
+      ctx.closePath();
+
+      ctx.fillStyle = bit ? "rgba(255,255,255,0.95)" : "rgba(0,0,0,0.55)";
+      ctx.strokeStyle = "rgba(232,238,247,0.65)";
+      ctx.lineWidth = 2;
+      ctx.fill();
+      ctx.stroke();
+
+      drawText(String(k+1), p.x, p.y - 28, 11, "rgba(232,238,247,0.70)");
+      drawText(String(bit), p.x, p.y, 13, bit ? "rgba(0,0,0,0.85)" : "rgba(232,238,247,0.65)");
+    }
+
+    // pulse
+    if (activePulse) {
+      const from = pts[activePulse.from];
+      const to = pts[activePulse.to];
+      const u = activePulse.progress;
+      const x = lerp(from.x, to.x, u);
+      const yy = lerp(from.y, to.y, u);
+      ctx.beginPath();
+      ctx.arc(x, yy, 5, 0, Math.PI*2);
+      ctx.closePath();
+      ctx.fillStyle = "rgba(255, 210, 80, 0.95)";
+      ctx.fill();
+    }
+  }
+
+  // ============================================================
+  // UI wiring
+  // ============================================================
+  const statusEl = document.getElementById("status");
+  const pauseBtn = document.getElementById("pause");
+  const stepBtn = document.getElementById("step");
+  const resetBtn = document.getElementById("reset");
+  const speedSlider = document.getElementById("speed");
+  const graphModeSel = document.getElementById("graphMode");
+
+  speedSlider.addEventListener("input", () => speed = parseFloat(speedSlider.value));
+
+  pauseBtn.addEventListener("click", () => {
+    paused = !paused;
+    pauseBtn.textContent = paused ? "Resume" : "Pause";
+  });
+
+  stepBtn.addEventListener("click", () => {
+    paused = true;
+    pauseBtn.textContent = "Resume";
+    runOneFullStep();
+  });
+
+  resetBtn.addEventListener("click", () => initState());
+
+  graphModeSel.addEventListener("change", () => {
+    mode = graphModeSel.value;
+    G = GRAPHS[mode];
+    initState();
+  });
+
+  // ============================================================
+  // Main loop
+  // ============================================================
+  initState();
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+
+    if (!paused) advanceRowMachine(dt);
+
+    const { left, right, midX } = layout();
+    clear();
+
+    // divider
+    ctx.strokeStyle = "rgba(255,255,255,0.08)";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(midX, 12);
+    ctx.lineTo(midX, canvas.getBoundingClientRect().height - 12);
+    ctx.stroke();
+
+    drawMatrixPanel(left);
+    drawGraphPanel(right);
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

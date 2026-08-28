@@ -1,0 +1,510 @@
+<!-- vibe coding for life -->
+<!-- https://chatgpt.com/share/6929a1d3-c014-8011-9e2e-60f41f07177d -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Neural Grid with Leak + Plasticity</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      margin: 0;
+    }
+    #left {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #right {
+      width: 360px;
+      padding: 16px;
+      box-sizing: border-box;
+      background: #181818;
+      border-left: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+    canvas {
+      border: 1px solid #333;
+      background: #000;
+    }
+    .control-group {
+      margin-bottom: 8px;
+    }
+    label {
+      font-size: 0.9rem;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    .small {
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+    button {
+      background: #333;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    button:hover {
+      background: #444;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #333;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <canvas id="networkCanvas" width="500" height="500"></canvas>
+  </div>
+  <div id="right">
+    <h2>Neural Grid Controls</h2>
+
+    <!-- Walker controls -->
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="manualControl">
+        Manual stimulus control (use sliders)
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label for="sliderX">Stimulus X position</label>
+      <input type="range" id="sliderX" min="0" max="99" value="50">
+    </div>
+
+    <div class="control-group">
+      <label for="sliderY">Stimulus Y position</label>
+      <input type="range" id="sliderY" min="0" max="99" value="50">
+    </div>
+
+    <div class="control-group">
+      <label for="stimStrength">Stimulus strength</label>
+      <input type="range" id="stimStrength" min="0" max="2" step="0.01" value="0.8">
+      <div class="small">How strongly the walker drives the network</div>
+    </div>
+
+    <!-- Leak -->
+    <div class="control-group">
+      <label for="leak">Leak (update fraction λ)</label>
+      <input type="range" id="leak" min="0" max="1" step="0.01" value="1.0">
+      <div class="small">
+        0 = frozen state, 1 = full tanh update (no leak), in-between = slower dynamics.
+      </div>
+    </div>
+
+    <!-- Local connectivity -->
+    <div class="control-group">
+      <label for="coupling">Local coupling gain (g_local)</label>
+      <input type="range" id="coupling" min="0" max="1.5" step="0.01" value="0.9">
+      <div class="small">Scales the local Gaussian recurrent kernel</div>
+    </div>
+
+    <!-- Random connectivity controls -->
+    <hr>
+
+    <div class="control-group">
+      <label for="randomProb">Random conn. probability</label>
+      <input type="range" id="randomProb" min="0" max="0.02" step="0.001" value="0.005">
+      <div class="small">
+        Approx. fraction of possible connections used per neuron (sparse). Higher = denser.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="randomGain">Random connectivity gain (g_random)</label>
+      <input type="range" id="randomGain" min="0" max="2.0" step="0.01" value="0.5">
+      <div class="small">
+        Global multiplier on the random weight matrix
+        (proxy for spectral radius → subcritical vs chaotic).
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="dalesRule" checked>
+        Enforce Dale's rule (E/I neurons)
+      </label>
+      <div class="small">
+        Each neuron is either excitatory or inhibitory; all outgoing random weights share one sign.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <button id="regenConn">Regenerate random connectivity</button>
+      <div class="small">
+        Re-samples the random connectivity with current probability and Dale setting.
+      </div>
+    </div>
+
+    <!-- Plasticity controls -->
+    <hr>
+
+    <div class="control-group">
+      <label for="learningRate">Learning rate (η)</label>
+      <input type="range" id="learningRate" min="0" max="0.02" step="0.0005" value="0.000">
+      <div class="small">
+        Sejnowski covariance rule on random weights.
+        Set to 0 to disable plasticity.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="maWindow">Moving average window (steps)</label>
+      <input type="range" id="maWindow" min="1" max="2000" step="1" value="100">
+      <div class="small">
+        Larger window = slower-moving mean activity.
+        We use an exponential moving average with α = 1 / window.
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="control-group">
+      <label for="updateSpeed">Update speed</label>
+      <input type="range" id="updateSpeed" min="1" max="5" step="1" value="2">
+      <div class="small">Iterations per animation frame</div>
+    </div>
+
+    <p class="small">
+      - 100×100 tanh neurons<br>
+      - Leak + local Gaussian connectivity (radius ≈ 3)<br>
+      - Sparse random connectivity (E/I optional)<br>
+      - Sejnowski-style Hebbian plasticity on random weights<br>
+      - Walker-driven Gaussian input (random walk or sliders)
+    </p>
+  </div>
+
+  <script>
+    // --- Model parameters ---
+    const N = 100;                 // grid size
+    const radius = 3;              // local connectivity radius in lattice units
+    const sigmaKernel = 2.0;       // std dev for local Gaussian kernel
+    const sigmaStim = 2.0;         // std dev for stimulus Gaussian
+    const canvasSize = 500;        // canvas is canvasSize x canvasSize pixels
+    const numNeurons = N * N;
+
+    // --- DOM elements ---
+    const canvas = document.getElementById('networkCanvas');
+    const ctx = canvas.getContext('2d');
+
+    const sliderX = document.getElementById('sliderX');
+    const sliderY = document.getElementById('sliderY');
+    const stimStrengthSlider = document.getElementById('stimStrength');
+    const leakSlider = document.getElementById('leak');
+    const couplingSlider = document.getElementById('coupling');
+    const updateSpeedSlider = document.getElementById('updateSpeed');
+    const manualControlCheckbox = document.getElementById('manualControl');
+
+    const randomProbSlider = document.getElementById('randomProb');
+    const randomGainSlider = document.getElementById('randomGain');
+    const dalesRuleCheckbox = document.getElementById('dalesRule');
+    const regenButton = document.getElementById('regenConn');
+
+    const learningRateSlider = document.getElementById('learningRate');
+    const maWindowSlider = document.getElementById('maWindow');
+
+    // --- State ---
+    let state = new Float32Array(numNeurons);
+    let nextState = new Float32Array(numNeurons);
+    let meanActivity = new Float32Array(numNeurons); // moving averages <a_i>
+
+    // Initialize with small random values
+    for (let i = 0; i < state.length; i++) {
+      state[i] = (Math.random() - 0.5) * 0.1;
+      meanActivity[i] = 0.0;
+    }
+
+    // Walker position (stimulus center)
+    let walker = { x: N / 2, y: N / 2 };
+
+    // --- Local Gaussian kernel ---
+    const kernel = [];
+    (function buildKernel() {
+      let sum = 0;
+      for (let dy = -radius; dy <= radius; dy++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          const r2 = dx * dx + dy * dy;
+          const val = Math.exp(-r2 / (2 * sigmaKernel * sigmaKernel));
+          kernel.push({ dx, dy, w: val });
+          sum += val;
+        }
+      }
+      // Normalize to sum=1; gain will be applied separately
+      for (const k of kernel) {
+        k.w /= sum;
+      }
+    })();
+
+    // --- Random connectivity (sparse) ---
+    // Store incoming connections for each neuron:
+    // randomInConnections[postIndex] = [{ pre: preIndex, w: weight }, ...]
+    let randomInConnections = [];
+    let neuronType = new Int8Array(numNeurons); // +1 excitatory, -1 inhibitory (if Dale's rule)
+
+    function regenerateRandomConnectivity() {
+      const prob = parseFloat(randomProbSlider.value); // 0..0.02
+      const useDales = dalesRuleCheckbox.checked;
+
+      randomInConnections = new Array(numNeurons);
+      for (let i = 0; i < numNeurons; i++) {
+        randomInConnections[i] = [];
+      }
+
+      // Assign neuron types if enforcing Dale's rule
+      if (useDales) {
+        const excitatoryFraction = 0.5; // 80% E, 20% I
+        for (let i = 0; i < numNeurons; i++) {
+          neuronType[i] = (Math.random() < excitatoryFraction) ? 1 : -1;
+        }
+      } else {
+        for (let i = 0; i < numNeurons; i++) {
+          neuronType[i] = 0; // unused
+        }
+      }
+
+      // For each presynaptic neuron, give it k random outgoing targets
+      // k ≈ prob * numNeurons; this ensures average in-degree ≈ prob * numNeurons.
+      let k = Math.round(prob * numNeurons);
+      const maxK = 100;          // cap for performance (and your laptop's sanity)
+      if (k > maxK) k = maxK;
+
+      if (k <= 0) {
+        console.log('Random connectivity: no connections (prob too low).');
+        return;
+      }
+
+      for (let pre = 0; pre < numNeurons; pre++) {
+        const sign = useDales ? (neuronType[pre] > 0 ? 1 : -1) : 1;
+
+        for (let c = 0; c < k; c++) {
+          const post = Math.floor(Math.random() * numNeurons);
+
+          // Base weight: uniform in [-1, 1]
+          const base = (Math.random() * 2 - 1);
+          const w = useDales ? sign * Math.abs(base) : base;
+
+          randomInConnections[post].push({ pre, w });
+        }
+      }
+
+      console.log('Random connectivity regenerated.',
+                  'prob=', prob.toFixed(3), 'k≈', k);
+    }
+
+    // --- Utility functions ---
+    function idx(x, y) {
+      return y * N + x;
+    }
+
+    // Periodic boundary conditions
+    function wrapIndex(x, N) {
+      if (x < 0) return x + N;
+      if (x >= N) return x - N;
+      return x;
+    }
+
+    // Random walk step for the walker
+    function stepWalker() {
+      const dir = Math.floor(Math.random() * 4);
+      if (dir === 0) walker.x += 1;
+      else if (dir === 1) walker.x -= 1;
+      else if (dir === 2) walker.y += 1;
+      else walker.y -= 1;
+
+      // Wrap around
+      walker.x = wrapIndex(walker.x, N);
+      walker.y = wrapIndex(walker.y, N);
+    }
+
+    // --- Moving average update (<a_i>) ---
+    function updateMovingAverages() {
+      const window = Math.max(1, parseInt(maWindowSlider.value));
+      const alpha = 1.0 / window;  // EMA with effective window ~ W
+
+      for (let i = 0; i < numNeurons; i++) {
+        const a = state[i];
+        const m = meanActivity[i];
+        meanActivity[i] = m + alpha * (a - m);
+      }
+    }
+
+    // --- Hebbian update (Sejnowski covariance rule) ---
+    function hebbianUpdate() {
+      const eta = parseFloat(learningRateSlider.value);
+      if (eta === 0) return; // plasticity off
+
+      const useDales = dalesRuleCheckbox.checked;
+
+      for (let post = 0; post < numNeurons; post++) {
+        const a_i = state[post];
+        const m_i = meanActivity[post];
+        const di = a_i - m_i;
+
+        const incoming = randomInConnections[post];
+        if (!incoming || incoming.length === 0) continue;
+
+        for (let e = 0; e < incoming.length; e++) {
+          const edge = incoming[e];
+          const pre = edge.pre;
+          const a_j = state[pre];
+          const m_j = meanActivity[pre];
+          const dj = a_j - m_j;
+
+          // Δw_ij = η (a_i - <a_i>) (a_j - <a_j>)
+          edge.w += eta * di * dj;
+
+          // Re-enforce Dale's rule by projecting back to correct sign
+          if (useDales) {
+            const sign = neuronType[pre] >= 0 ? 1 : -1;
+            edge.w = sign * Math.abs(edge.w);
+          }
+        }
+      }
+    }
+
+    // --- Network update ---
+    function updateNetwork() {
+      const couplingGain = parseFloat(couplingSlider.value);       // local g
+      const stimStrength = parseFloat(stimStrengthSlider.value);   // stimulus amplitude
+      const randomGain = parseFloat(randomGainSlider.value);       // global random gain
+      const leak = parseFloat(leakSlider.value);                   // leak λ
+
+      // Update walker position
+      if (manualControlCheckbox.checked) {
+        walker.x = parseInt(sliderX.value);
+        walker.y = parseInt(sliderY.value);
+      } else {
+        stepWalker();
+      }
+
+      // 1) Update moving averages based on current state
+      updateMovingAverages();
+
+      // 2) Hebbian update of random weights using current state & means
+      hebbianUpdate();
+
+      // 3) Compute next state with leak
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const index = idx(x, y);
+
+          let input = 0.0;
+
+          // Local recurrent input: Gaussian kernel with periodic boundaries
+          for (let k = 0; k < kernel.length; k++) {
+            const dx = kernel[k].dx;
+            const dy = kernel[k].dy;
+            const w = kernel[k].w;
+
+            const xx = wrapIndex(x + dx, N);
+            const yy = wrapIndex(y + dy, N);
+
+            input += w * state[idx(xx, yy)];
+          }
+          input *= couplingGain;
+
+          // Random recurrent input: sparse random matrix
+          const incoming = randomInConnections[index];
+          if (incoming && incoming.length > 0 && randomGain !== 0) {
+            let rInput = 0.0;
+            for (let e = 0; e < incoming.length; e++) {
+              const edge = incoming[e];
+              rInput += edge.w * state[edge.pre];
+            }
+            input += randomGain * rInput;
+          }
+
+          // External stimulus: Gaussian bump centered at walker
+          const dxw = x - walker.x;
+          const dyw = y - walker.y;
+          const r2 = dxw * dxw + dyw * dyw;
+          const stim = stimStrength * Math.exp(-r2 / (2 * sigmaStim * sigmaStim));
+          input += stim;
+
+          // Tanh activation
+          const nonlin = Math.tanh(input);
+
+          // Leak: x_{t+1} = (1 - λ) x_t + λ * tanh(input)
+          nextState[index] = (1.0 - leak) * state[index] + leak * nonlin;
+        }
+      }
+
+      // Swap buffers
+      const tmp = state;
+      state = nextState;
+      nextState = tmp;
+    }
+
+    // --- Visualization ---
+    function drawNetwork() {
+      const cellSize = canvasSize / N;
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.imageSmoothingEnabled = false;
+
+      for (let y = 0; y < N; y++) {
+        for (let x = 0; x < N; x++) {
+          const v = state[idx(x, y)];
+          // Map v ∈ [-1, 1] to color between blue (negative) and red (positive)
+          const t = (v + 1) / 2; // 0..1
+          const r = Math.floor(255 * t);
+          const g = 0;
+          const b = Math.floor(255 * (1 - t));
+
+          ctx.fillStyle = `rgb(${r},${g},${b})`;
+          ctx.fillRect(x * cellSize, y * cellSize, cellSize + 1, cellSize + 1);
+        }
+      }
+
+      // Draw walker position as a small square outline
+      ctx.strokeStyle = 'white';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(
+        walker.x * cellSize,
+        walker.y * cellSize,
+        cellSize,
+        cellSize
+      );
+    }
+
+    // --- Animation loop ---
+    function loop() {
+      const updatesPerFrame = parseInt(updateSpeedSlider.value);
+      for (let i = 0; i < updatesPerFrame; i++) {
+        updateNetwork();
+      }
+      drawNetwork();
+      requestAnimationFrame(loop);
+    }
+
+    // --- Event listeners for connectivity controls ---
+    regenButton.addEventListener('click', regenerateRandomConnectivity);
+    randomProbSlider.addEventListener('change', regenerateRandomConnectivity);
+    dalesRuleCheckbox.addEventListener('change', regenerateRandomConnectivity);
+
+    // Initial random connectivity & start animation
+    regenerateRandomConnectivity();
+    loop();
+  </script>
+</body>
+</html>

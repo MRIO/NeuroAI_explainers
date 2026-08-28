@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brunel E–I Balance: LIF Network (HTML+JS)</title>
+<style>
+  :root { --bg:#f7f7fb; --card:#ffffff; --ink:#111; --muted:#666; --line:#dcdce6; --accent:#0b0b0b; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color: var(--ink); background: var(--bg); }
+  .wrap { max-width: 1200px; margin: 24px auto; padding: 0 16px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  p.note { color: var(--muted); margin: 0 0 16px; } 
+  .grid { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); }
+  .controls .row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+  .controls .row label { width: 180px; color: #333; font-size: 13px; }
+  .controls input[type="range"] { flex: 1; }
+  .controls input[type="number"] { width: 110px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
+  .btn { appearance: none; border: none; background: var(--accent); color: #fff; padding: 10px 14px; border-radius: 12px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+  .btn[disabled] { opacity: .5; cursor: default; }
+  .plots { display: grid; grid-template-rows: 1fr 1fr; gap: 16px; }
+  canvas { width: 100%; height: 260px; border-radius: 12px; display: block; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .kvs { display:flex; gap:16px; flex-wrap:wrap; margin-top: 8px; color:#333; }
+  .kv { background:#fafafa; border:1px solid var(--line); border-radius:10px; padding:6px 10px; font-size:12px; }
+  @media (max-width: 960px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Brunel E–I Balance: LIF Network (HTML+JS)</h1>
+    <p class="note">Tune <code>J</code> (excitatory step), <code>g</code> (inhibitory/excitatory ratio), connectivity <code>p</code>, delay <code>D</code>, and external drive <code>Λ<sub>ext</sub></code>. Then click <strong>Run</strong> to visualize the raster and population rate.</p>
+
+    <div class="grid">
+      <div class="card controls">
+        <h3 style="margin:4px 0 10px">Parameters</h3>
+        <div id="ctrls"></div>
+        <div class="row" style="margin-top:8px; gap:12px; align-items:center;">
+          <button class="btn" id="runBtn">Run</button>
+          <span id="prog" style="color:#555; font-size:13px"></span>
+        </div>
+        <div class="hint">Try <b>AI</b>: J≈0.1–0.2 mV, g≈4–6, Λ<sub>ext</sub>≈500–2000 sp/s. 
+          For synchronous bursts: raise J, lower g a bit, keep a finite delay. For quiescence: raise g or reduce Λ<sub>ext</sub>.</div>
+        <div class="kvs" id="kvs"></div>
+      </div>
+
+      <div class="plots">
+        <div class="card"><canvas id="raster" width="1000" height="260"></canvas></div>
+        <div class="card"><canvas id="rate" width="1000" height="260"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <h3 style="margin:4px 0 8px">What to look for</h3>
+      <ul style="margin:0 0 0 18px; padding:0 0 0 8px; line-height:1.6">
+        <li><b>Asynchronous irregular (AI):</b> spikes scattered in raster; rate fairly flat.</li>
+        <li><b>Synchronous / oscillatory:</b> vertical bands in raster; oscillations in rate trace.</li>
+        <li><b>Quiescent:</b> activity dies when inhibition dominates or input is too weak.</li>
+      </ul>
+    </div>
+  </div>
+
+<script>
+// ---------------------- UI & Defaults ----------------------
+const defaults = {
+  N: 1000,
+  fracE: 0.8,
+  p: 0.1,
+  J: 0.6,
+  g: 4.0,
+  tau_m: 20.0,
+  V_rest: 0.0,
+  V_reset: 0.0,
+  V_th: 20.0,
+  refrac: 2.0,
+  D: 1.5,
+  dt: 0.1,
+  T: 2000.0,
+  lambdaExt: 1300.0,
+  seed: 1,
+  recordCount: 120,
+  rateWindow: 20.0,
+};
+let params = {...defaults};
+
+const ctrlSpec = [
+  ["N (neurons)", "N", 100, 3000, 100, "range"],
+  ["Excitatory fraction", "fracE", 0.5, 0.95, 0.01, "range"],
+  ["Connectivity p", "p", 0.02, 0.3, 0.01, "range"],
+  ["Synaptic step J (mV)", "J", 0.02, 0.6, 0.01, "range"],
+  ["Inhibition ratio g", "g", 0.5, 10, 0.1, "range"],
+  ["Ext. drive Λ_ext (sp/s)", "lambdaExt", 0, 5000, 50, "range"],
+  ["Delay D (ms)", "D", 0.1, 5, 0.1, "range"],
+  ["τ_m (ms)", "tau_m", 5, 40, 1, "range"],
+  ["Refrac (ms)", "refrac", 1, 5, 0.1, "range"],
+  ["dt (ms)", "dt", 0.05, 0.5, 0.05, "range"],
+  ["Duration T (ms)", "T", 500, 5000, 100, "range"],
+  ["Record count (raster)", "recordCount", 20, 400, 10, "range"],
+  ["Rate window (ms)", "rateWindow", 1, 50, 1, "range"],
+  ["Seed", "seed", 1, 9999, 1, "range"],
+];
+
+function renderControls() {
+  const ctrls = document.getElementById('ctrls');
+  ctrls.innerHTML = '';
+  for (const [label, key, min, max, step, type] of ctrlSpec) {
+    const row = document.createElement('div'); row.className = 'row';
+    const lab = document.createElement('label'); lab.textContent = label; row.appendChild(lab);
+    const input = document.createElement('input'); input.type = type; input.min = min; input.max = max; input.step = step; input.value = params[key]; input.style.flex=1;
+    input.addEventListener('input', (e)=>{ params[key] = parseFloat(e.target.value); kvs(); });
+    row.appendChild(input);
+    const val = document.createElement('div'); val.style.width='72px'; val.style.textAlign='right'; val.style.fontFeatureSettings='"tnum"'; val.textContent = params[key];
+    input.addEventListener('input', ()=> val.textContent = params[key]);
+    row.appendChild(val);
+    ctrls.appendChild(row);
+  }
+}
+
+function kvs() {
+  const kv = document.getElementById('kvs');
+  kv.innerHTML = '';
+  const items = [
+    `N_E=${Math.round(params.N*params.fracE)}`,
+    `N_I=${params.N - Math.round(params.N*params.fracE)}`,
+    `p=${params.p}`,
+    `J=${params.J} mV`,
+    `g=${params.g}`,
+    `Λ_ext=${params.lambdaExt} sp/s`,
+    `D=${params.D} ms`,
+    `τ_m=${params.tau_m} ms`,
+    `T=${params.T} ms`,
+  ];
+  for (const s of items) { const d=document.createElement('div'); d.className='kv'; d.textContent=s; kv.appendChild(d); }
+}
+
+renderControls();
+kvs();
+
+// ---------------------- RNG helpers ----------------------
+function reseed(seed) { // poor-man seeding for Math.random() diffusion
+  for (let i=0;i<(seed%997);i++) Math.random();
+}
+function rand() { return Math.random(); }
+function samplePoisson(lambda) {
+  if (lambda <= 0) return 0;
+  if (lambda < 30) {
+    const L = Math.exp(-lambda); let k = 0; let p = 1;
+    do { k++; p *= rand(); } while (p > L);
+    return k-1;
+  } else {
+    const u = rand(); const v = rand();
+    const z = Math.sqrt(-2*Math.log(u)) * Math.cos(2*Math.PI*v);
+    return Math.max(0, Math.round(lambda + Math.sqrt(lambda)*z));
+  }
+}
+
+// ---------------------- Simulation ----------------------
+function simulateBrunel(p, onProgress) {
+  const N = Math.floor(p.N);
+  const fracE = p.fracE;
+  const pconn = p.p;
+  const J = p.J;
+  const g = p.g;
+  const tau_m = p.tau_m;
+  const V_rest = p.V_rest;
+  const V_reset = p.V_reset;
+  const V_th = p.V_th;
+  const refrac = p.refrac;
+  const D = p.D;
+  const dt = p.dt;
+  const T = p.T;
+  const lambdaExt = p.lambdaExt;
+  const recordCount = Math.min(Math.floor(p.recordCount), N);
+  const rateWindow = p.rateWindow;
+
+  reseed(p.seed||1);
+
+  const N_E = Math.round(N*fracE), N_I = N - N_E;
+  const steps = Math.round(T/dt);
+  const delaySteps = Math.max(1, Math.round(D/dt));
+  const refracSteps = Math.round(refrac/dt);
+  const rateWinSteps = Math.max(1, Math.round(rateWindow/dt));
+
+  const V = new Float32Array(N).fill(V_rest);
+  const lastSpike = new Int32Array(N).fill(-1e9);
+  const isExc = new Array(N).fill(false); for (let i=0;i<N_E;i++) isExc[i]=true;
+
+  // Connectivity
+  const postTargets = new Array(N);
+  const weights = new Array(N);
+  for (let pre=0; pre<N; pre++) {
+    const tgs = []; const wts = [];
+    for (let post=0; post<N; post++) {
+      if (post===pre) continue;
+      if (rand() < pconn) { tgs.push(post); wts.push(isExc[pre] ? J : -g*J); }
+    }
+    postTargets[pre] = Int32Array.from(tgs);
+    weights[pre] = Float32Array.from(wts);
+  }
+
+  // Delayed spike ring
+  const ring = Array.from({length: delaySteps}, () => []);
+
+  // Recording
+  const raster = []; // {t,i}
+  const rate = new Float32Array(steps);
+
+  // External Poisson per dt
+  const lamDt = (lambdaExt/1000) * dt;
+  const a = Math.exp(-dt/tau_m);
+
+  for (let k=0; k<steps; k++) {
+    const t = k*dt;
+
+    // deliver due synaptic events
+    const due = ring[k % delaySteps];
+    for (let e=0; e<due.length; e+=2) { V[due[e]] += due[e+1]; }
+    due.length = 0;
+
+    // external Poisson
+    if (lamDt>0) {
+      for (let i=0;i<N;i++) {
+        const kext = samplePoisson(lamDt);
+        if (kext>0) V[i] += J*kext;
+      }
+    }
+
+    // leak integration (exact decay per step)
+    for (let i=0;i<N;i++) {
+      if (k - lastSpike[i] <= refracSteps && lastSpike[i] > -1e8) { V[i]=V_reset; continue; }
+      V[i] = V_rest + (V[i]-V_rest)*a;
+    }
+
+    // thresholding and scheduling
+    let spikes = 0;
+    for (let i=0;i<N;i++) {
+      if (V[i] >= V_th) {
+        lastSpike[i] = k; V[i] = V_reset; spikes++;
+        if (i < recordCount) raster.push({t, i});
+        const trg = postTargets[i]; const w = weights[i];
+        const bucket = ring[(k + delaySteps) % delaySteps];
+        for (let j=0;j<trg.length;j++) { bucket.push(trg[j], w[j]); }
+      }
+    }
+
+    rate[k] = (spikes / N) * (1000/dt);
+
+    if (onProgress && (k % Math.max(1, Math.floor(steps/50)) === 0)) onProgress(k/steps);
+  }
+
+  // Smooth rate
+  if (rateWinSteps>1) {
+    const sm = new Float32Array(steps); let acc = 0;
+    for (let k=0;k<steps;k++) { acc += rate[k]; if (k>=rateWinSteps) acc -= rate[k-rateWinSteps]; sm[k]= acc/Math.min(k+1, rateWinSteps); }
+    return { raster, rate: sm, dt, T, recordCount, N_E, N_I };
+  }
+  return { raster, rate, dt, T, recordCount, N_E, N_I };
+}
+
+// ---------------------- Plotting ----------------------
+function drawRaster(canvas, raster, T, recordN, N_E) {
+  const ctx = canvas.getContext('2d'); const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H); ctx.save(); ctx.font='12px sans-serif'; ctx.fillText(`Raster (first ${recordN} neurons)`, 8, 16);
+  const padL=40, padR=10, padT=24, padB=24; const plotW=W-padL-padR, plotH=H-padT-padB;
+  ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+  // E/I separator
+  const eFrac = N_E/recordN; const yE = padT + plotH*eFrac; ctx.strokeStyle = '#bbb'; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,yE); ctx.lineTo(padL+plotW,yE); ctx.stroke(); ctx.setLineDash([]);
+  // x ticks
+  ctx.fillStyle = '#444';
+  const tickStep = Math.max(100, Math.round(T/10));
+  for (let ms=0; ms<=T; ms+=tickStep) { const x = padL + (ms/T)*plotW; ctx.fillRect(x, padT+plotH, 1, 5); ctx.fillText(ms.toFixed(0)+" ms", x-10, padT+plotH+16); }
+  // spikes
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.beginPath();
+  const htick = Math.max(1, plotH/recordN*0.9);
+  for (const s of raster) { if (s.i>=recordN) continue; const x = padL + (s.t/T)*plotW; const y = padT + (s.i/recordN)*plotH; ctx.moveTo(x,y); ctx.lineTo(x,y+htick); }
+  ctx.stroke(); ctx.restore();
+}
+
+function drawRate(canvas, rate, dt, T) {
+  const ctx = canvas.getContext('2d'); const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H); ctx.save(); ctx.font='12px sans-serif'; ctx.fillText('Population firing rate (spikes/s/neuron)', 8, 16);
+  const padL=40, padR=10, padT=24, padB=24; const plotW=W-padL-padR, plotH=H-padT-padB;
+  let ymax = 1e-6; for (let i=0;i<rate.length;i++) ymax = Math.max(ymax, rate[i]); ymax *= 1.05;
+  ctx.strokeStyle = '#888'; ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+  // y ticks
+  ctx.fillStyle = '#444'; const yTicks = 4; for (let k=0;k<=yTicks;k++){ const yv=(k/yTicks)*ymax; const y=padT+plotH-(yv/ymax)*plotH; ctx.fillRect(padL-3,y,3,1); ctx.fillText(yv.toFixed(0), 6, y+4); }
+  // x ticks
+  const tickStep = Math.max(100, Math.round(T/10));
+  for (let ms=0; ms<=T; ms+=tickStep) { const x = padL + (ms/T)*plotW; ctx.fillRect(x, padT+plotH, 1, 5); ctx.fillText(ms.toFixed(0)+" ms", x-10, padT+plotH+16); }
+  // line
+  ctx.strokeStyle = '#0a0a0a'; ctx.lineWidth = 1.2; ctx.beginPath();
+  for (let i=0;i<rate.length;i++){ const t=i*dt; const x=padL+(t/T)*plotW; const y=padT+plotH-(rate[i]/ymax)*plotH; if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); }
+  ctx.stroke(); ctx.restore();
+}
+
+// ---------------------- Run button ----------------------
+const runBtn = document.getElementById('runBtn');
+const prog = document.getElementById('prog');
+const rasterCanvas = document.getElementById('raster');
+const rateCanvas = document.getElementById('rate');
+
+runBtn.addEventListener('click', () => {
+  runBtn.disabled = true; prog.textContent = 'Running… 0%';
+  const out = simulateBrunel({...params}, (pp)=>{ prog.textContent = `Running… ${Math.round(pp*100)}%`; });
+  drawRaster(rasterCanvas, out.raster, out.T, out.recordCount, out.N_E);
+  drawRate(rateCanvas, out.rate, out.dt, out.T);
+  prog.textContent = 'Done';
+  setTimeout(()=>{ prog.textContent=''; runBtn.disabled=false; }, 500);
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Brunel E–I LIF (React CDN, Two‑Column)</title>
+<style>
+  :root{--bg:#f6f7fb;--ink:#111;--muted:#666;--card:#fff;--line:#e3e3ef;--accent:#111}
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  .wrap{max-width:1200px;margin:24px auto;padding:0 16px}
+  h1{font-size:22px;margin:0 0 6px}
+  p.note{margin:0 0 16px;color:var(--muted)}
+  .grid{display:grid;grid-template-columns:320px 1fr;gap:16px}
+  @media (max-width: 900px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.04)}
+  .row{display:flex;align-items:center;gap:10px;padding:6px 0}
+  .row label{width:140px;color:#333;font-size:13px}
+  .row input[type="range"]{flex:1}
+  .val{width:70px;text-align:right;font-feature-settings:"tnum"}
+  .btn{appearance:none;border:none;background:var(--accent);color:#fff;padding:9px 12px;border-radius:10px;cursor:pointer}
+  .btn.secondary{background:#666}
+  .btn.ghost{background:#e9e9f5;color:#222}
+  .btn:disabled{opacity:.5;cursor:default}
+  .btnrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+  canvas{width:100%;height:320px;border-radius:12px;display:block}
+  .hint{color:var(--muted);font-size:12px;margin-top:8px}
+  .kvs{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}
+  .kv{background:#fafafa;border:1px solid var(--line);border-radius:10px;padding:4px 8px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Brunel E–I Balance: LIF Network (React CDN)</h1>
+  <p class="note">Continuous simulation with live sliders for <code>J</code>, <code>g</code>, <code>λ<sub>ext</sub></code>, <code>p</code>, <code>τ<sub>m</sub></code>, and synaptic delay <code>D</code>. Use ⏯ to control; <em>Rebuild Net</em> applies connectivity <code>p</code>.</p>
+  <div id="root"></div>
+</div>
+
+<!-- React 18 via CDN + Babel for JSX -->
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<script type="text/babel">
+const { useEffect, useRef, useState } = React;
+
+function BrunelReactCDN(){
+  // ---------- Parameters (live-adjustable) ----------
+  const [J, setJ] = useState(0.5);          // mV (excitatory step)
+  const [g, setG] = useState(5.0);          // inhibitory ratio
+  const [lambdaExt, setLambdaExt] = useState(1500); // spikes/s
+  const [p, setP] = useState(0.1);          // connectivity probability
+  const [tau_m, setTauM] = useState(20);    // ms
+  const [D, setD] = useState(1.5);          // ms delay
+
+  // Fixed basics for smooth loop
+  const dt = 1.0;               // ms fixed integration step
+  const windowMs = 2500;        // raster window
+  const N = 400;                // total neurons
+  const fracE = 0.8;            // 80% excitatory
+  const recordCount = 120;      // first neurons shown in raster
+  const V_rest = -65, V_reset = -65, V_th = -50;
+
+  // ---------- Simulation state ----------
+  const simRef = useRef(null);  // {V,lastSpike,isExc,post,w,ring,delaySteps,refracSteps,a}
+  const tMsRef = useRef(0);     // simulated time in ms
+  const playingRef = useRef(false);
+  const rafRef = useRef(null);
+  const rasterRef = useRef(null);
+  const rateRef = useRef(null);
+  const rasterData = useRef([]);    // list of {t,i}
+  const rateSeries = useRef([]);    // recent population rate values
+
+  // Build / rebuild network (connectivity depends on p)
+  function rebuildNetwork(){
+    const N_E = Math.round(N*fracE);
+    const isExc = new Array(N).fill(false); for(let i=0;i<N_E;i++) isExc[i]=true;
+    const post = new Array(N); const w = new Array(N);
+    
+for (let pre = 0; pre < N; pre++) {
+  const tg = [];
+  const wt = [];
+  for (let postId = 0; postId < N; postId++) {
+    if (postId === pre) continue;
+    if (Math.random() < p) {
+      tg.push(postId);
+      // Store only +1 for excitatory, -1 for inhibitory
+      wt.push(isExc[pre] ? 1 : -1);
+    }
+  }
+  post[pre] = Int32Array.from(tg);
+  w[pre] = Float32Array.from(wt);
+}
+
+
+
+    // ring buffer for delay
+    const delaySteps = Math.max(1, Math.round(D/dt));
+    const ring = Array.from({length: delaySteps}, ()=>[]);
+
+    simRef.current = {
+      V: new Float32Array(N).fill(V_rest),
+      lastSpike: new Int32Array(N).fill(-1e9),
+      isExc, post, w, ring, delaySteps,
+    };
+  }
+
+  // Recompute a few step constants on-the-fly (useRefs for speed)
+  const constRef = useRef({});
+  function updateDerivedConsts(){
+    constRef.current = {
+      refracSteps: Math.round(2.0/dt),  // 2 ms refractory
+      a: Math.exp(-dt/Math.max(1e-3, tau_m)),
+      lamDt: (lambdaExt/1000) * dt,
+      J, g
+    };
+    // Delay may have changed → rebuild ring size while keeping pending lost (simple reset)
+    if(simRef.current){
+      const delaySteps = Math.max(1, Math.round(D/dt));
+      if(delaySteps !== simRef.current.delaySteps){
+        simRef.current.ring = Array.from({length: delaySteps}, ()=>[]);
+        simRef.current.delaySteps = delaySteps;
+      }
+    }
+  }
+
+  // Init once
+  useEffect(()=>{ rebuildNetwork(); updateDerivedConsts(); drawFrames(true); }, []);
+
+  // When J/g/lambda/tau_m/D change, update derived constants; when p changes, we will rebuild only on explicit click
+  useEffect(()=>{ updateDerivedConsts(); }, [J,g,lambdaExt,tau_m,D]);
+
+  // ---------- Main loop ----------
+  function loop(){
+    // Run a few integration steps per frame for speed
+    const stepsPerFrame = 2; // ~2 ms per frame
+    for(let s=0; s<stepsPerFrame; s++) stepOnce();
+    drawFrames();
+    if(playingRef.current) rafRef.current = requestAnimationFrame(loop);
+  }
+
+  function stepOnce(){
+    const sim = simRef.current; if(!sim) return;
+    const { V, lastSpike, post, w, ring, delaySteps } = sim;
+    const { refracSteps, a, lamDt } = constRef.current;
+
+    // Deliver delayed synaptic events due now
+    const bucket = ring[(tMsRef.current/dt) % delaySteps | 0];
+    for(let e=0; e<bucket.length; e+=2){ V[bucket[e]] += bucket[e+1]; }
+    bucket.length = 0;
+
+    // External Poisson (fast Bernoulli/Poisson hybrid)
+    if(lamDt>0){
+      if(lamDt < 0.2){
+        for(let i=0;i<N;i++) if(Math.random() < lamDt) V[i] += J;
+      }else{
+        for(let i=0;i<N;i++){
+          // Normal approx to Poisson for speed
+          const u=Math.random(), v=Math.random();
+          const z=Math.sqrt(-2*Math.log(Math.max(1e-12,u)))*Math.cos(2*Math.PI*v);
+          const k=Math.max(0, Math.round(lamDt + Math.sqrt(lamDt)*z));
+          if(k>0) V[i] += J*k;
+        }
+      }
+    }
+
+    // Leak + refractory
+    for(let i=0;i<N;i++){
+      // refractory: hold at reset
+      if(((tMsRef.current/dt)|0) - lastSpike[i] <= refracSteps && lastSpike[i]>-1e7){ V[i]=V_reset; continue; }
+      V[i] = V_rest + (V[i]-V_rest)*a;
+    }
+
+    // Threshold & schedule spikes
+    let spikes=0;
+    for(let i=0;i<N;i++){
+      if(V[i] >= V_th){
+        lastSpike[i] = (tMsRef.current/dt)|0;
+        V[i] = V_reset; spikes++;
+        if(i < recordCount) rasterData.current.push({t:tMsRef.current, i});
+        // schedule outgoing
+
+
+
+              // schedule outgoing
+      const tg = post[i];
+      const wt = w[i];
+      const outBucket = ring[(((tMsRef.current/dt)|0) + delaySteps) % delaySteps];
+      for (let j = 0; j < tg.length; j++) {
+        const synW = wt[j] > 0
+          ? constRef.current.J                           // excitatory
+          : -constRef.current.g * constRef.current.J;    // inhibitory
+        outBucket.push(tg[j], synW);}
+
+
+      }
+    }
+
+    // Pop rate in spikes/s/neuron this step
+    const instRate = (spikes/N)*(1000/dt);
+    rateSeries.current.push(instRate);
+    // Keep last few seconds
+    while(rateSeries.current.length > windowMs) rateSeries.current.shift();
+
+    // Prune raster to window
+    const cutoff = tMsRef.current - windowMs;
+    while(rasterData.current.length && rasterData.current[0].t < cutoff) rasterData.current.shift();
+
+    tMsRef.current += dt;
+  }
+
+  // ---------- Drawing ----------
+  function drawFrames(initial=false){
+    drawRaster();
+    drawRate();
+  }
+
+  function drawRaster(){
+    const cvs = rasterRef.current; if(!cvs) return; const ctx = cvs.getContext('2d');
+    const W = cvs.width = cvs.clientWidth * devicePixelRatio;
+    const H = cvs.height = cvs.clientHeight * devicePixelRatio;
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+
+    const padL=40, padR=10, padT=24, padB=24;
+    const plotW = cvs.clientWidth - padL - padR;
+    const plotH = cvs.clientHeight - padT - padB;
+
+    ctx.clearRect(0,0,cvs.clientWidth,cvs.clientHeight);
+    ctx.save();
+    ctx.font='12px sans-serif';
+    ctx.fillText('Raster (first '+recordCount+' neurons)', 8, 16);
+
+    // axes
+    ctx.strokeStyle='#888'; ctx.beginPath();
+    ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+
+    // x ticks (time window)
+    const now = tMsRef.current; const start = Math.max(0, now - windowMs);
+    const tickStep = 500; // ms
+    ctx.fillStyle='#444';
+    for(let ms=Math.ceil(start/tickStep)*tickStep; ms<=now; ms+=tickStep){
+      const x = padL + ((ms - start)/windowMs)*plotW; ctx.fillRect(x, padT+plotH, 1, 5);
+      ctx.fillText((ms-now+windowMs).toFixed(0)+' ms', x-18, padT+plotH+16);
+    }
+
+
+
+    // E/I separator
+    const N_E = Math.round(N*fracE);
+    const yE = padT + plotH * (N_E/recordCount);
+    ctx.strokeStyle='#bbb'; ctx.setLineDash([4,4]); ctx.beginPath(); ctx.moveTo(padL,yE); ctx.lineTo(padL+plotW,yE); ctx.stroke(); ctx.setLineDash([]);
+
+    // spikes
+    ctx.strokeStyle='#111'; ctx.lineWidth=1; ctx.beginPath();
+    const htick = Math.max(1, plotH/recordCount*0.9);
+    const cutoff = now - windowMs;
+    for(const s of rasterData.current){
+      if(s.i >= recordCount) continue;
+      const x = padL + ((s.t - cutoff)/windowMs)*plotW;
+      const y = padT + (s.i/recordCount)*plotH;
+      ctx.moveTo(x,y); ctx.lineTo(x, y+htick);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawRate(){
+    const cvs = rateRef.current; if(!cvs) return; const ctx = cvs.getContext('2d');
+    const W = cvs.width = cvs.clientWidth * devicePixelRatio;
+    const H = cvs.height = cvs.clientHeight * devicePixelRatio;
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+
+    const padL=40, padR=10, padT=24, padB=24;
+    const plotW = cvs.clientWidth - padL - padR;
+    const plotH = cvs.clientHeight - padT - padB;
+
+    ctx.clearRect(0,0,cvs.clientWidth,cvs.clientHeight);
+    ctx.save(); ctx.font='12px sans-serif'; ctx.fillText('Population firing rate (spikes/s/neuron)', 8, 16);
+
+    // axes
+    ctx.strokeStyle='#888'; ctx.beginPath();
+    ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+
+    // y scale
+    let ymax = 1e-6; for(let i=0;i<rateSeries.current.length;i++) ymax = Math.max(ymax, rateSeries.current[i]); ymax *= 1.05;
+    // y ticks
+    ctx.fillStyle='#444'; const yTicks=4;
+    for(let k=0;k<=yTicks;k++){ const yv=(k/yTicks)*ymax; const y=padT+plotH-(yv/ymax)*plotH; ctx.fillRect(padL-3,y,3,1); ctx.fillText(yv.toFixed(0), 6, y+4); }
+
+
+    // x ticks (fixed 0–windowMs, 0 on right)
+    const tickStep = 500;
+    ctx.fillStyle = '#444';
+    for (let ms = 0; ms <= windowMs; ms += tickStep) {
+      const x = padL + ((windowMs - ms) / windowMs) * plotW;
+      ctx.fillRect(x, padT + plotH, 1, 5);
+      ctx.fillText(ms.toString(), x - 10, padT + plotH + 16);
+    }
+
+
+    // line
+    ctx.strokeStyle='#0b0b0b'; ctx.lineWidth=1.2; ctx.beginPath();
+    const L = rateSeries.current.length;
+    for(let i=0;i<L;i++){
+      const x = padL + (i/L)*plotW;
+      const y = padT + plotH - (rateSeries.current[i]/ymax)*plotH;
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke(); ctx.restore();
+  }
+
+  // ---------- Controls ----------
+  function play(){ if(playingRef.current) return; playingRef.current = true; rafRef.current = requestAnimationFrame(loop); }
+  function pause(){ playingRef.current = false; if(rafRef.current) cancelAnimationFrame(rafRef.current); }
+  function reset(){ pause(); rasterData.current=[]; rateSeries.current=[]; tMsRef.current=0; if(simRef.current){ simRef.current.V.fill(V_rest); simRef.current.lastSpike.fill(-1e9); simRef.current.ring.forEach(b=>b.length=0); } drawFrames(); }
+
+  // Rebuild applies new p (and uses current J/g in weights). Keeps other state cleared.
+  function rebuildAndReset(){ rebuildNetwork(); reset(); }
+
+  // Keep drawing while paused so UI responds
+  useEffect(()=>{ drawFrames(); });
+
+  // ---------- UI ----------
+  return (
+    <div className="grid">
+      <div className="card">
+        <h3 style={{margin:'4px 0 8px'}}>Controls</h3>
+        <Slider label="Synaptic step J (mV)" val={J} min={0.05} max={1.0} step={0.05} on={setJ} />
+        <Slider label="Inhibition ratio g" val={g} min={0.5} max={10} step={0.1} on={setG} />
+        <Slider label="External drive λ_ext (sp/s)" val={lambdaExt} min={0} max={5000} step={50} on={setLambdaExt} />
+        <Slider label="Connectivity p" val={p} min={0.02} max={0.3} step={0.01} on={setP} />
+        <Slider label="τ_m (ms)" val={tau_m} min={5} max={40} step={1} on={setTauM} />
+        <Slider label="Delay D (ms)" val={D} min={0.1} max={5} step={0.1} on={setD} />
+        <div className="btnrow">
+          <button className="btn" onClick={play}>▶ Play</button>
+          <button className="btn secondary" onClick={pause}>⏸ Pause</button>
+          <button className="btn ghost" onClick={reset}>↺ Reset</button>
+          <button className="btn ghost" onClick={rebuildAndReset}>Rebuild Net</button>
+        </div>
+        <div className="kvs">
+          <div className="kv">N_E={Math.round(N*fracE)}</div>
+          <div className="kv">N_I={N - Math.round(N*fracE)}</div>
+          <div className="kv">dt={dt} ms</div>
+          <div className="kv">window={windowMs} ms</div>
+        </div>
+        <div className="hint">Tip: For <b>AI</b> regime try J≈0.3–0.6, g≈4–6, λ<sub>ext</sub>≈800–2000. For synchronous bursts increase J and reduce g a bit; finite delay helps.</div>
+      </div>
+      <div style={{display:'grid',gridTemplateRows:'1fr 1fr',gap:'16px'}}>
+        <div className="card"><canvas ref={rasterRef} style={{width:'100%',height:'320px'}} /></div>
+        <div className="card"><canvas ref={rateRef} style={{width:'100%',height:'320px'}} /></div>
+      </div>
+    </div>
+  );
+}
+
+function Slider({label,val,min,max,step,on}){
+  return (
+    <div className="row">
+      <label>{label}</label>
+      <input type="range" min={min} max={max} step={step} value={val} onChange={e=>on(parseFloat(e.target.value))} />
+      <div className="val">{typeof val==='number' ? val.toFixed( (step+"" ).includes(".") ? (step+"").split(".")[1].length : 0) : val}</div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<BrunelReactCDN/>);
+</script>
+</body>
+</html>

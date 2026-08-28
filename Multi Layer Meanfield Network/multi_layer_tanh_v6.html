@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Multi-layer Tanh/Sigmoid Stack (Logging + Traces)</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #111;
+      color: #eee;
+      display: flex;
+      flex-direction: row;
+      height: 100vh;
+      margin: 0;
+    }
+    #left {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      box-sizing: border-box;
+    }
+    .canvas-frame {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+      position: relative; /* for inset overlay */
+    }
+    #networkCanvas {
+      border: 1px solid #333;
+      background: #000;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Inset connectivity viewport (top-right) */
+    #connOverlay {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      flex-direction: row;
+      gap: 4px;
+      background: rgba(0,0,0,0.7);
+      padding: 4px;
+      border-radius: 4px;
+      border: 1px solid #333;
+      z-index: 10;
+    }
+    #connCanvas, #connColorbar {
+      border: 1px solid #333;
+      background: #000;
+    }
+
+    #right {
+      width: 380px;
+      padding: 16px;
+      box-sizing: border-box;
+      background: #181818;
+      border-left: 1px solid #333;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+    }
+
+    #traceCanvas {
+      border: 1px solid #333;
+      background: #000;
+      width: 100%;
+      height: 120px;
+      display: block;
+    }
+
+    .control-group {
+      margin-bottom: 8px;
+    }
+    label {
+      font-size: 0.9rem;
+      display: block;
+      margin-bottom: 4px;
+    }
+    input[type="range"] {
+      width: 100%;
+    }
+    .small {
+      font-size: 0.8rem;
+      color: #aaa;
+    }
+    button {
+      background: #333;
+      color: #eee;
+      border: 1px solid #555;
+      border-radius: 4px;
+      padding: 6px 10px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    button:hover {
+      background: #444;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid #333;
+      margin: 8px 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="left">
+    <div class="canvas-frame">
+      <canvas id="networkCanvas"></canvas>
+
+      <!-- Inset compressed connectivity -->
+      <div id="connOverlay">
+        <canvas id="connCanvas" width="220" height="220"></canvas>
+        <canvas id="connColorbar" width="30" height="220"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div id="right">
+    <h2>Layered Neural Sheet</h2>
+
+    <!-- Logging -->
+    <div class="control-group">
+      <button id="dumpAll">Dump params + connectivity (JSON)</button>
+      <div class="small">
+        Exports parameters, local kernel, sparse random edges, and a compressed
+        effective connectivity matrix.
+      </div>
+    </div>
+
+    <hr>
+
+    <!-- Neuron trace viewer -->
+    <div class="control-group">
+      <strong>Neuron trace</strong>
+      <div class="small" id="selectedLabel">
+        Click on a neuron (any layer) to record its activity over time.
+      </div>
+      <canvas id="traceCanvas" width="340" height="120"></canvas>
+    </div>
+
+    <hr>
+
+    <!-- Walker controls -->
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="manualControl">
+        Manual walker control (use sliders)
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label for="sliderX">Walker X position</label>
+      <input type="range" id="sliderX" min="0" max="59" value="30">
+    </div>
+
+    <div class="control-group">
+      <label for="sliderY">Walker Y position</label>
+      <input type="range" id="sliderY" min="0" max="59" value="30">
+    </div>
+
+    <div class="control-group">
+      <label for="stimStrength">Walker stimulus strength</label>
+      <input type="range" id="stimStrength" min="0" max="2" step="0.01" value="0.8">
+      <div class="small">Gaussian bump applied only to the input layer (layer 0).</div>
+    </div>
+
+    <hr>
+
+    <!-- Leak & nonlinearity -->
+    <div class="control-group">
+      <label for="leak">Leak (update fraction λ)</label>
+      <input type="range" id="leak" min="0" max="1" step="0.01" value="0.9">
+      <div class="small">0 = frozen, 1 = full nonlinearity update.</div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="useSigmoid">
+        Use sigmoid nonlinearity (instead of tanh)
+      </label>
+      <div class="small">
+        Logistic σ(x) mapped to [-1,1]: 2σ(x)−1. Tanh is default.
+      </div>
+    </div>
+
+    <div class="control-group">
+      <label for="gLocal">Local coupling gain (g_local)</label>
+      <input type="range" id="gLocal" min="0" max="1.5" step="0.01" value="0.8">
+      <div class="small">Within-layer local neighborhood.</div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="useMexicanHat">
+        Use Mexican-hat local kernel
+      </label>
+      <div class="small">
+        Off: Gaussian. On: DoG with zero integral (center–surround).
+      </div>
+    </div>
+
+    <!-- Random connectivity -->
+    <div class="control-group">
+      <label for="randomProb">Random conn. probability</label>
+      <input type="range" id="randomProb" min="0" max="0.03" step="0.001" value="0.005">
+      <div class="small">Within-layer sparse random connectivity.</div>
+    </div>
+
+    <div class="control-group">
+      <label for="gRandom">Random connectivity gain (g_random)</label>
+      <input type="range" id="gRandom" min="0" max="2" step="0.01" value="0.4">
+      <div class="small">Scales random recurrent input.</div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="dalesRule" checked>
+        Enforce Dale's rule (per layer)
+      </label>
+      <div class="small">Each neuron is E or I; outgoing random weights share sign.</div>
+    </div>
+
+    <div class="control-group">
+      <button id="regenConn">Regenerate random connectivity</button>
+      <div class="small">Re-sample random connectivity for all layers.</div>
+    </div>
+
+    <hr>
+
+    <!-- Cross & back projections -->
+    <div class="control-group">
+      <label for="gCross">Feedforward gain (g_cross)</label>
+      <input type="range" id="gCross" min="0" max="1.5" step="0.01" value="0.5">
+      <div class="small">Local feedforward from layer ℓ to ℓ+1.</div>
+    </div>
+
+    <div class="control-group">
+      <label>
+        <input type="checkbox" id="enableBackProj">
+        Enable back projections (ℓ+1 → ℓ)
+      </label>
+    </div>
+
+    <div class="control-group">
+      <label for="gBack">Back projection gain (g_back)</label>
+      <input type="range" id="gBack" min="0" max="1.5" step="0.01" value="0.3">
+      <div class="small">Local feedback from higher to lower layers.</div>
+    </div>
+
+    <hr>
+
+    <div class="control-group">
+      <label for="updateSpeed">Update speed</label>
+      <input type="range" id="updateSpeed" min="1" max="5" step="1" value="2">
+      <div class="small">Iterations per animation frame.</div>
+    </div>
+
+    <p class="small">
+      - 3 layers, each 60×60 tanh/sigmoid neurons<br>
+      - Local kernel: Gaussian or Mexican hat (zero integral)<br>
+      - Local + random within-layer connectivity<br>
+      - Local feedforward & optional local feedback across layers<br>
+      - Layers stacked vertically with no overlap<br>
+      - Compressed effective connectivity as inset (top-right)<br>
+      - Clickable neurons with activity traces over time
+    </p>
+  </div>
+
+  <script>
+    // --------- Parameters ---------
+    const LAYERS = 3;
+    const N = 60;
+    const numNeurons = LAYERS * N * N;
+
+    const radiusLocal = 3;
+    const sigmaLocal = 2.0;
+    const sigmaStim = 2.0;
+    const SHEAR = 0.5;
+
+    const BINS_PER_LAYER = 24;
+    const TRACE_LEN = 400;
+
+    // Canvas / drawing
+    const networkCanvas = document.getElementById('networkCanvas');
+    const netCtx = networkCanvas.getContext('2d');
+
+    const connCanvas = document.getElementById('connCanvas');
+    const connCtx = connCanvas.getContext('2d');
+    const connColorbar = document.getElementById('connColorbar');
+    const connBarCtx = connColorbar.getContext('2d');
+
+    const traceCanvas = document.getElementById('traceCanvas');
+    const traceCtx = traceCanvas.getContext('2d');
+
+    const leftPane = document.getElementById('left');
+
+    // Geometry
+    let CELL_SIZE = 6;
+    let layerHeight = 0;
+    let layerWidth = 0;
+    let LAYER_GAP_Y = 0;
+    let BASE_OFFSET_X = 0;
+    let BASE_OFFSET_Y = 0;
+
+    function resizeCanvasAndGeometry() {
+      const rect = leftPane.getBoundingClientRect();
+
+      networkCanvas.width = rect.width - 16;  // minus padding a bit
+      networkCanvas.height = rect.height - 16;
+
+      const marginFrac = 0.92;
+      const maxW = networkCanvas.width * marginFrac;
+      const maxH = networkCanvas.height * marginFrac;
+
+      const cellFromWidth = maxW / (N * (1 + SHEAR));
+      const gapCells = 1;
+      const cellFromHeight =
+        maxH / (LAYERS * N + (LAYERS - 1) * gapCells);
+
+      CELL_SIZE = Math.floor(Math.min(cellFromWidth, cellFromHeight));
+      if (CELL_SIZE < 1) CELL_SIZE = 1;
+
+      LAYER_GAP_Y = CELL_SIZE * gapCells;
+      layerHeight = N * CELL_SIZE;
+      layerWidth = N * CELL_SIZE * (1 + SHEAR);
+
+      const stackHeight = LAYERS * layerHeight + (LAYERS - 1) * LAYER_GAP_Y;
+
+      BASE_OFFSET_X = (networkCanvas.width - layerWidth) / 2;
+      BASE_OFFSET_Y = (networkCanvas.height - stackHeight) / 2;
+    }
+
+    // --------- Controls ----------
+    const dumpAllBtn = document.getElementById('dumpAll');
+    const selectedLabel = document.getElementById('selectedLabel');
+
+    const sliderX = document.getElementById('sliderX');
+    const sliderY = document.getElementById('sliderY');
+    const manualControlCheckbox = document.getElementById('manualControl');
+    const stimStrengthSlider = document.getElementById('stimStrength');
+
+    const leakSlider = document.getElementById('leak');
+    const useSigmoidCheckbox = document.getElementById('useSigmoid');
+    const gLocalSlider = document.getElementById('gLocal');
+    const useMexicanHatCheckbox = document.getElementById('useMexicanHat');
+
+    const randomProbSlider = document.getElementById('randomProb');
+    const gRandomSlider = document.getElementById('gRandom');
+    const dalesRuleCheckbox = document.getElementById('dalesRule');
+    const regenButton = document.getElementById('regenConn');
+
+    const gCrossSlider = document.getElementById('gCross');
+    const enableBackProjCheckbox = document.getElementById('enableBackProj');
+    const gBackSlider = document.getElementById('gBack');
+    const updateSpeedSlider = document.getElementById('updateSpeed');
+
+    // --------- State ----------
+    let state = new Float32Array(numNeurons);
+    let nextState = new Float32Array(numNeurons);
+
+    for (let i = 0; i < numNeurons; i++) {
+      state[i] = (Math.random() - 0.5) * 0.1;
+    }
+
+    let walker = { x: Math.floor(N / 2), y: Math.floor(N / 2) };
+
+    function idx(layer, x, y) {
+      return layer * N * N + y * N + x;
+    }
+
+    function wrapIndex(x, N) {
+      if (x < 0) return x + N;
+      if (x >= N) return x - N;
+      return x;
+    }
+
+    // --------- Local kernel (Gaussian or Mexican hat) ---------
+    let localKernel = [];
+
+    function buildLocalKernel() {
+      localKernel = [];
+      const useMex = useMexicanHatCheckbox.checked;
+
+      if (!useMex) {
+        let sum = 0;
+        for (let dy = -radiusLocal; dy <= radiusLocal; dy++) {
+          for (let dx = -radiusLocal; dx <= radiusLocal; dx++) {
+            const r2 = dx * dx + dy * dy;
+            const val = Math.exp(-r2 / (2 * sigmaLocal * sigmaLocal));
+            localKernel.push({ dx, dy, w: val });
+            sum += val;
+          }
+        }
+        for (const k of localKernel) k.w /= sum;
+      } else {
+        const sigmaExc = sigmaLocal;
+        const sigmaInh = sigmaLocal * 1.8;
+
+        const temp = [];
+        let sumExc = 0, sumInh = 0;
+
+        for (let dy = -radiusLocal; dy <= radiusLocal; dy++) {
+          for (let dx = -radiusLocal; dx <= radiusLocal; dx++) {
+            const r2 = dx * dx + dy * dy;
+            const e = Math.exp(-r2 / (2 * sigmaExc * sigmaExc));
+            const inh = Math.exp(-r2 / (2 * sigmaInh * sigmaInh));
+            temp.push({ dx, dy, e, inh });
+            sumExc += e; sumInh += inh;
+          }
+        }
+
+        const B = sumExc / sumInh;
+        let maxAbs = 0;
+
+        for (const t of temp) {
+          const w = t.e - B * t.inh; // zero integral
+          localKernel.push({ dx: t.dx, dy: t.dy, w });
+          const a = Math.abs(w);
+          if (a > maxAbs) maxAbs = a;
+        }
+
+        if (maxAbs > 0) {
+          for (const k of localKernel) k.w /= maxAbs;
+        }
+      }
+    }
+
+    // --------- Random connectivity (within each layer) ---------
+    let randomInConnections = new Array(numNeurons);
+    let neuronType = new Int8Array(numNeurons);
+    const layerNeuronCount = N * N;
+
+    function regenerateRandomConnectivity() {
+      const prob = parseFloat(randomProbSlider.value);
+      const useDales = dalesRuleCheckbox.checked;
+
+      for (let i = 0; i < numNeurons; i++) {
+        randomInConnections[i] = [];
+        neuronType[i] = 0;
+      }
+
+      if (useDales) {
+        for (let l = 0; l < LAYERS; l++) {
+          for (let i = 0; i < layerNeuronCount; i++) {
+            const ni = l * layerNeuronCount + i;
+            neuronType[ni] = Math.random() < 0.5 ? 1 : -1;
+          }
+        }
+      }
+
+      let k = Math.round(prob * layerNeuronCount);
+      const maxK = 80;
+      if (k > maxK) k = maxK;
+      if (k <= 0) return;
+
+      const norm = 1 / Math.sqrt(Math.max(1, k));
+
+      for (let l = 0; l < LAYERS; l++) {
+        for (let preY = 0; preY < N; preY++) {
+          for (let preX = 0; preX < N; preX++) {
+            const preIndex = idx(l, preX, preY);
+            const sign = useDales ? (neuronType[preIndex] >= 0 ? 1 : -1) : 1;
+
+            for (let c = 0; c < k; c++) {
+              const postX = Math.floor(Math.random() * N);
+              const postY = Math.floor(Math.random() * N);
+              const postIndex = idx(l, postX, postY);
+
+              const base = (Math.random() * 2 - 1);
+              const raw  = useDales ? sign * Math.abs(base) : base;
+              const w = raw * norm;
+
+              // safety: enforce within-layer
+              const preLayer  = Math.floor(preIndex / layerNeuronCount);
+              const postLayer = Math.floor(postIndex / layerNeuronCount);
+              if (preLayer !== postLayer) {
+                throw new Error(`Cross-layer random edge detected: ${preLayer} -> ${postLayer}`);
+              }
+
+              randomInConnections[postIndex].push({ pre: preIndex, w });
+            }
+          }
+        }
+      }
+    }
+
+    // --------- Walker movement ---------
+    function stepWalker() {
+      const dir = Math.floor(Math.random() * 4);
+      if (dir === 0) walker.x += 1;
+      else if (dir === 1) walker.x -= 1;
+      else if (dir === 2) walker.y += 1;
+      else walker.y -= 1;
+
+      walker.x = wrapIndex(walker.x, N);
+      walker.y = wrapIndex(walker.y, N);
+    }
+
+    // --------- Projection: vertical stack, no x offset ---------
+    function projectCell(layer, gx, gy) {
+      const offsetX = BASE_OFFSET_X;
+      const offsetY = BASE_OFFSET_Y + layer * (layerHeight + LAYER_GAP_Y);
+
+      const px = offsetX + gx * CELL_SIZE + gy * SHEAR * CELL_SIZE;
+      const py = offsetY + gy * CELL_SIZE;
+
+      return { x: px, y: py, w: CELL_SIZE, h: CELL_SIZE };
+    }
+
+    // Inverse mapping: click → (layer, x, y)
+    function pickNeuronAt(mx, my) {
+      for (let l = 0; l < LAYERS; l++) {
+        const offsetX = BASE_OFFSET_X;
+        const offsetY = BASE_OFFSET_Y + l * (layerHeight + LAYER_GAP_Y);
+
+        const minX = offsetX;
+        const maxX = offsetX + layerWidth;
+        const minY = offsetY;
+        const maxY = offsetY + layerHeight;
+
+        if (mx < minX || mx > maxX || my < minY || my > maxY) continue;
+
+        const gyFloat = (my - offsetY) / CELL_SIZE;
+        const gy = Math.floor(gyFloat);
+        if (gy < 0 || gy >= N) continue;
+
+        const pxWithoutOffset = mx - offsetX;
+        const gxFloat = (pxWithoutOffset - gy * SHEAR * CELL_SIZE) / CELL_SIZE;
+        const gx = Math.floor(gxFloat);
+        if (gx < 0 || gx >= N) continue;
+
+        return { layer: l, x: gx, y: gy };
+      }
+      return null;
+    }
+
+    // --------- Compressed connectivity ---------
+    const groupSize = Math.ceil(layerNeuronCount / BINS_PER_LAYER);
+    const CM = LAYERS * BINS_PER_LAYER;
+    const compressed = new Float32Array(CM * CM);
+
+    function groupOf(layer, x, y) {
+      const within = y * N + x;
+      let gWithin = Math.floor(within / groupSize);
+      if (gWithin >= BINS_PER_LAYER) gWithin = BINS_PER_LAYER - 1;
+      return layer * BINS_PER_LAYER + gWithin;
+    }
+
+    function groupOfNeuronIndex(globalIndex) {
+      const layer = Math.floor(globalIndex / layerNeuronCount);
+      const within = globalIndex - layer * layerNeuronCount;
+      let gWithin = Math.floor(within / groupSize);
+      if (gWithin >= BINS_PER_LAYER) gWithin = BINS_PER_LAYER - 1;
+      return layer * BINS_PER_LAYER + gWithin;
+    }
+
+    function computeCompressedConnectivity() {
+      compressed.fill(0);
+
+      const gLocal = parseFloat(gLocalSlider.value);
+      const gRandom = parseFloat(gRandomSlider.value);
+      const gCross = parseFloat(gCrossSlider.value);
+      const gBack = parseFloat(gBackSlider.value);
+      const enableBack = enableBackProjCheckbox.checked;
+
+      for (let l = 0; l < LAYERS; l++) {
+        for (let y = 0; y < N; y++) {
+          for (let x = 0; x < N; x++) {
+            const postIndex = idx(l, x, y);
+            const gPost = groupOf(l, x, y);
+
+            if (gLocal !== 0) {
+              for (const k of localKernel) {
+                const xx = wrapIndex(x + k.dx, N);
+                const yy = wrapIndex(y + k.dy, N);
+                const gPre = groupOf(l, xx, yy);
+                compressed[gPost * CM + gPre] += gLocal * k.w;
+              }
+            }
+
+            if (gRandom !== 0) {
+              const incoming = randomInConnections[postIndex];
+              if (incoming && incoming.length) {
+                for (const edge of incoming) {
+                  const gPre = groupOfNeuronIndex(edge.pre);
+                  compressed[gPost * CM + gPre] += gRandom * edge.w;
+                }
+              }
+            }
+
+            if (gCross !== 0 && l > 0) {
+              for (const k of localKernel) {
+                const xx = wrapIndex(x + k.dx, N);
+                const yy = wrapIndex(y + k.dy, N);
+                const gPre = groupOf(l - 1, xx, yy);
+                compressed[gPost * CM + gPre] += gCross * k.w;
+              }
+            }
+
+            if (enableBack && gBack !== 0 && l < LAYERS - 1) {
+              for (const k of localKernel) {
+                const xx = wrapIndex(x + k.dx, N);
+                const yy = wrapIndex(y + k.dy, N);
+                const gPre = groupOf(l + 1, xx, yy);
+                compressed[gPost * CM + gPre] += gBack * k.w;
+              }
+            }
+          }
+        }
+      }
+
+      // // normalize rows by number of post neurons in each group
+      // const groupCounts = new Int32Array(CM);
+      // for (let l = 0; l < LAYERS; l++) {
+      //   for (let y = 0; y < N; y++) {
+      //     for (let x = 0; x < N; x++) {
+      //       const g = groupOf(l, x, y);
+      //       groupCounts[g]++;
+      //     }
+      //   }
+      // }
+
+      // for (let gPost = 0; gPost < CM; gPost++) {
+      //   const denom = Math.max(1, groupCounts[gPost]);
+      //   const rowStart = gPost * CM;
+      //   for (let gPre = 0; gPre < CM; gPre++) {
+      //     compressed[rowStart + gPre] /= denom;
+      //   }
+      // }
+
+      let maxAbs = 0;
+      for (let i = 0; i < compressed.length; i++) {
+        const a = Math.abs(compressed[i]);
+        if (a > maxAbs) maxAbs = a;
+      }
+      if (maxAbs < 1e-6) maxAbs = 1;
+      return maxAbs;
+    }
+
+    // Blue–gray–red colormap
+    function blueGrayRed(t) {
+      t = Math.max(0, Math.min(1, t));
+      if (t < 0.5) {
+        const s = t / 0.5;
+        const r = Math.round(128 * s);
+        const g = Math.round(128 * s);
+        const b = Math.round(255 - 127 * s);
+        return `rgb(${r},${g},${b})`;
+      } else {
+        const s = (t - 0.5) / 0.5;
+        const r = Math.round(128 + 127 * s);
+        const g = Math.round(128 - 128 * s);
+        const b = Math.round(128 - 128 * s);
+        return `rgb(${r},${g},${b})`;
+      }
+    }
+
+    function drawCompressedConnectivity() {
+      const w = connCanvas.width;
+      const h = connCanvas.height;
+      const cellW = w / CM;
+      const cellH = h / CM;
+
+      const maxAbs = computeCompressedConnectivity();
+
+      connCtx.clearRect(0, 0, w, h);
+      connCtx.imageSmoothingEnabled = false;
+
+      for (let row = 0; row < CM; row++) {
+        for (let col = 0; col < CM; col++) {
+          const val = compressed[row * CM + col];
+          const norm = val / maxAbs;
+          const t = (norm + 1) / 2;
+          connCtx.fillStyle = blueGrayRed(t);
+          connCtx.fillRect(col * cellW, row * cellH, cellW + 0.5, cellH + 0.5);
+        }
+      }
+
+      connCtx.strokeStyle = '#888';
+      connCtx.lineWidth = 1;
+      for (let l = 1; l < LAYERS; l++) {
+        const p = l * BINS_PER_LAYER;
+        const xLine = (p / CM) * w;
+        const yLine = (p / CM) * h;
+
+        connCtx.beginPath();
+        connCtx.moveTo(xLine, 0);
+        connCtx.lineTo(xLine, h);
+        connCtx.stroke();
+
+        connCtx.beginPath();
+        connCtx.moveTo(0, yLine);
+        connCtx.lineTo(w, yLine);
+        connCtx.stroke();
+      }
+
+      drawConnColorbar(maxAbs);
+    }
+
+    function drawConnColorbar(maxAbs) {
+      const w = connColorbar.width;
+      const h = connColorbar.height;
+
+      connBarCtx.clearRect(0, 0, w, h);
+
+      const grad = connBarCtx.createLinearGradient(0, 0, 0, h);
+      grad.addColorStop(0, 'rgb(255,0,0)');
+      grad.addColorStop(0.5, 'rgb(128,128,128)');
+      grad.addColorStop(1, 'rgb(0,0,255)');
+
+      connBarCtx.fillStyle = grad;
+      connBarCtx.fillRect(0, 0, w * 0.5, h);
+
+      connBarCtx.fillStyle = '#eee';
+      connBarCtx.font = '10px system-ui';
+      connBarCtx.textAlign = 'left';
+      connBarCtx.fillText(`+${maxAbs.toFixed(2)}`, w * 0.55, 10);
+      connBarCtx.fillText('0', w * 0.55, h / 2 + 3);
+      connBarCtx.fillText(`-${maxAbs.toFixed(2)}`, w * 0.55, h - 4);
+    }
+
+    // --------- Neuron trace state ---------
+    let selectedNeuron = null; // {layer, x, y} or null
+    let trace = new Float32Array(TRACE_LEN);
+    let traceIndex = 0;
+    let traceFilled = false;
+
+    function setSelectedNeuron(neuron) {
+      selectedNeuron = neuron;
+      traceIndex = 0;
+      traceFilled = false;
+      trace.fill(0);
+      if (neuron) {
+        selectedLabel.textContent =
+          `Selected neuron: layer ${neuron.layer}, x=${neuron.x}, y=${neuron.y}`;
+      } else {
+        selectedLabel.textContent =
+          'Click on a neuron (any layer) to record its activity over time.';
+      }
+    }
+
+    function logTraceSample() {
+      if (!selectedNeuron) return;
+      const v = state[idx(selectedNeuron.layer, selectedNeuron.x, selectedNeuron.y)];
+      trace[traceIndex] = v;
+      traceIndex = (traceIndex + 1) % TRACE_LEN;
+      if (traceIndex === 0) traceFilled = true;
+    }
+
+    function drawTrace() {
+      const W = traceCanvas.width;
+      const H = traceCanvas.height;
+      traceCtx.clearRect(0, 0, W, H);
+
+      traceCtx.fillStyle = '#111';
+      traceCtx.fillRect(0, 0, W, H);
+
+      const midY = H / 2;
+      traceCtx.strokeStyle = '#555';
+      traceCtx.lineWidth = 1;
+      traceCtx.beginPath();
+      traceCtx.moveTo(0, midY);
+      traceCtx.lineTo(W, midY);
+      traceCtx.stroke();
+
+      if (!selectedNeuron) return;
+
+      traceCtx.strokeStyle = '#0f0';
+      traceCtx.lineWidth = 1.5;
+      traceCtx.beginPath();
+
+      const len = traceFilled ? TRACE_LEN : traceIndex;
+      if (len === 0) return;
+
+      for (let i = 0; i < len; i++) {
+        const idxSample = traceFilled ? (traceIndex + i) % TRACE_LEN : i;
+        const v = trace[idxSample]; // ~[-1,1]
+        const x = (i / (TRACE_LEN - 1)) * W;
+        const y = midY - v * (H * 0.4);
+
+        if (i === 0) traceCtx.moveTo(x, y);
+        else traceCtx.lineTo(x, y);
+      }
+      traceCtx.stroke();
+    }
+
+    // --------- Network update ---------
+    function updateNetwork() {
+      const leak = parseFloat(leakSlider.value);
+      const gLocal = parseFloat(gLocalSlider.value);
+      const gRandom = parseFloat(gRandomSlider.value);
+      const gCross = parseFloat(gCrossSlider.value);
+      const gBack = parseFloat(gBackSlider.value);
+      const enableBack = enableBackProjCheckbox.checked;
+      const stimStrength = parseFloat(stimStrengthSlider.value);
+      const useSigmoid = useSigmoidCheckbox.checked;
+
+      if (manualControlCheckbox.checked) {
+        walker.x = parseInt(sliderX.value);
+        walker.y = parseInt(sliderY.value);
+      } else {
+        stepWalker();
+      }
+
+      const INPUT_LAYER = 0;
+
+      for (let l = 0; l < LAYERS; l++) {
+        for (let y = 0; y < N; y++) {
+          for (let x = 0; x < N; x++) {
+            const index = idx(l, x, y);
+            let input = 0.0;
+
+            if (gLocal !== 0) {
+              let localInput = 0.0;
+              for (const k of localKernel) {
+                const xx = wrapIndex(x + k.dx, N);
+                const yy = wrapIndex(y + k.dy, N);
+                localInput += k.w * state[idx(l, xx, yy)];
+              }
+              input += gLocal * localInput;
+            }
+
+            if (gRandom !== 0) {
+              const incoming = randomInConnections[index];
+              if (incoming && incoming.length > 0) {
+                let rIn = 0.0;
+                for (const edge of incoming) rIn += edge.w * state[edge.pre];
+                input += gRandom * rIn;
+              }
+            }
+
+            if (gCross !== 0 && l > 0) {
+              let crossIn = 0.0;
+              for (const k of localKernel) {
+                const xx = wrapIndex(x + k.dx, N);
+                const yy = wrapIndex(y + k.dy, N);
+                crossIn += k.w * state[idx(l - 1, xx, yy)];
+              }
+              input += gCross * crossIn;
+            }
+
+            if (enableBack && gBack !== 0 && l < LAYERS - 1) {
+              let backIn = 0.0;
+              for (const k of localKernel) {
+                const xx = wrapIndex(x + k.dx, N);
+                const yy = wrapIndex(y + k.dy, N);
+                backIn += k.w * state[idx(l + 1, xx, yy)];
+              }
+              input += gBack * backIn;
+            }
+
+            // Walker stimulus ONLY to input layer (layer 0)
+            if (l === INPUT_LAYER && stimStrength !== 0) {
+              const dxw = x - walker.x;
+              const dyw = y - walker.y;
+              const r2 = dxw * dxw + dyw * dyw;
+              const stim = stimStrength * Math.exp(-r2 / (2 * sigmaStim * sigmaStim));
+              input += stim;
+            }
+
+            // Nonlinearity: tanh or sigmoid mapped to [-1,1]
+            let nonlin;
+            if (useSigmoid) {
+              const s = 1 / (1 + Math.exp(-input)); // [0,1]
+              nonlin = 2 * s - 1;                   // [-1,1]
+            } else {
+              nonlin = Math.tanh(input);
+            }
+
+            nextState[index] = (1.0 - leak) * state[index] + leak * nonlin;
+          }
+        }
+      }
+
+      const tmp = state;
+      state = nextState;
+      nextState = tmp;
+    }
+
+    // --------- Drawing: network layers ---------
+    function drawNetwork() {
+      const W = networkCanvas.width;
+      const H = networkCanvas.height;
+      netCtx.clearRect(0, 0, W, H);
+      netCtx.imageSmoothingEnabled = false;
+
+      for (let l = 0; l < LAYERS; l++) {
+        for (let y = 0; y < N; y++) {
+          for (let x = 0; x < N; x++) {
+            const index = idx(l, x, y);
+            const v = state[index];
+            const t = (v + 1) / 2;
+            netCtx.fillStyle = blueGrayRed(t);
+
+            const cell = projectCell(l, x, y);
+            netCtx.fillRect(cell.x, cell.y, cell.w + 0.5, cell.h + 0.5);
+          }
+        }
+      }
+
+      // highlight walker on input layer (layer 0)
+      const inputLayer = 0;
+      const marker = projectCell(inputLayer, walker.x, walker.y);
+      netCtx.strokeStyle = 'white';
+      netCtx.lineWidth = 1.5;
+      netCtx.strokeRect(marker.x, marker.y, marker.w, marker.h);
+
+      // highlight selected neuron, if any
+      if (selectedNeuron) {
+        const c = projectCell(selectedNeuron.layer, selectedNeuron.x, selectedNeuron.y);
+        netCtx.strokeStyle = 'yellow';
+        netCtx.lineWidth = 1.5;
+        netCtx.strokeRect(c.x, c.y, c.w, c.h);
+      }
+    }
+
+    // --------- Logging / dump ---------
+    function collectRandomEdges() {
+      const edges = [];
+      for (let post = 0; post < numNeurons; post++) {
+        const incoming = randomInConnections[post];
+        if (!incoming || incoming.length === 0) continue;
+        for (const e of incoming) {
+          edges.push({ pre: e.pre, post, w: e.w });
+        }
+      }
+      return edges;
+    }
+
+    function dumpAll() {
+      const maxAbs = computeCompressedConnectivity();
+
+      const params = {
+        LAYERS, N,
+        radiusLocal, sigmaLocal, sigmaStim,
+        SHEAR,
+        BINS_PER_LAYER,
+        sliders: {
+          leak: parseFloat(leakSlider.value),
+          gLocal: parseFloat(gLocalSlider.value),
+          randomProb: parseFloat(randomProbSlider.value),
+          gRandom: parseFloat(gRandomSlider.value),
+          gCross: parseFloat(gCrossSlider.value),
+          gBack: parseFloat(gBackSlider.value),
+          stimStrength: parseFloat(stimStrengthSlider.value),
+          updateSpeed: parseInt(updateSpeedSlider.value)
+        },
+        toggles: {
+          manualControl: manualControlCheckbox.checked,
+          useMexicanHat: useMexicanHatCheckbox.checked,
+          dalesRule: dalesRuleCheckbox.checked,
+          enableBackProj: enableBackProjCheckbox.checked,
+          useSigmoid: useSigmoidCheckbox.checked
+        }
+      };
+
+      const payload = {
+        params,
+        localKernel: localKernel.map(k => ({ dx: k.dx, dy: k.dy, w: k.w })),
+        randomEdges: collectRandomEdges(),
+        compressedConnectivity: {
+          size: CM,
+          binsPerLayer: BINS_PER_LAYER,
+          maxAbsForViz: maxAbs,
+          matrix: Array.from(compressed)
+        }
+      };
+
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tanh_stack_dump_${Date.now()}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      URL.revokeObjectURL(url);
+    }
+
+    // --------- Animation loop ---------
+    let frameCount = 0;
+    function loop() {
+      const updatesPerFrame = parseInt(updateSpeedSlider.value);
+      for (let i = 0; i < updatesPerFrame; i++) {
+        updateNetwork();
+      }
+
+      logTraceSample();
+      drawNetwork();
+
+      if (frameCount % 5 === 0) {
+        drawCompressedConnectivity();
+      }
+      drawTrace();
+
+      frameCount++;
+      requestAnimationFrame(loop);
+    }
+
+    // --------- Events & init ---------
+    dumpAllBtn.addEventListener('click', dumpAll);
+
+    regenButton.addEventListener('click', regenerateRandomConnectivity);
+    randomProbSlider.addEventListener('change', regenerateRandomConnectivity);
+    dalesRuleCheckbox.addEventListener('change', regenerateRandomConnectivity);
+    useMexicanHatCheckbox.addEventListener('change', () => {
+      buildLocalKernel();
+      drawCompressedConnectivity();
+    });
+
+    [gLocalSlider, gRandomSlider, gCrossSlider, gBackSlider, enableBackProjCheckbox].forEach(el => {
+      el.addEventListener('input', () => drawCompressedConnectivity());
+      el.addEventListener('change', () => drawCompressedConnectivity());
+    });
+
+    // Click-to-select neuron
+    networkCanvas.addEventListener('click', (e) => {
+      const rect = networkCanvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+      const picked = pickNeuronAt(mx, my);
+      setSelectedNeuron(picked);
+    });
+
+    window.addEventListener('resize', () => {
+      resizeCanvasAndGeometry();
+      drawNetwork();
+      drawCompressedConnectivity();
+      drawTrace();
+    });
+
+    resizeCanvasAndGeometry();
+    buildLocalKernel();
+    regenerateRandomConnectivity();
+    drawCompressedConnectivity();
+    drawTrace();
+    loop();
+  </script>
+</body>
+</html>

@@ -1,0 +1,1323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reichardt–Hassenstein Detectors: How a Fly Sees Motion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<style>
+  :root{
+    --bg:#0a0a1a;
+    --panel:#12121f;
+    --panel2:#171728;
+    --border:#26263c;
+    --text:#e6e6f0;
+    --muted:#8b8ba3;
+    --a:#2dd4bf;      /* sensor A / leading */
+    --b:#f5c542;      /* sensor B / trailing */
+    --corr:#f5427a;   /* correlator output / motion energy */
+    --neg:#5b8def;    /* opponent / negative */
+    --violet:#a78bfa; /* flow vector */
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:'IBM Plex Sans', sans-serif; line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:900px; margin:0 auto; padding:0 24px;}
+  .wide{max-width:1080px;}
+  h1,h2,h3{font-family:'IBM Plex Sans',sans-serif; font-weight:600; letter-spacing:-0.01em;}
+  h1{font-size:2.4rem; line-height:1.25; margin:0 0 0.4em;}
+  h2{font-size:1.5rem; color:#fff; margin:0 0 0.6em; padding-top:0.2em;}
+  h2 .num{color:var(--corr); font-family:'IBM Plex Mono',monospace; font-size:0.85rem; display:block; margin-bottom:0.3em; letter-spacing:0.08em;}
+  p{color:#cfcfe0; font-size:1.04rem; margin:0 0 1em;}
+  p.lede{color:#fff; font-size:1.2rem;}
+  .muted{color:var(--muted);}
+  code, .mono{font-family:'IBM Plex Mono',monospace; font-size:0.92em;}
+  .hero{padding:8vh 0 6vh;}
+  .hero .tag{font-family:'IBM Plex Mono',monospace; color:var(--corr); font-size:0.85rem; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:1em; display:block;}
+  section{padding:5em 0;}
+  section.section{border-top:1px solid var(--border);}
+  .figure{
+    background:var(--panel); border:1px solid var(--border); border-radius:14px;
+    padding:28px; margin:2em 0; box-shadow:0 20px 50px -30px rgba(0,0,0,0.6);
+  }
+  figcaption{color:var(--muted); font-size:0.9rem; margin-top:14px; line-height:1.6;}
+  .controls-row{display:flex; flex-wrap:wrap; gap:24px 32px; margin:18px 0;}
+  .control{flex:1 1 220px; min-width:200px;}
+  .control label{display:flex; justify-content:space-between; font-size:0.85rem; color:var(--muted); margin-bottom:6px; font-family:'IBM Plex Mono',monospace;}
+  .control label .val{color:var(--text); font-weight:500;}
+  /* slider */
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:24px; background:transparent; cursor:grab; margin:0;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:4px; background:var(--border); border-radius:2px;}
+  input[type=range]::-moz-range-track{height:4px; background:var(--border); border-radius:2px;}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:18px; height:18px; border-radius:50%;
+    background:var(--corr); border:2px solid #fff2; margin-top:-7px; cursor:grab;
+    box-shadow:0 2px 8px rgba(245,66,122,0.5);
+  }
+  input[type=range]::-moz-range-thumb{
+    width:18px; height:18px; border-radius:50%; background:var(--corr); border:2px solid #fff2; cursor:grab;
+    box-shadow:0 2px 8px rgba(245,66,122,0.5);
+  }
+  .btn{
+    background:var(--panel2); border:1px solid var(--border); color:var(--text);
+    font-family:'IBM Plex Mono',monospace; font-size:0.85rem; padding:9px 18px; border-radius:8px;
+    cursor:pointer; transition:all 0.15s ease; letter-spacing:0.03em;
+  }
+  .btn:hover{background:#1d1d33; border-color:#3a3a5c;}
+  .btn.primary{background:var(--corr); color:#1a0510; border-color:var(--corr); font-weight:600;}
+  .btn.primary:hover{background:#ff5c8a;}
+  .readout{
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-top:18px;
+  }
+  .readout .item{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:12px 14px;}
+  .readout .item .k{font-family:'IBM Plex Mono',monospace; font-size:0.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em; margin-bottom:4px;}
+  .readout .item .v{font-family:'IBM Plex Mono',monospace; font-size:1.15rem; color:#fff;}
+  .readout .item .v small{color:var(--muted); font-size:0.7rem;}
+  canvas{display:block; max-width:100%;}
+  .legend{display:flex; gap:18px; flex-wrap:wrap; font-size:0.85rem; color:var(--muted); margin-top:10px;}
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .dot{width:10px; height:10px; border-radius:50%; display:inline-block;}
+  .eq{background:var(--panel2); border:1px solid var(--border); border-radius:10px; padding:16px 20px; margin:1.2em 0; overflow-x:auto;}
+  .callout{
+    border-left:3px solid var(--corr); background:linear-gradient(90deg, rgba(245,66,122,0.08), transparent);
+    padding:16px 20px; border-radius:0 10px 10px 0; margin:1.6em 0;
+  }
+  .callout p{color:#fff; margin:0; font-size:1.02rem;}
+  .pipeline{display:flex; gap:28px; align-items:flex-start;}
+  .pipeline-main{position:relative; flex:1 1 auto; min-width:0; display:flex; flex-direction:column; align-items:center; gap:18px;}
+  .pipeline-knob{
+    flex:0 0 148px; display:flex; flex-direction:column; align-items:center; gap:6px;
+    border-left:1px solid var(--border); padding-left:24px; text-align:center;
+  }
+  .ctx-block{width:100%; display:flex; flex-direction:column; align-items:center;}
+  .ctx-label{font-family:'IBM Plex Mono',monospace; font-size:0.68rem; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:8px;}
+  .ctx-block.world .ctx-label{color:#9a9ac0;}
+  .ctx-block.retina{
+    background:radial-gradient(ellipse at center, rgba(167,139,250,0.09), transparent 72%);
+    border:1px solid #2a2a4a; border-radius:46px/20px; padding:12px 8px 2px;
+  }
+  .ctx-block.retina .ctx-label{color:var(--violet);}
+  .ctx-block.detector .ctx-label{color:var(--corr);}
+  #projSvg{position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; overflow:visible;}
+  .hr-diagram-wrap{display:flex; justify-content:center; margin:2px 0 0;}
+  .hr-diagram-wrap svg{max-width:100%; height:auto;}
+  .hr-part{transition:opacity 0.05s linear, filter 0.05s linear;}
+  #tauKnob{cursor:ns-resize; touch-action:none;}
+  .knob-value{font-family:'IBM Plex Mono',monospace; font-size:1.1rem; color:#fff; margin-top:2px;}
+  .knob-hint{font-family:'IBM Plex Mono',monospace; font-size:0.68rem; color:var(--muted);}
+  .pipeline-knob .readout{grid-template-columns:1fr; gap:8px; width:100%; margin-top:12px;}
+  .pipeline-knob .readout .v{font-size:0.92rem;}
+  @media (max-width:820px){
+    .pipeline{flex-direction:column; align-items:center;}
+    .pipeline-knob{border-left:none; border-top:1px solid var(--border); padding-left:0; padding-top:18px; width:100%; flex:none;}
+  }
+  .grid-e{
+    display:grid;
+    grid-template-columns:110px 260px 110px;
+    grid-template-rows:110px 260px 110px;
+    grid-template-areas:
+      "nw n ne"
+      "w c e"
+      "sw s se";
+    gap:8px; justify-content:center; margin:0 auto;
+  }
+  .cell{position:relative; display:flex; align-items:center; justify-content:center;}
+  .cell canvas{border-radius:8px; background:#08080f;}
+  .cell.n{grid-area:n;} .cell.ne{grid-area:ne;} .cell.e{grid-area:e;}
+  .cell.se{grid-area:se;} .cell.s{grid-area:s;} .cell.sw{grid-area:sw;}
+  .cell.w{grid-area:w;} .cell.nw{grid-area:nw;} .cell.c{grid-area:c;}
+  .cell .lbl{position:absolute; top:3px; left:6px; font-family:'IBM Plex Mono',monospace; font-size:0.62rem; color:var(--muted); z-index:2;}
+  .cell.c canvas{border:1px solid var(--border);}
+  .cell:not(.c) canvas{border:1px solid #1e1e30;}
+  .side-panel{display:flex; gap:36px; flex-wrap:wrap; align-items:flex-start; margin-top:24px; justify-content:center;}
+  .vec-widget{text-align:center;}
+  .vec-widget canvas{background:#08080f; border:1px solid var(--border); border-radius:10px; cursor:grab;}
+  footer{padding:6em 0 4em; text-align:center;}
+  footer p{color:var(--muted); font-size:0.9rem;}
+  ::selection{background:var(--corr); color:#fff;}
+  @media (max-width:760px){
+    .grid-e{grid-template-columns:70px 180px 70px; grid-template-rows:70px 180px 70px;}
+    h1{font-size:1.8rem;}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap hero">
+  <span class="tag">Explorable · Insect Vision</span>
+  <h1>How does a fly, with no cortex, know which way something is moving?</h1>
+  <p class="lede">A single photoreceptor can only report how bright things are, right now, at one point in space. It has no way to encode motion by itself. Yet flies dodge swatting hands in milliseconds. This is the story of the circuit that makes that possible — built from nothing more than two sensors, a delay, and a multiplication.</p>
+</div>
+
+<section class="section" id="s0">
+  <div class="wrap">
+    <h2><span class="num">00 — Definition</span>What is motion perception?</h2>
+    <p>Motion perception is the inference of <em>velocity</em> — how a feature's position changes over time — from a sequence of instantaneous, static snapshots of the world. It is not a raw input; it has to be computed.</p>
+    <p>A single sensor sampling light intensity at one location can tell you that its input got brighter or dimmer. It cannot, on its own, tell you that the brightening is <em>part of something moving in a direction</em>. Direction and speed only become available once you compare what one sensor sees with what a <em>different, nearby</em> sensor saw a moment before. That comparison — space plus a time delay — is the entire idea behind everything below.</p>
+  </div>
+</section>
+
+<section class="section" id="s1">
+  <div class="wrap wide">
+    <h2><span class="num">01 — One pipeline</span>World → retina → detector</h2>
+    <p>What follows is one continuous chain, not three separate ideas. A dot moves through physical space. That motion projects onto the fly's one-dimensional retina as a sweep through <strong>visual angle</strong> — the angle <span class="mono">φ</span> between the fly's forward axis and the line of sight to the dot. Two points on that retina feed straight into a Reichardt–Hassenstein detector, whose two input branches are the same two receptors highlighted below. Follow the dashed lines down: it's the same signal, shown three ways.</p>
+    <div class="eq" id="eq1"></div>
+
+    <div class="figure">
+      <div class="pipeline">
+        <div class="pipeline-main">
+          <div class="ctx-block world">
+            <span class="ctx-label">World — physical space, top-down</span>
+            <canvas id="topview" width="320" height="200"></canvas>
+          </div>
+          <div class="ctx-block retina">
+            <span class="ctx-label">Retina — the fly's 1D field of view</span>
+            <canvas id="strip" width="720" height="86"></canvas>
+          </div>
+          <div class="ctx-block detector">
+            <span class="ctx-label">Reichardt–Hassenstein detector</span>
+            <div class="hr-diagram-wrap">
+              <svg id="hrSvg" viewBox="0 0 360 420" width="360" height="420">
+                <!-- stimulus direction -->
+                <line x1="130" y1="14" x2="230" y2="14" stroke="#ffffff88" stroke-width="2"/>
+                <polygon points="230,9 244,14 230,19" fill="#ffffff88"/>
+                <text x="180" y="9" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#8b8ba3">motion</text>
+
+                <!-- receptors -->
+                <path id="recvA" class="hr-part" d="M 82 46 A 28 28 0 0 1 138 46" fill="none" stroke="var(--a)" stroke-width="6" stroke-linecap="round"/>
+                <path id="recvB" class="hr-part" d="M 222 46 A 28 28 0 0 1 278 46" fill="none" stroke="var(--b)" stroke-width="6" stroke-linecap="round"/>
+                <text x="110" y="70" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="var(--a)">A</text>
+                <text x="250" y="70" text-anchor="middle" font-family="IBM Plex Mono" font-size="12" fill="var(--b)">B</text>
+
+                <!-- straight (live) segments into delay boxes -->
+                <line id="lineA-straight" class="hr-part" x1="110" y1="78" x2="110" y2="112" stroke="var(--a)" stroke-width="2.5"/>
+                <line id="lineB-straight" class="hr-part" x1="250" y1="78" x2="250" y2="112" stroke="var(--b)" stroke-width="2.5"/>
+
+                <!-- crossed live connections direct to the opposite multiplier -->
+                <line id="lineA-cross" class="hr-part" x1="110" y1="78" x2="250" y2="246" stroke="var(--a)" stroke-width="2" opacity="0.6"/>
+                <line id="lineB-cross" class="hr-part" x1="250" y1="78" x2="110" y2="246" stroke="var(--b)" stroke-width="2" opacity="0.6"/>
+
+                <!-- delay boxes -->
+                <rect id="tauBoxA" class="hr-part" x="85" y="112" width="50" height="40" rx="6" fill="#171728" stroke="var(--a)" stroke-width="2"/>
+                <rect id="tauBoxB" class="hr-part" x="225" y="112" width="50" height="40" rx="6" fill="#171728" stroke="var(--b)" stroke-width="2"/>
+                <text x="110" y="138" text-anchor="middle" font-family="IBM Plex Mono" font-size="15" fill="#fff">τ</text>
+                <text x="250" y="138" text-anchor="middle" font-family="IBM Plex Mono" font-size="15" fill="#fff">τ</text>
+
+                <!-- delayed output down to same-side multiplier -->
+                <line id="lineA-tau-out" class="hr-part" x1="110" y1="152" x2="110" y2="246" stroke="#7fe3d6" stroke-width="2.5"/>
+                <line id="lineB-tau-out" class="hr-part" x1="250" y1="152" x2="250" y2="246" stroke="#ffe08a" stroke-width="2.5"/>
+
+                <!-- multipliers, each tagged with the motion direction it prefers -->
+                <circle id="mLeftCircle" class="hr-part" cx="110" cy="256" r="26" fill="#171728" stroke="var(--corr)" stroke-width="2.5"/>
+                <circle id="mRightCircle" class="hr-part" cx="250" cy="256" r="26" fill="#171728" stroke="var(--neg)" stroke-width="2.5"/>
+                <text x="110" y="262" text-anchor="middle" font-family="IBM Plex Mono" font-size="15" fill="#fff">×</text>
+                <text x="250" y="262" text-anchor="middle" font-family="IBM Plex Mono" font-size="15" fill="#fff">×</text>
+                <!-- preference arrows -->
+                <g id="prefLeft"><line x1="40" y1="256" x2="72" y2="256" stroke="var(--corr)" stroke-width="3"/><polygon points="72,250 84,256 72,262" fill="var(--corr)"/><text x="62" y="242" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="var(--corr)">prefers →</text></g>
+                <g id="prefRight"><line x1="320" y1="256" x2="288" y2="256" stroke="var(--neg)" stroke-width="3"/><polygon points="288,250 276,256 288,262" fill="var(--neg)"/><text x="300" y="242" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="var(--neg)">prefers ←</text></g>
+
+                <!-- into subtraction -->
+                <line id="lineM-left-out" class="hr-part" x1="110" y1="282" x2="180" y2="330" stroke="var(--corr)" stroke-width="2.5"/>
+                <line id="lineM-right-out" class="hr-part" x1="250" y1="282" x2="180" y2="330" stroke="var(--neg)" stroke-width="2.5"/>
+                <circle id="minusCircle" class="hr-part" cx="180" cy="352" r="24" fill="#171728" stroke="#fff" stroke-width="2.5"/>
+                <text x="180" y="359" text-anchor="middle" font-family="IBM Plex Mono" font-size="18" fill="#fff">−</text>
+
+                <!-- output -->
+                <line id="outArrowLine" class="hr-part" x1="180" y1="376" x2="180" y2="404" stroke="#fff" stroke-width="2.5"/>
+                <polygon id="outArrowHead" class="hr-part" points="172,400 180,414 188,400" fill="#fff"/>
+                <text x="180" y="34" text-anchor="middle" font-family="IBM Plex Mono" font-size="10" fill="#5a5a78">R(t) — direction-selective output ↓</text>
+              </svg>
+            </div>
+          </div>
+
+          <svg id="projSvg">
+            <line id="projLine" x1="0" y1="0" x2="0" y2="0" stroke="#ffffff66" stroke-width="1.5" stroke-dasharray="3,4"/>
+            <line id="projLineA" x1="0" y1="0" x2="0" y2="0" stroke="var(--a)" stroke-width="1.3" stroke-dasharray="3,4" opacity="0.55"/>
+            <line id="projLineB" x1="0" y1="0" x2="0" y2="0" stroke="var(--b)" stroke-width="1.3" stroke-dasharray="3,4" opacity="0.55"/>
+          </svg>
+        </div>
+
+        <div class="pipeline-knob">
+          <span class="ctx-label">Correlator delay</span>
+          <svg id="tauKnob" viewBox="0 0 120 120" width="104" height="104">
+            <circle cx="60" cy="60" r="50" fill="#171728" stroke="var(--border)" stroke-width="2"/>
+            <path id="knobTrack" fill="none" stroke="#2a2a44" stroke-width="7" stroke-linecap="round"/>
+            <path id="knobFill" fill="none" stroke="var(--corr)" stroke-width="7" stroke-linecap="round"/>
+            <line id="knobPointer" x1="60" y1="60" x2="60" y2="24" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="60" cy="60" r="5" fill="#fff"/>
+          </svg>
+          <div class="knob-value" id="tauKnobVal">35 ms</div>
+          <div class="knob-hint">drag ↕ to adjust τ</div>
+          <div class="readout">
+            <div class="item"><div class="k">Correlator match</div><div class="v" id="rMatch">–</div></div>
+            <div class="item"><div class="k">Implied preferred ω</div><div class="v" id="rOmegaPref">Δφ/τ = –°/s</div></div>
+          </div>
+        </div>
+      </div>
+
+      <p class="muted" style="font-size:0.82rem; margin:16px 0 4px; font-family:'IBM Plex Mono',monospace; letter-spacing:0.06em;">SPIKE TRAINS — each neuron's output as discrete spikes, color-coded by cell</p>
+      <canvas id="spikeRaster" width="720" height="118"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--a)"></span>A — receptor</span>
+        <span><span class="dot" style="background:var(--b)"></span>B — receptor</span>
+        <span><span class="dot" style="background:var(--corr)"></span>→ subunit (prefers rightward)</span>
+        <span><span class="dot" style="background:var(--neg)"></span>← subunit (prefers leftward)</span>
+      </div>
+
+      <div class="controls-row">
+        <div class="control">
+          <label>Stimulus velocity <span class="val" id="vVal">→ 120 cm/s</span></label>
+          <input type="range" id="vSlider" min="-300" max="300" value="120" step="1">
+          <div style="display:flex; justify-content:space-between; font-family:'IBM Plex Mono',monospace; font-size:0.66rem; color:var(--muted); margin-top:2px;"><span>← left</span><span>0</span><span>right →</span></div>
+        </div>
+        <div class="control">
+          <label>Distance to fly <span class="val" id="dVal">12 cm</span></label>
+          <input type="range" id="dSlider" min="4" max="30" value="12" step="0.5">
+        </div>
+        <div class="control" style="flex:0 0 140px; display:flex; align-items:flex-end;">
+          <button class="btn primary" id="playBtnA">⏸ Pause</button>
+        </div>
+      </div>
+
+      <div class="readout">
+        <div class="item"><div class="k">Sensor separation Δφ</div><div class="v" id="rDphi">10.0° <small>drag markers</small></div></div>
+        <div class="item"><div class="k">Angular speed ω (at center)</div><div class="v" id="rOmega">– °/s</div></div>
+        <div class="item"><div class="k">Time between activations Δt</div><div class="v" id="rDt">– ms</div></div>
+        <div class="item"><div class="k">Playback</div><div class="v" id="rSlomo">slowed ×– for visibility</div></div>
+      </div>
+
+      <p class="muted" style="font-size:0.88rem; margin:18px 0 0;">Same pipeline, unrolled in time — the waveforms actually flowing through the wiring above:</p>
+      <canvas id="traces" width="720" height="150" style="margin-top:10px;"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--a)"></span>L<sub>A</sub>(t) — sensor A, live</span>
+        <span><span class="dot" style="background:#7fe3d6"></span>L<sub>A</sub>(t−τ) — sensor A, remembered</span>
+        <span><span class="dot" style="background:var(--b)"></span>L<sub>B</sub>(t) — sensor B, live</span>
+      </div>
+      <canvas id="corrTrace" width="720" height="150" style="margin-top:14px;"></canvas>
+      <div class="legend">
+        <span><span class="dot" style="background:var(--corr)"></span>A-remembered × B-live (→ subunit)</span>
+        <span><span class="dot" style="background:var(--neg)"></span>B-remembered × A-live (← subunit)</span>
+        <span><span class="dot" style="background:#fff"></span>R = difference (opponent output)</span>
+      </div>
+
+      <figcaption>Top to bottom: the fly in physical space (not what it perceives, just the scene from outside) → the retina's actual one-dimensional angular strip, linked by the dashed projection line → the two retinal points wired directly into the detector, linked by the two colored dashed lines → the same live/delayed/multiplied signals again, unrolled as waveforms. The knob on the right sets τ for the whole pipeline. Everything loops continuously; drag the sensors, the sliders, or the knob any time.</figcaption>
+    </div>
+
+    <div class="eq" id="eq2"></div>
+
+    <div class="callout">
+      <p>Try shrinking Δφ while keeping speed fixed, then try widening it. The two sensors fire closer together in time when they're close together in the field — <strong>Δt scales with sensor separation, not just with stimulus speed.</strong> Now drag the knob: the same correlator match can be reached by changing τ instead of anything about the stimulus.</p>
+    </div>
+    <p>The correlator itself has no idea what "50 cm/s" means. It only knows whether a remembered signal and a live signal happened to coincide. The exact same peak response could come from a fast dot with widely spaced sensors, or a slow dot with closely spaced sensors — τ = Δt either way. The unit only acquires a meaning in physical units — <span class="mono">ω<sub>pref</sub> = Δφ / τ</span> — once you also know how far apart its two sensors are.</p>
+  </div>
+</section>
+
+<section class="section" id="s4">
+  <div class="wrap wide">
+    <h2><span class="num">02 — Tiling</span>One pair becomes an array</h2>
+    <p>A single detector reports on one location. Real motion-vision systems tile the whole field with a repeating <strong>array</strong> of identical detectors — a row of receptors on top, and between every adjacent pair, one delay-and-multiply unit. Neighboring detectors share receptors, so the field is covered without gaps. This is the columnar organization seen throughout insect optic lobes.</p>
+    <div class="figure">
+      <canvas id="tileArray" width="720" height="230"></canvas>
+      <div class="controls-row">
+        <div class="control" style="flex:0 0 160px;">
+          <button class="btn primary" id="playBtnD">⏸ Pause</button>
+        </div>
+      </div>
+      <figcaption>An array of Reichardt detectors tiling the retina. Top row: receptors (each shared by two detectors). Each detector below crosses its two receptors through delay units into a multiplier; the whole unit brightens as the dot passes its patch of field. Schematic after the columnar arrays of Vitzthum &amp; Homberg (1998). The sweep uses the same velocity, distance, and τ set above — flip the velocity negative and the activation wave reverses.</figcaption>
+    </div>
+    <p>Now generalize once more: give every point in the field neighbors in <em>every</em> direction, not just left–right. That's the step from this one-dimensional array to a real, two-dimensional eye.</p>
+  </div>
+</section>
+
+<section class="section" id="s5">
+  <div class="wrap wide">
+    <h2><span class="num">03 — Synthesis</span>A 2D field of eight directional detectors</h2>
+    <p>The connectivity rule is simple and completely local: <strong>for every pair of cells that sit at a fixed distance and a fixed relative position in the image, wire up one detector.</strong> Take a 50×50 patch of visual field. For each pixel, pair it with the neighbor one step away in each of the 8 compass directions (N, NE, E, SE, S, SW, W, NW), and drop a delay-and-multiply unit on that pair. The relative position of the two cells <em>is</em> the direction that detector prefers — a pixel paired with its eastern neighbor prefers rightward motion, a pixel paired with its northern neighbor prefers upward motion.</p>
+    <p>Collecting all the "paired-with-my-eastern-neighbor" units across the whole patch gives one full map of rightward motion; all the "paired-with-my-northern-neighbor" units give a separate map of upward motion, and so on. Eight relative positions, eight maps. (Pairing cells <em>two</em> or three steps apart instead of one would build detectors tuned to faster motion — same rule, larger Δ.)</p>
+    <p>The center panel below is the stimulus: a field of moving dots driven by a velocity vector you control — this is <strong>optic flow</strong>. Drag the tip of the arrow to set direction and speed continuously. The eight panels around it are the live output of the eight directional maps, each sitting on the side matching the direction it prefers. The knob on the right sets the shared delay τ of every detector in the array.</p>
+
+    <div class="figure">
+      <div class="grid-e">
+        <div class="cell n"><span class="lbl">N</span><canvas class="mmap" data-dir="2" width="100" height="100"></canvas></div>
+        <div class="cell ne"><span class="lbl">NE</span><canvas class="mmap" data-dir="1" width="100" height="100"></canvas></div>
+        <div class="cell e"><span class="lbl">E</span><canvas class="mmap" data-dir="0" width="100" height="100"></canvas></div>
+        <div class="cell se"><span class="lbl">SE</span><canvas class="mmap" data-dir="7" width="100" height="100"></canvas></div>
+        <div class="cell s"><span class="lbl">S</span><canvas class="mmap" data-dir="6" width="100" height="100"></canvas></div>
+        <div class="cell sw"><span class="lbl">SW</span><canvas class="mmap" data-dir="5" width="100" height="100"></canvas></div>
+        <div class="cell w"><span class="lbl">W</span><canvas class="mmap" data-dir="4" width="100" height="100"></canvas></div>
+        <div class="cell nw"><span class="lbl">NW</span><canvas class="mmap" data-dir="3" width="100" height="100"></canvas></div>
+        <div class="cell c"><canvas id="fieldMain" width="250" height="250"></canvas></div>
+      </div>
+
+      <div class="side-panel">
+        <div class="vec-widget">
+          <canvas id="vecWidget" width="200" height="200"></canvas>
+          <div class="legend" style="justify-content:center;">
+            <span><span class="dot" style="background:var(--violet)"></span>true flow vector (drag)</span>
+            <span><span class="dot" style="background:#fff"></span>decoded from the 8 maps</span>
+          </div>
+        </div>
+        <div class="pipeline-knob" style="border-left:none; padding-left:0;">
+          <span class="ctx-label">Detector delay τ</span>
+          <svg id="tau2Knob" viewBox="0 0 120 120" width="96" height="96">
+            <circle cx="60" cy="60" r="50" fill="#171728" stroke="var(--border)" stroke-width="2"/>
+            <path id="knob2Track" fill="none" stroke="#2a2a44" stroke-width="7" stroke-linecap="round"/>
+            <path id="knob2Fill" fill="none" stroke="var(--corr)" stroke-width="7" stroke-linecap="round"/>
+            <line id="knob2Pointer" x1="60" y1="60" x2="60" y2="24" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
+            <circle cx="60" cy="60" r="5" fill="#fff"/>
+          </svg>
+          <div class="knob-value" id="tau2KnobVal">4 fr</div>
+          <div class="knob-hint">drag ↕ · longer τ → slower preferred speed</div>
+        </div>
+        <div style="flex:1 1 240px; min-width:220px;">
+          <div class="control">
+            <label>Correlator offset Δ <span class="val" id="offVal">1 cell</span></label>
+            <input type="range" id="offSlider" min="1" max="4" value="1" step="1">
+          </div>
+          <div class="control" style="margin-top:12px;">
+            <label>Correlator threshold <span class="val" id="threshVal">0.08</span></label>
+            <input type="range" id="threshSlider" min="0" max="30" value="8" step="1">
+          </div>
+          <div class="control" style="margin-top:12px;">
+            <label>Motion coherence <span class="val" id="cohVal">70%</span></label>
+            <input type="range" id="cohSlider" min="0" max="100" value="70" step="1">
+          </div>
+          <p class="muted" style="font-size:0.84rem; margin-top:12px;">The offset Δ is how many cells apart the two arms of each detector sit. Together with the delay τ it fixes the detector's <em>preferred speed</em> = Δ·fps ⁄ τ. The flow vector's default magnitude is set to that preferred speed, so the array is tuned to the stimulus; drag the arrow away from it to watch the response fall off.</p>
+          <div class="readout" style="margin-top:10px;">
+            <div class="item"><div class="k">Preferred speed</div><div class="v" id="rPrefSpeed">– cells/s</div></div>
+            <div class="item"><div class="k">True speed</div><div class="v" id="rTrueSpeed">– cells/s</div></div>
+            <div class="item"><div class="k">True direction</div><div class="v" id="rTrueDir">– °</div></div>
+          </div>
+        </div>
+      </div>
+      <figcaption>Each mini-map is half-wave-rectified motion energy for one preferred direction, lightly smoothed in time for legibility. The white dashed arrow sums the eight maps' outputs back into a single decoded flow vector — compare it to the violet true vector as you drag the vector or drop the coherence slider.</figcaption>
+    </div>
+
+    <div class="callout">
+      <p>Watch the decoded arrow as you lower coherence. It doesn't just shrink smoothly — direction and magnitude both become unreliable, because the population of correlators is voting on noisy, half-contradictory local evidence. This is the same signal-in-noise problem a fly's visual system solves every time it flies through cluttered, moving foliage.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="s6">
+  <div class="wrap">
+    <h2><span class="num">04 — Generality</span>The same wiring, other senses</h2>
+    <p>This circuit — a coincidence detector fed by one live line and one delay line — is not particular to compound eyes. Swap "photoreceptor" for "ear" and you get the <strong>Jeffress model</strong> of sound localization: neurons in the auditory brainstem receive input from both ears over axons that act as fixed delay lines, and each neuron fires maximally when a sound's interaural time difference happens to exactly cancel its own built-in delay. A population of these neurons, each tuned to a different delay, encodes the direction a sound came from — the same way a population of Reichardt detectors, each tuned to a different Δφ and τ, encodes the direction something moved.</p>
+    <p>Nothing in the wiring requires light, either. Two mechanoreceptors a few millimeters apart on the skin, feeding the same delay-and-multiply circuit, could in principle report the direction and speed of a stimulus brushing across the surface — an insect walking up your arm, or a raised dot moving under a fingertip. Any two-point sensor array with a fixed internal delay can become a velocity detector. What changes across sensory systems is the receptor; the algorithm stays the same.</p>
+  </div>
+</section>
+
+<footer class="wrap">
+  <p>Built from one idea, repeated: compare a delayed signal against a live one, at two points in space. One pair becomes a detector. A row of pairs becomes a 1D motion map. A grid of pairs, in eight directions, becomes optic flow.</p>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------- shared helpers ---------- */
+  const D2R = Math.PI/180, R2D = 180/Math.PI;
+  const clamp = (v,lo,hi)=>Math.max(lo,Math.min(hi,v));
+  const lerp = (a,b,t)=>a+(b-a)*t;
+  function gauss(t,t0,sigma){ const z=(t-t0)/sigma; return Math.exp(-0.5*z*z); }
+
+  const COLORS = {
+    a:getCss('--a'), b:getCss('--b'), corr:getCss('--corr'), neg:getCss('--neg'),
+    violet:getCss('--violet'), text:getCss('--text'), muted:getCss('--muted'), border:getCss('--border')
+  };
+  function getCss(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function renderEq(id, tex){
+    try{
+      katex.render(tex, document.getElementById(id), {displayMode:true, throwOnError:false});
+    }catch(e){ document.getElementById(id).textContent = tex; }
+  }
+  window.addEventListener('load', function(){
+    if(window.katex){
+      renderEq('eq1', "\\varphi(x) = \\arctan\\!\\left(\\frac{x}{d}\\right) \\qquad \\omega(t)=\\frac{d\\varphi}{dt}=\\frac{v\\,d}{d^2+x(t)^2}");
+      renderEq('eq2', "R(t) = \\underbrace{L_A(t-\\tau)\\cdot L_B(t)}_{\\text{prefers}\\;\\rightarrow} \\;-\\; \\underbrace{L_B(t-\\tau)\\cdot L_A(t)}_{\\text{prefers}\\;\\leftarrow}");
+    }
+  });
+
+  /* =========================================================
+     SECTION A/B/C — shared fly-detector state + simulation
+     ========================================================= */
+  const Fly = {
+    d: 12, v: 120, tau: 35,
+    phiA: -15, phiB: -5,
+    N: 420, Tplay: 5.0,
+    data: null
+  };
+
+  const SPEED_MIN = 4; // cm/s below which we treat the stimulus as stationary
+
+  function flyRecompute(){
+    const philim = 65; // degrees, strip range
+    const xmax = Fly.d*Math.tan(philim*D2R);
+    const speed = Math.abs(Fly.v);
+    const dir = Fly.v>=0 ? 1 : -1;              // +1 = left→right, -1 = right→left
+    const stationary = speed < SPEED_MIN;
+    const effSpeed = Math.max(speed, SPEED_MIN);
+    const Treal = (2*xmax)/effSpeed;
+    const N = Fly.N;
+    const ts = new Float32Array(N), xs=new Float32Array(N), phis=new Float32Array(N), omegas=new Float32Array(N);
+    const LA=new Float32Array(N), LB=new Float32Array(N), LAd=new Float32Array(N), LBd=new Float32Array(N);
+    const sub1=new Float32Array(N), sub2=new Float32Array(N), Rarr=new Float32Array(N);
+
+    const xA = Fly.d*Math.tan(Fly.phiA*D2R);
+    const xB = Fly.d*Math.tan(Fly.phiB*D2R);
+    // crossing times for the swept dot (depend on direction)
+    const tA = dir>0 ? (xA + xmax)/effSpeed : (xmax - xA)/effSpeed;
+    const tB = dir>0 ? (xB + xmax)/effSpeed : (xmax - xB)/effSpeed;
+    const dt_ms = (tB-tA)*1000;                 // signed: +ve when B fires after A (rightward)
+    const sigma = Math.min(0.02, Treal/15);
+    const tauS = Fly.tau/1000;
+
+    for(let i=0;i<N;i++){
+      const t = (i/(N-1))*Treal;
+      const x = dir>0 ? (-xmax + effSpeed*t) : (xmax - effSpeed*t);
+      const phi = Math.atan2(x, Fly.d)*R2D;
+      const omega = (effSpeed*Fly.d/(Fly.d*Fly.d + x*x))*R2D*dir;
+      ts[i]=t; xs[i]= stationary ? 0 : x; phis[i]= stationary ? 0 : phi; omegas[i]= stationary ? 0 : omega;
+      if(stationary){ LA[i]=LB[i]=LAd[i]=LBd[i]=sub1[i]=sub2[i]=Rarr[i]=0; continue; }
+      LA[i] = gauss(t, tA, sigma);
+      LB[i] = gauss(t, tB, sigma);
+      LAd[i] = gauss(t, tA+tauS, sigma); // L_A(t-tau) peaks at t = tA+tau
+      LBd[i] = gauss(t, tB+tauS, sigma);
+      sub1[i] = LAd[i]*LB[i];            // A-delayed × B-live  → prefers A→B (rightward, →)
+      sub2[i] = LBd[i]*LA[i];            // B-delayed × A-live  → prefers B→A (leftward, ←)
+      Rarr[i] = sub1[i]-sub2[i];
+    }
+    let maxSub1=0, maxSub2=0;
+    for(let i=0;i<N;i++){ if(sub1[i]>maxSub1) maxSub1=sub1[i]; if(sub2[i]>maxSub2) maxSub2=sub2[i]; }
+    const normMax = Math.max(maxSub1, maxSub2, 1e-6);
+
+    Fly.data = {ts,xs,phis,omegas,LA,LB,LAd,LBd,sub1,sub2,Rarr,Treal,xmax,tA,tB,dt_ms,maxSub1,maxSub2,normMax,stationary,dir,philim};
+    updateFlyReadouts();
+  }
+
+  function updateFlyReadouts(){
+    const d = Fly.data;
+    const dphi = Fly.phiB - Fly.phiA;
+    document.getElementById('rDphi').innerHTML = dphi.toFixed(1)+'°';
+    const omegaCenter = (Fly.v/Fly.d)*R2D; // signed, at x=0
+    const dirLabel = Fly.v>=SPEED_MIN? ' →' : Fly.v<=-SPEED_MIN? ' ←' : '';
+    document.getElementById('rOmega').textContent = (d.stationary?'0':omegaCenter.toFixed(0))+' °/s'+dirLabel;
+    document.getElementById('rDt').textContent = d.stationary? '— (still)' : d.dt_ms.toFixed(1)+' ms';
+    const scale = Fly.Tplay/d.Treal;
+    document.getElementById('rSlomo').textContent = d.stationary? 'stimulus stationary' : 'slowed ×'+scale.toFixed(0)+' for visibility';
+
+    const omegaPref = dphi/(Fly.tau/1000);
+    document.getElementById('rOmegaPref').innerHTML = 'Δφ/τ = '+omegaPref.toFixed(0)+' °/s';
+    if(d.stationary){
+      document.getElementById('rMatch').textContent = 'no motion';
+    } else {
+      const win = d.maxSub1>=d.maxSub2 ? '→' : '←';
+      const strength = clamp((Math.max(d.maxSub1,d.maxSub2))/(d.maxSub1+d.maxSub2+1e-6),0.5,1);
+      document.getElementById('rMatch').textContent = win+'  ('+((strength*2-1)*100).toFixed(0)+'% selective)';
+    }
+  }
+
+  /* ---- canvases: topview + strip (section 1) ---- */
+  const topCv = document.getElementById('topview'), topCx = topCv.getContext('2d');
+  const stripCv = document.getElementById('strip'), stripCx = stripCv.getContext('2d');
+
+  function phiToStripX(phi, w, philim){ return ((phi+philim)/(2*philim))*w; }
+
+  function drawTopview(revealFrac){
+    const W=topCv.width, H=topCv.height;
+    topCx.clearRect(0,0,W,H);
+    const flyX = 40, flyY = H-24;
+    const pxPerCm = Math.min((H-50)/Fly.d, 3.2);
+    const dPx = Fly.d*pxPerCm;
+    // forward axis
+    topCx.strokeStyle = '#33334d'; topCx.setLineDash([4,4]); topCx.lineWidth=1;
+    topCx.beginPath(); topCx.moveTo(flyX,flyY); topCx.lineTo(flyX, flyY-dPx-20); topCx.stroke();
+    topCx.setLineDash([]);
+    // stimulus line
+    const lineY = flyY-dPx;
+    topCx.strokeStyle='#26264a'; topCx.lineWidth=1.5;
+    topCx.beginPath(); topCx.moveTo(10,lineY); topCx.lineTo(W-10,lineY); topCx.stroke();
+    // sensor rays
+    function ray(phi,color){
+      const a = phi*D2R;
+      const len = dPx/Math.cos(a);
+      const ex = flyX + len*Math.sin(a), ey = flyY - len*Math.cos(a);
+      topCx.strokeStyle=color; topCx.globalAlpha=0.55; topCx.lineWidth=1.3;
+      topCx.beginPath(); topCx.moveTo(flyX,flyY); topCx.lineTo(ex,ey); topCx.stroke();
+      topCx.globalAlpha=1;
+    }
+    ray(Fly.phiA, COLORS.a); ray(Fly.phiB, COLORS.b);
+    // dot position
+    let x=0, phi=0;
+    if(Fly.data){
+      const idx = clamp(Math.round(revealFrac*(Fly.N-1)),0,Fly.N-1);
+      x = Fly.data.xs[idx]; phi = Fly.data.phis[idx];
+    }
+    const dotX = flyX + x*pxPerCm, dotY = lineY;
+    topCx.fillStyle='#fff'; topCx.beginPath(); topCx.arc(dotX,dotY,5,0,7); topCx.fill();
+    // line of sight to dot + angle arc
+    topCx.strokeStyle='#ffffff99'; topCx.lineWidth=1.3;
+    topCx.beginPath(); topCx.moveTo(flyX,flyY); topCx.lineTo(dotX,dotY); topCx.stroke();
+    topCx.strokeStyle=COLORS.corr; topCx.lineWidth=1.6;
+    const arcStart=-Math.PI/2, arcEnd=arcStart+phi*D2R;
+    topCx.beginPath(); topCx.arc(flyX,flyY,26,arcStart,arcEnd, phi<0);
+    topCx.stroke();
+    // fly body
+    topCx.fillStyle='#ddddee';
+    topCx.beginPath(); topCx.moveTo(flyX,flyY-9); topCx.lineTo(flyX-7,flyY+6); topCx.lineTo(flyX+7,flyY+6); topCx.closePath(); topCx.fill();
+    // labels
+    topCx.fillStyle=COLORS.muted; topCx.font='11px "IBM Plex Mono"';
+    topCx.fillText('d = '+Fly.d.toFixed(1)+' cm', flyX+8, flyY-dPx/2);
+    topCx.fillStyle='#fff'; topCx.fillText('φ = '+phi.toFixed(1)+'°', flyX+30, flyY-14);
+  }
+
+  let stripDrag = null; // 'A' | 'B' | null
+  function drawStrip(revealFrac){
+    const W=stripCv.width, H=stripCv.height;
+    stripCx.clearRect(0,0,W,H);
+    const philim = Fly.data? Fly.data.philim : 65;
+    const midY = 34;
+    stripCx.strokeStyle = COLORS.border; stripCx.lineWidth=2;
+    stripCx.beginPath(); stripCx.moveTo(6,midY); stripCx.lineTo(W-6,midY); stripCx.stroke();
+    // ticks
+    stripCx.fillStyle = COLORS.muted; stripCx.font='10px "IBM Plex Mono"'; stripCx.textAlign='center';
+    for(let p=-60;p<=60;p+=15){
+      const x = phiToStripX(p, W, philim);
+      stripCx.strokeStyle='#2a2a44'; stripCx.beginPath(); stripCx.moveTo(x,midY-5); stripCx.lineTo(x,midY+5); stripCx.stroke();
+      stripCx.fillText(p+'°', x, midY+22);
+    }
+    // sensor triangles
+    function marker(phi,color,label){
+      const x = phiToStripX(phi, W, philim);
+      stripCx.fillStyle=color;
+      stripCx.beginPath(); stripCx.moveTo(x,midY-8); stripCx.lineTo(x-8,midY-22); stripCx.lineTo(x+8,midY-22); stripCx.closePath(); stripCx.fill();
+      stripCx.fillStyle='#000'; stripCx.font='bold 9px "IBM Plex Mono"'; stripCx.fillText(label,x,midY-13);
+    }
+    marker(Fly.phiA, COLORS.a, 'A');
+    marker(Fly.phiB, COLORS.b, 'B');
+    // moving dot
+    if(Fly.data){
+      const idx = clamp(Math.round(revealFrac*(Fly.N-1)),0,Fly.N-1);
+      const phi = Fly.data.phis[idx];
+      const x = phiToStripX(phi, W, philim);
+      stripCx.fillStyle='#fff';
+      stripCx.beginPath(); stripCx.arc(x,midY,6,0,7); stripCx.fill();
+      stripCx.shadowColor='#fff'; stripCx.shadowBlur=8; stripCx.beginPath(); stripCx.arc(x,midY,6,0,7); stripCx.fill(); stripCx.shadowBlur=0;
+    }
+  }
+
+  function stripEventToPhi(evt){
+    const rect = stripCv.getBoundingClientRect();
+    const cx = (evt.touches? evt.touches[0].clientX : evt.clientX) - rect.left;
+    const scaleX = stripCv.width/rect.width;
+    const xCanvas = cx*scaleX;
+    const philim = Fly.data? Fly.data.philim : 65;
+    let phi = (xCanvas/stripCv.width)*(2*philim) - philim;
+    return clamp(phi, -philim+1, philim-1);
+  }
+  stripCv.addEventListener('pointerdown', function(e){
+    if(e.target!==stripCv) return;
+    const philim = Fly.data? Fly.data.philim : 65;
+    const xA = phiToStripX(Fly.phiA, stripCv.width, philim);
+    const xB = phiToStripX(Fly.phiB, stripCv.width, philim);
+    const rect = stripCv.getBoundingClientRect();
+    const scaleX = stripCv.width/rect.width;
+    const xc = (e.clientX-rect.left)*scaleX;
+    stripDrag = Math.abs(xc-xA) < Math.abs(xc-xB) ? 'A' : 'B';
+    e.preventDefault();
+  });
+  document.addEventListener('pointermove', function(e){
+    if(!stripDrag) return;
+    let phi = stripEventToPhi(e);
+    if(stripDrag==='A') Fly.phiA = clamp(phi, -64, Fly.phiB-2);
+    else Fly.phiB = clamp(phi, Fly.phiA+2, 64);
+    flyRecompute();
+    drawStrip(currentRevealA); drawTopview(currentRevealA);
+  });
+  document.addEventListener('pointerup', function(){ stripDrag=null; });
+
+  /* ---- trace charts (section 2) ---- */
+  const tracesCv = document.getElementById('traces'), tracesCx = tracesCv.getContext('2d');
+  const corrCv = document.getElementById('corrTrace'), corrCx = corrCv.getContext('2d');
+
+  function drawLineChart(cx, W, H, series, revealFrac, opts){
+    cx.clearRect(0,0,W,H);
+    const pad = 10;
+    const zero = opts && opts.centered ? H/2 : H-pad;
+    if(opts && opts.centered){
+      cx.strokeStyle='#26264a'; cx.beginPath(); cx.moveTo(0,zero); cx.lineTo(W,zero); cx.stroke();
+    }
+    const n = Fly.data.N;
+    const upto = clamp(Math.round(revealFrac*(n-1)),1,n-1);
+    series.forEach(s=>{
+      cx.strokeStyle = s.color; cx.lineWidth=2; cx.beginPath();
+      for(let i=0;i<=upto;i++){
+        const x = (i/(n-1))*W;
+        const yv = s.data[i]* (opts&&opts.gain? opts.gain:1);
+        const y = opts && opts.centered ? zero - yv*(H/2-pad) : (H-pad) - yv*(H-2*pad);
+        if(i===0) cx.moveTo(x,y); else cx.lineTo(x,y);
+      }
+      cx.stroke();
+    });
+    // playhead
+    const px = (upto/(n-1))*W;
+    cx.strokeStyle='#ffffff55'; cx.lineWidth=1;
+    cx.beginPath(); cx.moveTo(px,0); cx.lineTo(px,H); cx.stroke();
+  }
+
+  function drawTraces(revealFrac){
+    if(!Fly.data) return;
+    drawLineChart(tracesCx, tracesCv.width, tracesCv.height, [
+      {data:Fly.data.LA, color:COLORS.a},
+      {data:Fly.data.LAd, color:'#7fe3d6'},
+      {data:Fly.data.LB, color:COLORS.b}
+    ], revealFrac, {});
+  }
+  function drawCorr(revealFrac){
+    if(!Fly.data) return;
+    const g = Fly.data.maxSub1>0 ? 1/Fly.data.maxSub1 : 1;
+    drawLineChart(corrCx, corrCv.width, corrCv.height, [
+      {data:Fly.data.sub1, color:COLORS.corr},
+      {data:Fly.data.sub2, color:COLORS.neg},
+      {data:Fly.data.Rarr, color:'#ffffff'}
+    ], revealFrac, {gain:g, centered:true});
+  }
+
+  /* ---- scrolling spike-train raster, color-coded by responsible neuron ---- */
+  const spikeCv = document.getElementById('spikeRaster'), spikeCx = spikeCv.getContext('2d');
+  const SPIKE_ROWS = [
+    {key:'LA',  label:'A',   color:COLORS.a},
+    {key:'LB',  label:'B',   color:COLORS.b},
+    {key:'fwd', label:'→',   color:COLORS.corr},
+    {key:'mir', label:'←',   color:COLORS.neg}
+  ];
+  const spikeState = SPIKE_ROWS.map(()=>({acc:0, spikes:[]}));
+  let spikeLastNow = null;
+  const SPIKE_WIN_S = 2.6;     // seconds of history visible across the panel
+  const SPIKE_PEAK_RATE = 30;  // spikes/s when a signal is at full amplitude
+  function signalFor(key, idx){
+    // raw signals (each already peaks near 1); the correlator products peak at 1
+    // only when τ matches the true delay, so the →/← rows fire hardest when tuned
+    const d=Fly.data;
+    if(key==='LA')  return d.LA[idx];
+    if(key==='LB')  return d.LB[idx];
+    if(key==='fwd') return d.sub1[idx];
+    if(key==='mir') return d.sub2[idx];
+    return 0;
+  }
+  function drawSpikes(now){
+    if(!Fly.data) return;
+    const W=spikeCv.width, H=spikeCv.height, padL=34, rightX=W-6;
+    const usable = rightX - padL;
+    const pxPerS = usable / SPIKE_WIN_S;
+    if(spikeLastNow===null) spikeLastNow = now;
+    let dtReal = (now - spikeLastNow)/1000; spikeLastNow = now;
+    if(Fly.paused) dtReal = 0;
+    dtReal = clamp(dtReal, 0, 0.08);
+    const idx = clamp(Math.round(currentRevealA*(Fly.N-1)),0,Fly.N-1);
+
+    // advance existing spikes leftward and generate new ones at the right edge
+    SPIKE_ROWS.forEach(function(row, r){
+      const st = spikeState[r];
+      for(const s of st.spikes) s.x -= pxPerS*dtReal;
+      st.spikes = st.spikes.filter(s=>s.x>=padL);
+      const v = clamp(signalFor(row.key, idx),0,1);
+      st.acc += v*SPIKE_PEAK_RATE*dtReal;
+      let guard=0;
+      while(st.acc>=1 && guard++<12){ st.spikes.push({x:rightX}); st.acc-=1; }
+    });
+
+    // draw
+    spikeCx.clearRect(0,0,W,H);
+    const rowH = (H-8)/SPIKE_ROWS.length;
+    SPIKE_ROWS.forEach(function(row, r){
+      const yMid = 4 + r*rowH + rowH/2;
+      spikeCx.strokeStyle='#1e1e30'; spikeCx.lineWidth=1;
+      spikeCx.beginPath(); spikeCx.moveTo(padL, yMid+rowH*0.42); spikeCx.lineTo(rightX, yMid+rowH*0.42); spikeCx.stroke();
+      spikeCx.fillStyle=row.color; spikeCx.font='bold 12px "IBM Plex Mono"'; spikeCx.textAlign='center'; spikeCx.textBaseline='middle';
+      spikeCx.fillText(row.label, padL/2, yMid);
+      spikeCx.strokeStyle=row.color; spikeCx.lineWidth=2;
+      const tickH = rowH*0.66;
+      for(const s of spikeState[r].spikes){
+        spikeCx.beginPath(); spikeCx.moveTo(s.x, yMid-tickH/2); spikeCx.lineTo(s.x, yMid+tickH/2); spikeCx.stroke();
+      }
+    });
+    // "now" edge (spikes are born here and scroll left)
+    spikeCx.strokeStyle='#ffffff33'; spikeCx.lineWidth=1;
+    spikeCx.beginPath(); spikeCx.moveTo(rightX,0); spikeCx.lineTo(rightX,H); spikeCx.stroke();
+  }
+
+  /* ---- HR wiring diagram (section 2), live-linked to the sim ---- */
+  const hr = {
+    recvA: document.getElementById('recvA'), recvB: document.getElementById('recvB'),
+    lineAstraight: document.getElementById('lineA-straight'), lineBstraight: document.getElementById('lineB-straight'),
+    lineAcross: document.getElementById('lineA-cross'), lineBcross: document.getElementById('lineB-cross'),
+    tauBoxA: document.getElementById('tauBoxA'), tauBoxB: document.getElementById('tauBoxB'),
+    lineAtauOut: document.getElementById('lineA-tau-out'), lineBtauOut: document.getElementById('lineB-tau-out'),
+    mLeft: document.getElementById('mLeftCircle'), mRight: document.getElementById('mRightCircle'),
+    lineMleftOut: document.getElementById('lineM-left-out'), lineMrightOut: document.getElementById('lineM-right-out'),
+    minus: document.getElementById('minusCircle'),
+    outLine: document.getElementById('outArrowLine'), outHead: document.getElementById('outArrowHead')
+  };
+  function setGlow(el, mag, color){
+    if(!el) return;
+    const m = clamp(mag,0,1);
+    el.style.opacity = (0.32+m*0.68).toFixed(2);
+    el.style.filter = m>0.06 ? 'drop-shadow(0 0 '+(3+m*11).toFixed(0)+'px '+color+')' : 'none';
+  }
+  function drawHRDiagram(revealFrac){
+    if(!Fly.data) return;
+    const idx = clamp(Math.round(revealFrac*(Fly.N-1)),0,Fly.N-1);
+    const d = Fly.data;
+    setGlow(hr.recvA, d.LA[idx], COLORS.a); setGlow(hr.recvB, d.LB[idx], COLORS.b);
+    setGlow(hr.lineAstraight, d.LA[idx], COLORS.a); setGlow(hr.lineBstraight, d.LB[idx], COLORS.b);
+    setGlow(hr.lineAcross, d.LA[idx], COLORS.a); setGlow(hr.lineBcross, d.LB[idx], COLORS.b);
+    setGlow(hr.tauBoxA, Math.max(d.LA[idx],d.LAd[idx]), COLORS.a); setGlow(hr.tauBoxB, Math.max(d.LB[idx],d.LBd[idx]), COLORS.b);
+    setGlow(hr.lineAtauOut, d.LAd[idx], '#7fe3d6'); setGlow(hr.lineBtauOut, d.LBd[idx], '#ffe08a');
+    const g = d.maxSub1>0 ? 1/d.maxSub1 : 1;
+    const s1 = clamp(d.sub1[idx]*g,0,1), s2 = clamp(d.sub2[idx]*g,0,1);
+    setGlow(hr.mLeft, s1, COLORS.corr); setGlow(hr.mRight, s2, COLORS.neg);
+    setGlow(hr.lineMleftOut, s1, COLORS.corr); setGlow(hr.lineMrightOut, s2, COLORS.neg);
+    const rMag = clamp(Math.abs(d.Rarr[idx])*g,0,1);
+    setGlow(hr.minus, rMag, '#ffffff'); setGlow(hr.outLine, rMag, '#ffffff'); setGlow(hr.outHead, rMag, '#ffffff');
+  }
+
+  /* ---- pipeline connector lines: world dot -> retina -> detector receptors ---- */
+  const projSvg = document.getElementById('projSvg');
+  const projLine = document.getElementById('projLine');
+  const projLineA = document.getElementById('projLineA');
+  const projLineB = document.getElementById('projLineB');
+  const hrSvgEl = document.getElementById('hrSvg');
+
+  function updatePipelineLines(revealFrac){
+    if(!Fly.data) return;
+    const idx = clamp(Math.round(revealFrac*(Fly.N-1)),0,Fly.N-1);
+    const x = Fly.data.xs[idx], phi = Fly.data.phis[idx];
+    const pxPerCm = Math.min((topCv.height-50)/Fly.d, 3.2);
+    const flyX=40, flyY=topCv.height-24;
+    const dotXcanvas = flyX + x*pxPerCm;
+    const dotYcanvas = flyY - Fly.d*pxPerCm;
+
+    const topRect = topCv.getBoundingClientRect();
+    const stripRect = stripCv.getBoundingClientRect();
+    const hrRect = hrSvgEl.getBoundingClientRect();
+    const svgRect = projSvg.getBoundingClientRect();
+    if(svgRect.width===0 || topRect.width===0 || hrRect.width===0) return;
+
+    const scaleTX = topRect.width/topCv.width, scaleTY = topRect.height/topCv.height;
+    const p1x = topRect.left + dotXcanvas*scaleTX - svgRect.left;
+    const p1y = topRect.top + dotYcanvas*scaleTY - svgRect.top;
+    const stripX = phiToStripX(phi, stripCv.width, Fly.data.philim);
+    const scaleSX = stripRect.width/stripCv.width, scaleSY = stripRect.height/stripCv.height;
+    const p2x = stripRect.left + stripX*scaleSX - svgRect.left;
+    const p2y = stripRect.top + 34*scaleSY - svgRect.top;
+    projLine.setAttribute('x1',p1x.toFixed(1)); projLine.setAttribute('y1',p1y.toFixed(1));
+    projLine.setAttribute('x2',p2x.toFixed(1)); projLine.setAttribute('y2',p2y.toFixed(1));
+
+    const scaleHR = hrRect.width/360;
+    function sensorToReceptor(phiSensor, rxView, ryView, lineEl){
+      const sx = phiToStripX(phiSensor, stripCv.width, Fly.data.philim);
+      const q1x = stripRect.left + sx*scaleSX - svgRect.left;
+      const q1y = stripRect.top + 34*scaleSY - svgRect.top;
+      const q2x = hrRect.left + rxView*scaleHR - svgRect.left;
+      const q2y = hrRect.top + ryView*scaleHR - svgRect.top;
+      lineEl.setAttribute('x1',q1x.toFixed(1)); lineEl.setAttribute('y1',q1y.toFixed(1));
+      lineEl.setAttribute('x2',q2x.toFixed(1)); lineEl.setAttribute('y2',q2y.toFixed(1));
+    }
+    sensorToReceptor(Fly.phiA, 110, 30, projLineA);
+    sensorToReceptor(Fly.phiB, 250, 30, projLineB);
+  }
+
+  /* ---- reusable rotary knob factory ---- */
+  const KNOB_A0=-135, KNOB_A1=135;
+  function polar(cx,cy,r,angleDeg){
+    const rad = angleDeg*D2R;
+    return {x: cx + r*Math.sin(rad), y: cy - r*Math.cos(rad)};
+  }
+  function arcPath(cx,cy,r,a0,a1){
+    const p0 = polar(cx,cy,r,a0), p1 = polar(cx,cy,r,a1);
+    const largeArc = (a1-a0)>180 ? 1 : 0;
+    return 'M '+p0.x.toFixed(2)+' '+p0.y.toFixed(2)+' A '+r+' '+r+' 0 '+largeArc+' 1 '+p1.x.toFixed(2)+' '+p1.y.toFixed(2);
+  }
+  function makeKnob(svgId, trackId, fillId, pointerId, valId, opts, onChange){
+    const svg = document.getElementById(svgId);
+    const trackEl = document.getElementById(trackId);
+    const fillEl = document.getElementById(fillId);
+    const pointerEl = document.getElementById(pointerId);
+    const valEl = document.getElementById(valId);
+    trackEl.setAttribute('d', arcPath(60,60,40,KNOB_A0,KNOB_A1));
+    function angleFor(v){ return KNOB_A0 + (clamp(v,opts.min,opts.max)-opts.min)/(opts.max-opts.min)*(KNOB_A1-KNOB_A0); }
+    function render(){
+      const v = opts.get();
+      const ang = angleFor(v);
+      fillEl.setAttribute('d', arcPath(60,60,40,KNOB_A0,ang));
+      const p = polar(60,60,34,ang);
+      pointerEl.setAttribute('x2', p.x.toFixed(2)); pointerEl.setAttribute('y2', p.y.toFixed(2));
+      valEl.textContent = opts.fmt(v);
+    }
+    let drag=null;
+    svg.addEventListener('pointerdown', function(e){ drag={y:e.clientY, v:opts.get()}; svg.setPointerCapture(e.pointerId); e.preventDefault(); });
+    svg.addEventListener('pointermove', function(e){
+      if(!drag) return;
+      const dy = drag.y - e.clientY;
+      const nv = clamp(drag.v + dy*opts.sens, opts.min, opts.max);
+      opts.set(nv); render(); if(onChange) onChange();
+    });
+    function end(){ drag=null; }
+    svg.addEventListener('pointerup', end); svg.addEventListener('pointercancel', end);
+    return {render};
+  }
+
+  const tauKnob = makeKnob('tauKnob','knobTrack','knobFill','knobPointer','tauKnobVal',
+    {min:8, max:120, sens:0.7, get:()=>Fly.tau, set:v=>{Fly.tau=v;}, fmt:v=>Math.round(v)+' ms'},
+    flyRecompute);
+  function updateKnobUI(){ tauKnob.render(); }
+
+  /* =========================================================
+     SECTION D — 1D array of Reichardt detectors (shared timeline)
+     ========================================================= */
+  const tileCv = document.getElementById('tileArray'), tileCx = tileCv.getContext('2d');
+  const NUM_DET = 11; // number of detectors in the array
+
+  function drawTileArray(revealFrac){
+    if(!Fly.data) return;
+    const W=tileCv.width, H=tileCv.height;
+    tileCx.clearRect(0,0,W,H);
+    const philim = Fly.data.philim;
+    const marginX = 40;
+    const spanW = W - 2*marginX;
+    const yRec = 40;      // receptor row
+    const yTau = 96;      // delay boxes
+    const yMul = 150;     // multipliers
+    const yOut = 196;     // outputs
+    const nRec = NUM_DET+1;
+
+    const idx = clamp(Math.round(revealFrac*(Fly.N-1)),0,Fly.N-1);
+    const dotPhi = Fly.data.phis[idx];
+    const dotFrac = (dotPhi+philim)/(2*philim);
+    const dotX = marginX + clamp(dotFrac,0,1)*spanW;
+
+    const recX = k => marginX + (spanW/(nRec-1))*k;
+    const tauMatch = Fly.tau/1000;
+
+    // moving dot above the array
+    tileCx.fillStyle='#fff';
+    tileCx.beginPath(); tileCx.arc(dotX, 14, 5, 0, 7); tileCx.fill();
+    tileCx.fillStyle=COLORS.muted; tileCx.font='9px "IBM Plex Mono"'; tileCx.textAlign='center';
+    tileCx.fillText('moving dot', dotX, 30);
+
+    // receptor activation: gaussian bump around dot position
+    function recAct(k){
+      const rx = recX(k);
+      const d = (rx-dotX)/(spanW/nRec);
+      return Math.exp(-0.5*d*d/0.35);
+    }
+
+    // detectors
+    for(let m=0;m<NUM_DET;m++){
+      const xL = recX(m), xR = recX(m+1), xC = (xL+xR)/2;
+      // per-detector response: dot near this detector AND direction/timing match
+      const actL = recAct(m), actR = recAct(m+1);
+      const near = Math.max(actL, actR);
+      // timing: local pair spacing gives a dt; matches tau best when dir is rightward
+      const localDtheta = (2*philim/nRec); // deg
+      const localDt = Math.abs(localDtheta*D2R*Fly.d/Math.max(Math.abs(Fly.v),1)); // s, rough
+      const tuning = Math.exp(-0.5*Math.pow((localDt-tauMatch)/(tauMatch*0.9+0.01),2));
+      const dirOK = Fly.data.stationary ? 0 : (Fly.data.dir>0 ? 1 : 0.25);
+      const resp = clamp(near*tuning*(0.4+0.6*dirOK), 0, 1);
+
+      // connection lines receptor -> multiplier (crossed)
+      tileCx.strokeStyle = withAlpha(COLORS.a, 0.35+0.5*actL); tileCx.lineWidth=1.5;
+      tileCx.beginPath(); tileCx.moveTo(xL,yRec+8); tileCx.lineTo(xL,yTau-6); tileCx.stroke();
+      tileCx.beginPath(); tileCx.moveTo(xL,yTau+18); tileCx.lineTo(xC,yMul-8); tileCx.stroke();
+      tileCx.strokeStyle = withAlpha(COLORS.b, 0.35+0.5*actR);
+      tileCx.beginPath(); tileCx.moveTo(xR,yRec+8); tileCx.lineTo(xR,yTau-6); tileCx.stroke();
+      tileCx.beginPath(); tileCx.moveTo(xR,yTau+18); tileCx.lineTo(xC,yMul-8); tileCx.stroke();
+
+      // delay boxes
+      tileCx.fillStyle='#171728'; tileCx.strokeStyle=withAlpha(COLORS.a,0.7); tileCx.lineWidth=1.2;
+      roundRect(tileCx,xL-9,yTau-6,18,24,4); tileCx.fill(); tileCx.stroke();
+      tileCx.strokeStyle=withAlpha(COLORS.b,0.7); roundRect(tileCx,xR-9,yTau-6,18,24,4); tileCx.fill(); tileCx.stroke();
+      tileCx.fillStyle='#cfcfe0'; tileCx.font='9px "IBM Plex Mono"'; tileCx.textAlign='center';
+      tileCx.fillText('τ',xL,yTau+9); tileCx.fillText('τ',xR,yTau+9);
+
+      // multiplier, glowing with response
+      tileCx.beginPath(); tileCx.arc(xC,yMul,13,0,7);
+      tileCx.fillStyle='#171728'; tileCx.fill();
+      if(resp>0.03){
+        tileCx.save(); tileCx.shadowColor=COLORS.corr; tileCx.shadowBlur=4+resp*16;
+        tileCx.fillStyle=withAlpha(COLORS.corr, 0.25+0.7*resp);
+        tileCx.beginPath(); tileCx.arc(xC,yMul,13,0,7); tileCx.fill(); tileCx.restore();
+      }
+      tileCx.strokeStyle=COLORS.corr; tileCx.lineWidth=1.6; tileCx.beginPath(); tileCx.arc(xC,yMul,13,0,7); tileCx.stroke();
+      tileCx.fillStyle='#fff'; tileCx.font='11px "IBM Plex Mono"'; tileCx.fillText('×',xC,yMul+1);
+
+      // output stub
+      tileCx.strokeStyle=withAlpha(COLORS.corr,0.3+0.7*resp); tileCx.lineWidth=1.5+resp*2;
+      tileCx.beginPath(); tileCx.moveTo(xC,yMul+13); tileCx.lineTo(xC,yOut); tileCx.stroke();
+      tileCx.fillStyle=withAlpha(COLORS.corr,0.3+0.7*resp);
+      tileCx.beginPath(); tileCx.arc(xC,yOut+4,2+resp*3,0,7); tileCx.fill();
+    }
+
+    // receptors (drawn last so they sit on top)
+    for(let k=0;k<nRec;k++){
+      const rx = recX(k), a = recAct(k);
+      tileCx.beginPath(); tileCx.arc(rx,yRec,7,0,7);
+      tileCx.fillStyle = a>0.05 ? withAlpha('#ffffff',0.25+0.7*a) : '#20203a';
+      tileCx.fill();
+      tileCx.strokeStyle='#4a4a6a'; tileCx.lineWidth=1; tileCx.stroke();
+    }
+
+    // labels
+    tileCx.fillStyle=COLORS.muted; tileCx.font='9px "IBM Plex Mono"'; tileCx.textAlign='left';
+    tileCx.fillText('receptors', 4, yRec+3);
+    tileCx.fillText('delays', 4, yTau+9);
+    tileCx.fillText('× units', 4, yMul+3);
+    tileCx.fillText('output', 4, yOut+3);
+  }
+  function withAlpha(hex, a){
+    hex = hex.replace('#','');
+    if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+    const n = parseInt(hex,16);
+    return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+clamp(a,0,1).toFixed(2)+')';
+  }
+  function roundRect(cx,x,y,w,h,r){
+    cx.beginPath();
+    cx.moveTo(x+r,y); cx.arcTo(x+w,y,x+w,y+h,r); cx.arcTo(x+w,y+h,x,y+h,r);
+    cx.arcTo(x,y+h,x,y,r); cx.arcTo(x,y,x+w,y,r); cx.closePath();
+  }
+
+  // alias used by the shared render loop
+  function drawTileStrip(revealFrac){ drawTileArray(revealFrac); }
+
+  /* ---- unified, continuously looping timeline for sections 1-3 ---- */
+  let currentRevealA = 0;
+  Fly.paused = false;
+  Fly.elapsedBase = 0;
+  Fly.t0A = performance.now();
+
+  function getElapsed(now){
+    return Fly.paused ? Fly.elapsedBase : Fly.elapsedBase + (now - Fly.t0A)/1000;
+  }
+  const playButtons = [document.getElementById('playBtnA'), document.getElementById('playBtnD')];
+  function updatePlayButtons(){
+    const label = Fly.paused ? '▶ Play' : '⏸ Pause';
+    playButtons.forEach(function(b){ if(b) b.textContent = label; });
+  }
+  function togglePause(){
+    const now = performance.now();
+    if(!Fly.paused){ Fly.elapsedBase = getElapsed(now); Fly.paused = true; }
+    else { Fly.t0A = now; Fly.paused = false; }
+    updatePlayButtons();
+  }
+  playButtons.forEach(function(b){ if(b) b.addEventListener('click', togglePause); });
+
+  function loopAB(now){
+    const elapsed = getElapsed(now);
+    const frac = (elapsed % Fly.Tplay) / Fly.Tplay;
+    currentRevealA = frac;
+    drawTopview(frac); drawStrip(frac); drawTraces(frac); drawCorr(frac);
+    drawHRDiagram(frac); updatePipelineLines(frac); drawSpikes(now); drawTileStrip(frac);
+    requestAnimationFrame(loopAB);
+  }
+
+  document.getElementById('vSlider').addEventListener('input', function(e){
+    Fly.v = parseFloat(e.target.value);
+    const mag = Math.abs(Fly.v).toFixed(0);
+    const arrow = Fly.v>=SPEED_MIN? '→ ' : Fly.v<=-SPEED_MIN? '← ' : '';
+    document.getElementById('vVal').textContent = (Math.abs(Fly.v)<SPEED_MIN? 'still · ' : arrow)+mag+' cm/s';
+    flyRecompute();
+  });
+  document.getElementById('dSlider').addEventListener('input', function(e){
+    Fly.d = parseFloat(e.target.value);
+    document.getElementById('dVal').textContent = Fly.d.toFixed(1)+' cm';
+    flyRecompute();
+  });
+  /* initial computation + start the shared loop */
+  flyRecompute();
+  updateKnobUI();
+  drawTopview(0); drawStrip(0); drawTraces(0); drawCorr(0); drawTileStrip(0); drawHRDiagram(0); drawSpikes(performance.now());
+  requestAnimationFrame(loopAB);
+
+  /* =========================================================
+     SECTION E — 2D grid, 8 directional EMD maps, optic flow
+     ========================================================= */
+  const GRID = 50;
+  const CELLS = GRID*GRID;
+  const DIRS = [ [1,0],[1,-1],[0,-1],[-1,-1],[-1,0],[-1,1],[0,1],[1,1] ]; // E,NE,N,NW,W,SW,S,SE matching data-dir 0..7
+
+  const FPS = 30; // simulation frame rate (FRAME_DT = 1/FPS below)
+  const Field = {
+    coherence:0.7,
+    vecPx:{x:100,y:100}, // handle position on 200x200 widget (set to preferred speed at init)
+    Smax:16, // cells/sec at full radius (adapted to preferred speed)
+    tauFrames:4, // low-pass delay (frames) shared by every 2D detector
+    offset:1,    // correlator spatial offset Δ, in cells
+    corrThresh:0.08, // correlator threshold
+    dots:[],
+    numDots:90,
+    grid:new Float32Array(CELLS),
+    lp:new Float32Array(CELLS),
+    maps:[], // 8 x Float32Array(CELLS) smoothed display
+    decodeMax:0.001,
+    lastT:0
+  };
+  for(let i=0;i<8;i++) Field.maps.push(new Float32Array(CELLS));
+  for(let i=0;i<Field.numDots;i++) Field.dots.push({x:Math.random()*GRID, y:Math.random()*GRID});
+
+  // preferred speed of every detector, from spacing and delay: Δ·fps / τ  (cells/s)
+  function preferredSpeed(){ return Field.offset * FPS / Field.tauFrames; }
+  // point the flow vector at the preferred speed so the array is tuned to the stimulus
+  function syncFlowToPreferred(preserveAngle){
+    const ps = preferredSpeed();
+    Field.Smax = Math.max(12, ps*1.35); // keep the tuned point well inside the widget
+    const ang = preserveAngle ? Math.atan2(Field.vecPx.y-100, Field.vecPx.x-100) : 0;
+    const r = clamp(ps/Field.Smax,0,1)*80;
+    Field.vecPx = {x:100+Math.cos(ang)*r, y:100+Math.sin(ang)*r};
+    if(typeof updateFieldReadouts==='function') updateFieldReadouts();
+  }
+
+  const mainCv = document.getElementById('fieldMain'), mainCx = mainCv.getContext('2d');
+  const offMain = document.createElement('canvas'); offMain.width=GRID; offMain.height=GRID;
+  const offMainCx = offMain.getContext('2d');
+  const offMap = document.createElement('canvas'); offMap.width=GRID; offMap.height=GRID;
+  const offMapCx = offMap.getContext('2d');
+
+  const mmapCanvases = Array.from(document.querySelectorAll('.mmap'));
+  const vecCv = document.getElementById('vecWidget'), vecCx = vecCv.getContext('2d');
+  const cohSlider = document.getElementById('cohSlider');
+  cohSlider.addEventListener('input', function(e){
+    Field.coherence = parseFloat(e.target.value)/100;
+    document.getElementById('cohVal').textContent = e.target.value+'%';
+  });
+
+  function updateFieldReadouts(){
+    document.getElementById('rPrefSpeed').textContent = preferredSpeed().toFixed(1)+' cells/s';
+    const v = fieldToVec(Field.vecPx.x, Field.vecPx.y);
+    document.getElementById('rTrueSpeed').textContent = v.speed.toFixed(1)+' cells/s';
+    document.getElementById('rTrueDir').textContent = (v.ang*R2D).toFixed(0)+'°';
+  }
+
+  const tau2Knob = makeKnob('tau2Knob','knob2Track','knob2Fill','knob2Pointer','tau2KnobVal',
+    {min:1, max:14, sens:0.05, get:()=>Field.tauFrames, set:v=>{Field.tauFrames=v;}, fmt:v=>v.toFixed(1)+' fr'},
+    ()=>syncFlowToPreferred(true));
+  tau2Knob.render();
+
+  document.getElementById('offSlider').addEventListener('input', function(e){
+    Field.offset = parseInt(e.target.value,10);
+    document.getElementById('offVal').textContent = Field.offset+(Field.offset===1?' cell':' cells');
+    syncFlowToPreferred(true);
+  });
+  document.getElementById('threshSlider').addEventListener('input', function(e){
+    Field.corrThresh = parseFloat(e.target.value)/100;
+    document.getElementById('threshVal').textContent = Field.corrThresh.toFixed(2);
+  });
+
+  function wrap(v,n){ v = v % n; if(v<0) v+=n; return v; }
+
+  function fieldToVec(px,py){
+    const dx = px-100, dy = py-100;
+    const dist = Math.min(80, Math.hypot(dx,dy));
+    const ang = Math.atan2(dy,dx);
+    const speed = (dist/80)*Field.Smax;
+    return {vx:Math.cos(ang)*speed, vy:Math.sin(ang)*speed, speed, ang};
+  }
+
+  function stepDots(dt){
+    const {vx,vy} = fieldToVec(Field.vecPx.x, Field.vecPx.y);
+    for(const dot of Field.dots){
+      if(Math.random() < Field.coherence){
+        dot.x = wrap(dot.x + vx*dt, GRID);
+        dot.y = wrap(dot.y + vy*dt, GRID);
+      } else {
+        dot.x = Math.random()*GRID;
+        dot.y = Math.random()*GRID;
+      }
+    }
+  }
+
+  function rasterize(){
+    Field.grid.fill(0);
+    for(const dot of Field.dots){
+      const xi = Math.floor(dot.x)%GRID, yi=Math.floor(dot.y)%GRID;
+      Field.grid[yi*GRID+xi] = 1;
+    }
+  }
+
+  function updateLP(){
+    const g=Field.grid, lp=Field.lp, tf=Field.tauFrames;
+    for(let i=0;i<CELLS;i++) lp[i] += (g[i]-lp[i])/tf;
+  }
+
+  function computeMaps(){
+    const g=Field.grid, lp=Field.lp, off=Field.offset, thr=Field.corrThresh;
+    for(let d=0; d<8; d++){
+      const [dx,dy] = DIRS[d];
+      const odx = dx*off, ody = dy*off;   // scale neighbour spacing by the offset Δ
+      const map = Field.maps[d];
+      for(let y=0;y<GRID;y++){
+        const ny = wrap(y+ody,GRID);
+        for(let x=0;x<GRID;x++){
+          const nx = wrap(x+odx,GRID);
+          const i = y*GRID+x, j = ny*GRID+nx;
+          let R = lp[i]*g[j] - lp[j]*g[i];   // delayed-here × now-there  −  delayed-there × now-here
+          R -= thr;                          // threshold away low-level noise
+          if(R<0) R=0;
+          map[i] = map[i]*0.85 + R*0.15*6.0; // temporal smoothing + display gain
+        }
+      }
+    }
+  }
+
+  function renderMain(){
+    const img = offMainCx.createImageData(GRID,GRID);
+    for(let i=0;i<CELLS;i++){
+      const v = Field.grid[i]>0 ? 255 : Math.floor(20+ Field.lp[i]*80);
+      img.data[i*4]=v*0.85; img.data[i*4+1]=v*0.9; img.data[i*4+2]=v; img.data[i*4+3]=255;
+    }
+    offMainCx.putImageData(img,0,0);
+    mainCx.imageSmoothingEnabled=false;
+    mainCx.clearRect(0,0,mainCv.width,mainCv.height);
+    mainCx.drawImage(offMain,0,0,mainCv.width,mainCv.height);
+  }
+
+  function hexToRgb(hex){
+    hex = hex.replace('#','');
+    if(hex.length===3) hex = hex.split('').map(c=>c+c).join('');
+    const n = parseInt(hex,16);
+    return [ (n>>16)&255, (n>>8)&255, n&255 ];
+  }
+  const corrRgb = hexToRgb(COLORS.corr);
+
+  // one shared, slowly-adapting scale across ALL eight maps, so weak/off-axis
+  // maps stay dark instead of being stretched to their own local maximum
+  let globalMapMax = 0.05;
+  function renderMaps(){
+    let gmax = 0.001;
+    for(let d=0; d<8; d++){ const m=Field.maps[d]; for(let i=0;i<CELLS;i++) if(m[i]>gmax) gmax=m[i]; }
+    globalMapMax = Math.max(globalMapMax*0.96, gmax);   // jump up instantly, relax down slowly
+    const scale = Math.max(globalMapMax, 0.05);
+    mmapCanvases.forEach(cv=>{
+      const d = parseInt(cv.dataset.dir,10);
+      const map = Field.maps[d];
+      const img = offMapCx.createImageData(GRID,GRID);
+      for(let i=0;i<CELLS;i++){
+        const t = clamp(map[i]/scale, 0, 1);
+        img.data[i*4] = corrRgb[0]*t;
+        img.data[i*4+1] = corrRgb[1]*t;
+        img.data[i*4+2] = corrRgb[2]*t;
+        img.data[i*4+3] = 255;
+      }
+      offMapCx.putImageData(img,0,0);
+      const cx = cv.getContext('2d');
+      cx.imageSmoothingEnabled=false;
+      cx.clearRect(0,0,cv.width,cv.height);
+      cx.drawImage(offMap,0,0,cv.width,cv.height);
+    });
+  }
+
+  function decodeVector(){
+    let ex=0, ey=0;
+    for(let d=0; d<8; d++){
+      const [dx,dy] = DIRS[d];
+      let sum=0;
+      const map = Field.maps[d];
+      for(let i=0;i<CELLS;i++) sum += map[i];
+      ex += sum*dx; ey += sum*dy;
+    }
+    return {ex,ey};
+  }
+
+  function drawVecWidget(){
+    const W=vecCv.width,H=vecCv.height, cx0=100, cy0=100;
+    vecCx.clearRect(0,0,W,H);
+    // rings
+    vecCx.strokeStyle='#22223a'; vecCx.lineWidth=1;
+    [26,53,80].forEach(r=>{ vecCx.beginPath(); vecCx.arc(cx0,cy0,r,0,7); vecCx.stroke(); });
+    vecCx.beginPath(); vecCx.moveTo(cx0-84,cy0); vecCx.lineTo(cx0+84,cy0); vecCx.moveTo(cx0,cy0-84); vecCx.lineTo(cx0,cy0+84); vecCx.stroke();
+
+    // true vector arrow
+    drawArrow(vecCx, cx0, cy0, Field.vecPx.x, Field.vecPx.y, COLORS.violet, 3, false);
+    // handle
+    vecCx.fillStyle=COLORS.violet;
+    vecCx.beginPath(); vecCx.arc(Field.vecPx.x, Field.vecPx.y, 7, 0, 7); vecCx.fill();
+
+    // decoded vector
+    const {ex,ey} = decodeVector();
+    const mag = Math.hypot(ex,ey);
+    Field.decodeMax = Math.max(Field.decodeMax*0.995, mag, 0.001);
+    const dispLen = clamp(80*(mag/Field.decodeMax), 0, 80);
+    const ang = Math.atan2(ey,ex);
+    const dx = cx0+Math.cos(ang)*dispLen, dy = cy0+Math.sin(ang)*dispLen;
+    drawArrow(vecCx, cx0, cy0, dx, dy, '#ffffff', 2, true);
+  }
+
+  function drawArrow(cx,x0,y0,x1,y1,color,width,dashed){
+    cx.strokeStyle=color; cx.fillStyle=color; cx.lineWidth=width;
+    if(dashed) cx.setLineDash([5,4]); else cx.setLineDash([]);
+    cx.beginPath(); cx.moveTo(x0,y0); cx.lineTo(x1,y1); cx.stroke();
+    cx.setLineDash([]);
+    const ang = Math.atan2(y1-y0,x1-x0);
+    const ah=8;
+    cx.beginPath();
+    cx.moveTo(x1,y1);
+    cx.lineTo(x1-ah*Math.cos(ang-0.4), y1-ah*Math.sin(ang-0.4));
+    cx.lineTo(x1-ah*Math.cos(ang+0.4), y1-ah*Math.sin(ang+0.4));
+    cx.closePath(); cx.fill();
+  }
+
+  let vecDrag=false;
+  vecCv.addEventListener('pointerdown', function(e){
+    if(e.target!==vecCv) return;
+    vecDrag=true; updateVecFromEvent(e); e.preventDefault();
+  });
+  document.addEventListener('pointermove', function(e){ if(vecDrag) updateVecFromEvent(e); });
+  document.addEventListener('pointerup', function(){ vecDrag=false; });
+  function updateVecFromEvent(e){
+    const rect = vecCv.getBoundingClientRect();
+    const scaleX = vecCv.width/rect.width, scaleY = vecCv.height/rect.height;
+    let px = (e.clientX-rect.left)*scaleX, py=(e.clientY-rect.top)*scaleY;
+    const dx=px-100, dy=py-100, dist=Math.min(80,Math.hypot(dx,dy));
+    const ang=Math.atan2(dy,dx);
+    Field.vecPx.x = 100+Math.cos(ang)*dist;
+    Field.vecPx.y = 100+Math.sin(ang)*dist;
+    updateFieldReadouts();
+  }
+  // init: tune the flow vector to the detectors' preferred speed (East)
+  syncFlowToPreferred(false);
+  (function(){
+    updateFieldReadouts();
+  })();
+
+  const FRAME_DT = 1/30;
+  function loopE(ts){
+    if(!Field.lastT) Field.lastT = ts;
+    const elapsed = (ts - Field.lastT)/1000;
+    if(elapsed >= FRAME_DT){
+      Field.lastT = ts;
+      stepDots(FRAME_DT);
+      rasterize();
+      updateLP();
+      computeMaps();
+      renderMain();
+      renderMaps();
+      drawVecWidget();
+    }
+    requestAnimationFrame(loopE);
+  }
+  requestAnimationFrame(loopE);
+
+})();
+</script>
+</body>
+</html>
