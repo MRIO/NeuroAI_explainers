@@ -8,6 +8,7 @@ GitHub Pages serves the demos directly from this repository.
 
 ### Neurons, sensory systems, and receptive fields
 
+- [Shishi-odoshi leaky integrate-and-fire neuron](https://mrio.github.io/NeuroAI_explainers/LIF%20neuron%20shishi-odoshi/) — explore input current, leak, threshold, reset, and refractoriness through a simulated Japanese water clapper.
 - [Adaptive exponential (AdEx) spiking neuron phase space](https://mrio.github.io/NeuroAI_explainers/Spiking%20Neuron%20%28AdEx%29/adex_phase_space_v5.html) — explore AdEx trajectories, nullclines, and firing behavior.
 - [Adaptive exponential (AdEx) 2D phase space](https://mrio.github.io/NeuroAI_explainers/Spiking%20Neuron%20%28AdEx%29/2D_spking_phase_space.html) — an alternative version of the AdEx phase-space explorer.
 - [LGN ON/OFF center-surround cells](https://mrio.github.io/NeuroAI_explainers/LGN_on_off_cells/lgn_on_off_center_surround.html) — interact with center-surround receptive fields.
