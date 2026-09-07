@@ -1,0 +1,723 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A leaky integrate-and-fire neuron as a Japanese shishi-odoshi water clapper: a real particle-fluid simulation fills a bamboo tube until it tips, and the V(t) trace spikes.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Shishi-odoshi Neuron">
+<meta property="og:description" content="A leaky integrate-and-fire neuron as a Japanese water clapper — real fluid simulation, live V(t) trace.">
+<meta property="og:image" content="https://USERNAME.github.io/REPO/preview.png">
+<meta property="og:url" content="https://USERNAME.github.io/REPO/">
+<meta name="twitter:card" content="summary_large_image">
+<style>html{color-scheme:light dark}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Shishi-odoshi Neuron</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Old+Mincho:wght@400;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --bg:#e7ebe4; --surface:#f7f9f4; --surface2:#eef1e9; --line:#ccd4c8; --line-soft:#dde3d8;
+  --ink:#1c251f; --muted:#5d6b61; --accent:#26808f; --accent-2:#57b3bd; --accent-soft:#d8ecee;
+  --spike:#a86f14; --bamboo:#6f8244;
+  --shadow:0 1px 2px rgba(28,37,31,.07), 0 8px 24px -14px rgba(28,37,31,.22);
+}
+:root:not([data-theme="light"]){ }
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0e1310; --surface:#161e19; --surface2:#1b241e; --line:#2b352e; --line-soft:#232d27;
+    --ink:#e4eae3; --muted:#93a298; --accent:#5cc0cc; --accent-2:#8ad8e0; --accent-soft:#123035;
+    --spike:#dda94e; --bamboo:#9db063;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 30px -16px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0e1310; --surface:#161e19; --surface2:#1b241e; --line:#2b352e; --line-soft:#232d27;
+  --ink:#e4eae3; --muted:#93a298; --accent:#5cc0cc; --accent-2:#8ad8e0; --accent-soft:#123035;
+  --spike:#dda94e; --bamboo:#9db063;
+  --shadow:0 1px 2px rgba(0,0,0,.5), 0 10px 30px -16px rgba(0,0,0,.7);
+}
+
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:15px; line-height:1.55; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1160px;margin:0 auto;padding:26px 22px 44px;display:flex;flex-direction:column;gap:20px}
+
+.eyebrow{
+  font-family:"IBM Plex Mono",ui-monospace,monospace; font-size:11.5px; letter-spacing:.16em;
+  text-transform:uppercase; color:var(--muted); margin:0 0 6px;
+}
+h1{
+  font-family:"Zen Old Mincho",Georgia,serif; font-weight:700; font-size:clamp(28px,4vw,40px);
+  line-height:1.08; margin:0 0 10px; text-wrap:balance; letter-spacing:.01em;
+}
+.lede{max-width:66ch;margin:0;color:var(--muted)}
+.lede b{color:var(--ink);font-weight:500}
+
+.stage{display:grid;grid-template-columns:minmax(0,1.02fr) minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:920px){.stage{grid-template-columns:1fr}}
+
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:4px;box-shadow:var(--shadow)}
+
+/* ---------- scene ---------- */
+.scene{position:relative;aspect-ratio:520/620;overflow:hidden;border-radius:4px 4px 0 0}
+.scene canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#water{filter:url(#gooey)}
+.bird{position:absolute;left:2.5%;bottom:19.2%;width:23%;pointer-events:none}
+.bird .wingg{transform-box:view-box;transform-origin:52px 66px}
+.bird.startle{animation:hop .5s cubic-bezier(.2,.9,.3,1)}
+.bird.startle .wingg{animation:flap .5s ease-out}
+@keyframes hop{0%{transform:translateY(0)}25%{transform:translateY(-11%) rotate(-3deg)}60%{transform:translateY(-3%)}100%{transform:translateY(0)}}
+@keyframes flap{0%{transform:rotate(0)}30%{transform:rotate(-38deg)}70%{transform:rotate(6deg)}100%{transform:rotate(0)}}
+@media (prefers-reduced-motion:reduce){.bird.startle,.bird.startle .wingg{animation:none}}
+.caption{
+  display:flex;gap:14px;justify-content:space-between;align-items:baseline;flex-wrap:wrap;
+  padding:9px 13px;border-top:1px solid var(--line-soft);
+  font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted);letter-spacing:.02em;
+}
+
+/* ---------- right column ---------- */
+.rail{display:flex;flex-direction:column;gap:16px;min-width:0}
+.plotbox{padding:12px 12px 6px}
+.plotbox canvas{width:100%;height:auto;display:block}
+.plothead{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:2px 2px 8px}
+.plothead h2{font-family:"Zen Old Mincho",Georgia,serif;font-size:16px;font-weight:400;margin:0;letter-spacing:.01em}
+.plothead .unit{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line-soft)}
+.stat{padding:9px 12px 11px}
+.stat + .stat{border-left:1px solid var(--line-soft)}
+.stat .k{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.stat .v{font-family:"IBM Plex Mono",monospace;font-size:19px;font-variant-numeric:tabular-nums;margin-top:1px}
+.stat .v span{font-size:11px;color:var(--muted);margin-left:3px}
+
+.controls{padding:14px 16px 16px;display:flex;flex-direction:column;gap:13px}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:2px 10px;align-items:center}
+.ctl label{font-size:13px}
+.ctl label em{font-style:normal;color:var(--muted);font-family:"IBM Plex Mono",monospace;font-size:11.5px;margin-left:6px}
+.ctl output{font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--accent)}
+.ctl input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--accent);height:20px;margin:0}
+.ctl input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:3px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
+button{
+  font:500 12.5px/1 "IBM Plex Sans",sans-serif;color:var(--ink);background:var(--surface2);
+  border:1px solid var(--line);border-radius:3px;padding:8px 13px;cursor:pointer;
+}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+
+.map{padding:2px 16px 14px}
+.map h3{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);font-weight:500;margin:12px 0 4px}
+.map dl{margin:0;display:grid;grid-template-columns:1fr 1fr;gap:0}
+.map div{display:contents}
+.map dt,.map dd{margin:0;padding:6px 0;border-top:1px solid var(--line-soft);font-size:13px}
+.map dt{color:var(--muted)}
+.map dd{font-family:"IBM Plex Mono",monospace;font-size:12.5px}
+.map dd i{font-style:italic}
+
+footer{color:var(--muted);font-size:13px;max-width:78ch}
+.credit{color:var(--muted);font-size:12.5px;max-width:78ch;margin:0}
+.credit a{color:var(--accent)}
+.credit b{color:var(--ink);font-weight:500}
+footer code{font-family:"IBM Plex Mono",monospace;font-size:12.5px;background:var(--surface2);border:1px solid var(--line-soft);border-radius:3px;padding:1px 5px}
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <filter id="gooey">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="b"/>
+    <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -11"/>
+  </filter>
+</defs></svg>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Leaky integrate &amp; fire — a mechanical analogy</p>
+    <h1>Shishi-odoshi Neuron</h1>
+    <p class="lede">A bamboo tube fills from a spout until the water's torque beats the counterweight. It tips, dumps, swings back and <b>clacks</b> — then starts again from empty. The water is a real particle fluid; the trace on the right is the tube's state variable, and the tipping event <i>is</i> the spike.</p>
+  </header>
+
+  <div class="stage">
+    <section class="panel">
+      <div class="scene">
+        <canvas id="back" aria-label="A bamboo water clapper in a garden: a spout pours into a pivoted tube beside a pond, with a bird perched on a rock"></canvas>
+        <canvas id="water"></canvas>
+        <canvas id="front"></canvas>
+        <svg class="bird" id="bird" viewBox="-14 6 150 116" aria-hidden="true">
+          <g>
+            <path d="M30,56 L-8,50 L-8,72 L28,76 Z" fill="#63753b"/><path d="M22,58 L-4,54 M20,66 L-6,64" stroke="#4e5c2e" stroke-width="1.4" fill="none"/>
+            <path d="M20,72 C20,54 40,41 66,43 C90,45 105,55 105,70 C105,88 83,98 58,96 C34,94 20,85 20,72 Z" fill="#ece6d2"/>
+            <path d="M20,69 C23,53 41,41 66,43 C90,45 105,55 105,69 C93,59 71,52 51,54 C37,56 26,61 20,69 Z" fill="#7d8f4a"/>
+            <circle cx="92" cy="46" r="16" fill="#8a9c50"/>
+            <path d="M104,42 C112,40 126,45 130,49 C124,53 112,55 104,53 Z" fill="#c9a227"/>
+            <path d="M62,94 L60,107 M76,93 L79,106" stroke="#8d7b45" stroke-width="3" stroke-linecap="round" fill="none"/>
+            <path d="M56,107 h9 M75,106 h9" stroke="#8d7b45" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+            <g class="wingg"><path d="M42,64 C56,54 78,56 88,68 C78,80 56,80 42,72 Z" fill="#63753b"/>
+            <path d="M46,68 C58,62 74,63 82,70" stroke="#4e5c2e" stroke-width="1.6" fill="none"/></g>
+            <circle cx="96" cy="42" r="6.4" fill="#f4f1e4"/>
+            <circle cx="96" cy="42" r="3" fill="#1d2418"/>
+          </g>
+        </svg>
+      </div>
+      <div class="caption">
+        <span id="capState">filling</span>
+        <span>spout → tube → pond</span>
+      </div>
+    </section>
+
+    <div class="rail">
+      <section class="panel plotbox">
+        <div class="plothead">
+          <h2>Water torque, relative to the counterweight</h2>
+          <span class="unit">V(t)</span>
+        </div>
+        <canvas id="plot" aria-label="Time series of the tube's water torque, rising to threshold and resetting at each tip"></canvas>
+        <div class="stats">
+          <div class="stat"><div class="k">rate</div><div class="v" id="sRate">0.00<span>Hz</span></div></div>
+          <div class="stat"><div class="k">last interval</div><div class="v" id="sIsi">—<span>s</span></div></div>
+          <div class="stat"><div class="k">V now</div><div class="v" id="sV">0.00</div></div>
+        </div>
+      </section>
+
+      <section class="panel controls">
+        <div class="ctl">
+          <label for="cFlow">Spout flow <em>input current I</em></label><output id="oFlow">60</output>
+          <input id="cFlow" type="range" min="0" max="100" value="60">
+        </div>
+        <div class="ctl">
+          <label for="cLeak">Leak hole <em>conductance g<sub>L</sub></em></label><output id="oLeak">0.18</output>
+          <input id="cLeak" type="range" min="0" max="100" value="18">
+        </div>
+        <div class="ctl">
+          <label for="cThr">Counterweight <em>threshold &theta;</em></label><output id="oThr">1.00</output>
+          <input id="cThr" type="range" min="50" max="130" value="100">
+        </div>
+        <div class="btns">
+          <button id="bPause" aria-pressed="false">Pause</button>
+          <button id="bReset">Empty the tube</button>
+          <button id="bSound" aria-pressed="false">Clack sound</button>
+        </div>
+      </section>
+
+      <section class="panel map">
+        <h3>What maps to what</h3>
+        <dl>
+          <div><dt>Spout flow</dt><dd>input current <i>I</i></dd></div>
+          <div><dt>Water in the tube</dt><dd>membrane potential <i>V</i></dd></div>
+          <div><dt>Hole in the floor</dt><dd>leak <i>g<sub>L</sub>(V−E<sub>L</sub>)</i></dd></div>
+          <div><dt>Counterweight torque</dt><dd>threshold <i>&theta;</i></dd></div>
+          <div><dt>Tip &amp; dump</dt><dd>spike, reset to <i>V<sub>r</sub></i></dd></div>
+          <div><dt>Swing back &amp; clack</dt><dd>refractory period</dd></div>
+        </dl>
+      </section>
+    </div>
+  </div>
+
+  <footer>The tube integrates: <code>C dV/dt = I − g<sub>L</sub>V</code>, and when <code>V ≥ θ</code> it empties and cannot refill until it has swung back. Turn the flow down far enough and the leak drains the tube as fast as the spout fills it — <b>V</b> settles below threshold and the garden goes quiet, exactly as a leaky neuron stops firing below rheobase.</footer>
+  <p class="credit">Built for <b>NB2181 Computational Modeling of Dynamical Systems</b>, TU Delft. Water is a position-based-fluids (SPH) solver; the tube is driven by the real torque of the particles inside it. <br>YOUR NAME, 2026 &middot; <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> &middot; <a href="https://github.com/USERNAME/REPO">source</a></p>
+</div>
+
+<script>
+(function(){
+"use strict";
+// ---------------------------------------------------------------- geometry
+var W=520, H=620;
+var PIV={x:296,y:296}, R=27, UT=-132, UC=12, UM=148;
+var TH_REST=-0.38, TH_MAX=0.55;
+var NOZ={x:352,y:198}, POND=505, HOLE_U=UC+22;
+
+function fit(cv,w,h,cap){
+  var d=Math.min(window.devicePixelRatio||1, cap||2);
+  cv.width=Math.round(w*d); cv.height=Math.round(h*d);
+  var g=cv.getContext('2d'); g.setTransform(d,0,0,d,0,0); return g;
+}
+var gb=fit(document.getElementById('back'),W,H,2);
+var gw=fit(document.getElementById('water'),W,H,1.3);
+var gf=fit(document.getElementById('front'),W,H,2);
+var plotCv=document.getElementById('plot');
+var PW=560,PH=280; plotCv.style.aspectRatio=PW+'/'+PH;
+var gp=fit(plotCv,PW,PH,2);
+var birdEl=document.getElementById('bird');
+
+// ---------------------------------------------------------------- fluid (position based fluids)
+var MAXP=1400, HK=11, HK2=HK*HK, PR=3.2, GRAV=1500;
+var px=new Float32Array(MAXP), py=new Float32Array(MAXP);
+var vx=new Float32Array(MAXP), vy=new Float32Array(MAXP);
+var ox=new Float32Array(MAXP), oy=new Float32Array(MAXP);
+var lam=new Float32Array(MAXP), ax=new Float32Array(MAXP), ay=new Float32Array(MAXP);
+var fre=new Float32Array(MAXP), n=0;
+
+var K6=4/(Math.PI*Math.pow(HK,8)), KS=30/(Math.PI*Math.pow(HK,5));
+function w6(r2){ var d=HK2-r2; return d<=0?0:K6*d*d*d; }
+// rest density from a hexagonal packing at the spawn spacing
+var RHO0=(function(){ var s=5.6,acc=0,i,j,dx,dy,r2;
+  for(i=-3;i<=3;i++)for(j=-3;j<=3;j++){ dx=(i+((j&1)?0.5:0))*s; dy=j*s*0.866; r2=dx*dx+dy*dy; acc+=w6(r2); }
+  return acc; })();
+var SCORR_K=0.15, SCORR_W=w6(Math.pow(0.28*HK,2));
+
+var GW=Math.ceil(W/HK)+6, GH=Math.ceil(H/HK)+6;
+var head=new Int32Array(GW*GH), nxt=new Int32Array(MAXP);
+function cellOf(x,y){
+  var ix=Math.floor(x/HK)+3, iy=Math.floor(y/HK)+3;
+  if(ix<0)ix=0; if(ix>=GW)ix=GW-1; if(iy<0)iy=0; if(iy>=GH)iy=GH-1;
+  return ix+iy*GW;
+}
+function buildGrid(){
+  head.fill(-1);
+  for(var i=0;i<n;i++){ var c=cellOf(px[i],py[i]); nxt[i]=head[c]; head[c]=i; }
+}
+
+// ---------------------------------------------------------------- tube state
+var th=TH_REST, om=0, ct=Math.cos(th), st=Math.sin(th);
+var P={flow:0.55, leak:0.18, thr:1.0, paused:false, sound:false};
+var TAU0=8700, I0=1250, DAMP=380;
+var tauW=0, inTube=0, Vnow=0, Vsm=0, tSim=0, lastSpike=-99, spikes=[], hist=[], WIN=14;
+var ripples=[], clackT=-99, state='filling';
+
+function toLocal(x,y,out){ var dx=x-PIV.x, dy=y-PIV.y; out[0]=dx*ct+dy*st; out[1]=-dx*st+dy*ct; }
+function toWorld(u,v,out){ out[0]=PIV.x+u*ct-v*st; out[1]=PIV.y+u*st+v*ct; }
+var _l=[0,0], _w=[0,0];
+
+function collide(i){
+  var dx=px[i]-PIV.x, dy=py[i]-PIV.y;
+  var u=dx*ct+dy*st, v=-dx*st+dy*ct, hit=false;
+  if(fre[i]<=0){
+    if(u>UC && u<UM){
+      if(v>R-PR && v<R+15){ v=R-PR; hit=true; }
+      else if(v>=R+15 && v<R+15+PR){ v=R+15+PR; hit=true; }
+      else if(v<-R+PR && v>-R-12 && (-vx[i]*st+vy[i]*ct)<0){ v=-R+PR; hit=true; }
+    } else if(u<=UC && u>=UT-PR-4){
+      if(u>UC-44 && v>-(R+7) && v<R+PR){ u=UC+PR; hit=true; }
+      else if(v>-(R+PR) && v<R+PR){ v = v<0 ? -(R+PR) : R+PR; hit=true; }
+    }
+  }
+  if(hit){
+    px[i]=PIV.x+u*ct-v*st; py[i]=PIV.y+u*st+v*ct;
+  }
+}
+
+function emit(dt){
+  emit.acc=(emit.acc||0)+P.flow*130*dt;
+  while(emit.acc>=1 && n<MAXP){
+    emit.acc-=1;
+    px[n]=NOZ.x+(Math.random()-0.5)*8; py[n]=NOZ.y+Math.random()*5;
+    vx[n]=(Math.random()-0.5)*9; vy[n]=60+Math.random()*22;
+    fre[n]=0; n++;
+  }
+}
+
+function leak(dt){
+  if(P.leak<=0) return;
+  leak.acc=(leak.acc||0)+P.leak*62*dt;
+  while(leak.acc>=1){
+    leak.acc-=1;
+    var best=-1, bd=1e9;
+    for(var i=0;i<n;i++){
+      if(fre[i]>0) continue;
+      var dx=px[i]-PIV.x, dy=py[i]-PIV.y;
+      var u=dx*ct+dy*st, v=-dx*st+dy*ct;
+      if(u<UC||u>UM||v<0||v>R+2) continue;
+      var d=Math.abs(u-HOLE_U)+Math.abs(v-R)*0.6;
+      if(d<bd){bd=d;best=i;}
+    }
+    if(best<0){ leak.acc=0; return; }
+    fre[best]=0.55;
+  }
+}
+
+function compact(){
+  var k=0;
+  for(var i=0;i<n;i++){
+    var keep=true;
+    if(py[i]>POND-2 && px[i]>104){ keep=false; if(ripples.length<26) ripples.push({x:px[i],y:POND,t:tSim}); }
+    else if(py[i]>H-8 || px[i]<7 || px[i]>W-7) keep=false;
+    if(keep){
+      if(k!==i){ px[k]=px[i];py[k]=py[i];vx[k]=vx[i];vy[k]=vy[i];fre[k]=fre[i]; }
+      k++;
+    }
+  }
+  n=k;
+}
+
+function step(dt){
+  // --- tube dynamics from the actual water
+  var sum=0, cnt=0, i,j;
+  for(i=0;i<n;i++){
+    if(fre[i]>0) continue;
+    var dx=px[i]-PIV.x, dy=py[i]-PIV.y;
+    var u=dx*ct+dy*st, v=-dx*st+dy*ct;
+    if(u>UC && u<UM && v<R+2 && v>-R*2.2){ sum+=dx; cnt++; }
+  }
+  tauW=sum; inTube=cnt;
+  var tauC=TAU0*P.thr;
+  var Vp=Vnow; Vnow=tauW/tauC;
+  if(Vp<1 && Vnow>=1 && th<TH_REST+0.12 && tSim-lastSpike>0.4){ lastSpike=tSim; spikes.push(tSim); }
+  var I=I0+0.55*cnt;
+  var alpha=(tauW-tauC-DAMP*om)/I;
+  om+=alpha*dt; th+=om*dt;
+  if(th<TH_REST){ th=TH_REST; if(om<-0.5){ clack(-om); } om=-om*0.20; }
+  if(th>TH_MAX){ th=TH_MAX; om=-om*0.28; }
+  ct=Math.cos(th); st=Math.sin(th);
+  state = th>TH_REST+0.06 ? 'tipping — spilling' : (Vnow>0.75?'nearly full':'filling');
+
+  // --- predict
+  for(i=0;i<n;i++){
+    if(fre[i]>0) fre[i]-=dt;
+    vy[i]+=GRAV*dt;
+    ox[i]=px[i]; oy[i]=py[i];
+    px[i]+=vx[i]*dt; py[i]+=vy[i]*dt;
+    collide(i);
+  }
+  buildGrid();
+
+  // --- density constraint
+  for(var it=0; it<3; it++){
+    for(i=0;i<n;i++){
+      var rho=0, gxs=0, gys=0, s2=0;
+      var cx=Math.floor(px[i]/HK)+3, cy=Math.floor(py[i]/HK)+3;
+      for(var a=-1;a<=1;a++)for(var b=-1;b<=1;b++){
+        var ix=cx+a, iy=cy+b; if(ix<0||iy<0||ix>=GW||iy>=GH) continue;
+        for(j=head[ix+iy*GW]; j>=0; j=nxt[j]){
+          var dx2=px[i]-px[j], dy2=py[i]-py[j], r2=dx2*dx2+dy2*dy2;
+          if(r2>=HK2) continue;
+          rho+=w6(r2);
+          if(r2>1e-6){
+            var r=Math.sqrt(r2), c=-KS*(HK-r)*(HK-r)/r/RHO0;
+            var gx=c*dx2, gy=c*dy2;
+            gxs+=gx; gys+=gy; s2+=gx*gx+gy*gy;
+          }
+        }
+      }
+      s2+=gxs*gxs+gys*gys;
+      lam[i]=-((rho/RHO0)-1)/(s2+0.0012);
+    }
+    for(i=0;i<n;i++){
+      var ddx=0, ddy=0;
+      var cx2=Math.floor(px[i]/HK)+3, cy2=Math.floor(py[i]/HK)+3;
+      for(var a2=-1;a2<=1;a2++)for(var b2=-1;b2<=1;b2++){
+        var ix2=cx2+a2, iy2=cy2+b2; if(ix2<0||iy2<0||ix2>=GW||iy2>=GH) continue;
+        for(j=head[ix2+iy2*GW]; j>=0; j=nxt[j]){
+          if(j===i) continue;
+          var dx3=px[i]-px[j], dy3=py[i]-py[j], r3=dx3*dx3+dy3*dy3;
+          if(r3>=HK2||r3<1e-6) continue;
+          var rr=Math.sqrt(r3);
+          var sc=-SCORR_K*Math.pow(w6(r3)/SCORR_W,4);
+          var cc=-KS*(HK-rr)*(HK-rr)/rr/RHO0*(lam[i]+lam[j]+sc);
+          ddx+=cc*dx3; ddy+=cc*dy3;
+        }
+      }
+      ax[i]=ddx; ay[i]=ddy;
+    }
+    for(i=0;i<n;i++){
+      var mx=ax[i], my=ay[i], mm=Math.sqrt(mx*mx+my*my);
+      if(mm>8){ mx*=8/mm; my*=8/mm; }
+      px[i]+=mx; py[i]+=my; collide(i);
+    }
+  }
+
+  // --- velocities + xsph viscosity
+  for(i=0;i<n;i++){ vx[i]=(px[i]-ox[i])/dt; vy[i]=(py[i]-oy[i])/dt; }
+  for(i=0;i<n;i++){
+    var sx=0, sy=0, cx3=Math.floor(px[i]/HK)+3, cy3=Math.floor(py[i]/HK)+3;
+    for(var a3=-1;a3<=1;a3++)for(var b3=-1;b3<=1;b3++){
+      var ix3=cx3+a3, iy3=cy3+b3; if(ix3<0||iy3<0||ix3>=GW||iy3>=GH) continue;
+      for(j=head[ix3+iy3*GW]; j>=0; j=nxt[j]){
+        var dx4=px[i]-px[j], dy4=py[i]-py[j], r4=dx4*dx4+dy4*dy4;
+        if(r4>=HK2) continue;
+        var ww=w6(r4)/RHO0;
+        sx+=(vx[j]-vx[i])*ww; sy+=(vy[j]-vy[i])*ww;
+      }
+    }
+    vx[i]+=0.28*sx; vy[i]+=0.28*sy;
+  }
+
+  leak(dt); emit(dt); compact();
+  tSim+=dt;
+  Vsm+=(Vnow-Vsm)*0.3;
+  hist.push(tSim, Math.min(Vsm,3));
+  while(hist.length>2 && hist[0]<tSim-WIN-1) hist.splice(0,2);
+  while(spikes.length && spikes[0]<tSim-WIN-1) spikes.shift();
+  while(ripples.length && tSim-ripples[0].t>1.6) ripples.shift();
+}
+
+// ---------------------------------------------------------------- sound
+var actx=null;
+function clack(v){
+  clackT=tSim;
+  if(!birdEl.classList.contains('startle')){
+    birdEl.classList.add('startle');
+    setTimeout(function(){birdEl.classList.remove('startle');},520);
+  }
+  if(!P.sound||!actx) return;
+  var t0=actx.currentTime, g=actx.createGain(), amp=Math.min(0.5,0.12+v*0.09);
+  g.gain.setValueAtTime(amp,t0); g.gain.exponentialRampToValueAtTime(0.0008,t0+0.28);
+  g.connect(actx.destination);
+  [392,596,1180].forEach(function(f,k){
+    var o=actx.createOscillator(), gg=actx.createGain();
+    o.type=k===2?'triangle':'sine'; o.frequency.setValueAtTime(f,t0);
+    gg.gain.setValueAtTime(1/(k+1.6),t0); gg.gain.exponentialRampToValueAtTime(0.001,t0+0.12+0.1*k);
+    o.connect(gg); gg.connect(g); o.start(t0); o.stop(t0+0.4);
+  });
+}
+
+// ---------------------------------------------------------------- scene painting
+var bgCache=document.createElement('canvas'); bgCache.width=W*2; bgCache.height=H*2;
+(function(){
+  var g=bgCache.getContext('2d'); g.setTransform(2,0,0,2,0,0);
+  var sky=g.createLinearGradient(0,0,0,H);
+  sky.addColorStop(0,'#c9d6cc'); sky.addColorStop(0.45,'#e2e8dc'); sky.addColorStop(1,'#cfd8c6');
+  g.fillStyle=sky; g.fillRect(0,0,W,H);
+  // distant bamboo
+  g.strokeStyle='rgba(105,125,88,0.20)';
+  [40,72,455,486,505].forEach(function(x,i){
+    g.lineWidth=i%2?9:13; g.beginPath(); g.moveTo(x,-10); g.lineTo(x+ (i%2?10:-8), 520); g.stroke();
+  });
+  g.strokeStyle='rgba(105,125,88,0.14)'; g.lineWidth=3;
+  [[30,120,90,60],[470,150,530,96]].forEach(function(a){ g.beginPath(); g.moveTo(a[0],a[1]); g.quadraticCurveTo(a[2],a[3],a[2]+18,a[3]+26); g.stroke(); });
+
+  // pond
+  var pw=g.createLinearGradient(0,POND,0,H);
+  pw.addColorStop(0,'#5c8f8c'); pw.addColorStop(0.35,'#2f5f63'); pw.addColorStop(1,'#1b3b41');
+  g.fillStyle=pw; g.fillRect(0,POND,W,H-POND);
+  g.fillStyle='rgba(255,255,255,0.30)'; g.fillRect(0,POND,W,1.6);
+  // banks
+  g.fillStyle='#4d5f35';
+  g.beginPath(); g.moveTo(0,POND+2); g.quadraticCurveTo(60,POND-16,118,POND+8); g.lineTo(118,H); g.lineTo(0,H); g.closePath(); g.fill();
+  g.beginPath(); g.moveTo(W,POND+4); g.quadraticCurveTo(W-26,POND-8,W-52,POND+16); g.lineTo(W-52,H); g.lineTo(W,H); g.closePath(); g.fill();
+  g.fillStyle='rgba(140,168,96,0.5)';
+  g.beginPath(); g.moveTo(0,POND+4); g.quadraticCurveTo(58,POND-13,118,POND+10); g.lineTo(118,POND+18); g.quadraticCurveTo(58,POND-4,0,POND+14); g.closePath(); g.fill();
+
+  function stone(cx,cy,rx,ry,rot,c1,c2){
+    g.save(); g.translate(cx,cy); g.rotate(rot);
+    var gr=g.createLinearGradient(0,-ry,0,ry); gr.addColorStop(0,c1); gr.addColorStop(1,c2);
+    g.fillStyle=gr; g.beginPath(); g.ellipse(0,0,rx,ry,0,0,6.284); g.fill();
+    g.restore();
+  }
+  // bird rock (left) + moss
+  stone(72,528,86,50,-0.06,'#9aa093','#5b6157');
+  stone(64,498,58,22,-0.05,'#adb2a4','#767c6e');
+  g.fillStyle='rgba(122,150,80,0.55)';
+  g.beginPath(); g.ellipse(40,486,26,7,-0.12,0,6.284); g.fill();
+  // clack stone under the tail
+  stone(166,386,54,26,-0.04,'#a7ab9d','#6b7064');
+  stone(124,378,28,11,-0.03,'#bcc0b2','#8b9082');
+  // pond stones
+  stone(432,522,50,15,0.03,'#828779','#4c5147');
+  stone(300,526,38,11,-0.02,'#7b8073','#474c42');
+
+  // post
+  var post=g.createLinearGradient(284,0,310,0);
+  post.addColorStop(0,'#7c8b4c'); post.addColorStop(0.35,'#a5b26a'); post.addColorStop(1,'#5f6c36');
+  g.fillStyle=post; g.fillRect(285,296,22,226);
+  g.fillStyle='rgba(60,70,34,0.55)';
+  [352,414,476].forEach(function(y){ g.fillRect(283,y,26,5); });
+  g.fillStyle='#59672f'; g.beginPath(); g.moveTo(288,470); g.lineTo(304,470); g.lineTo(316,520); g.lineTo(276,520); g.closePath(); g.fill();
+
+  // spout pipe
+  g.save();
+  g.translate(NOZ.x,NOZ.y-16); g.rotate(Math.atan2(34,-300));
+  var sp=g.createLinearGradient(0,-9,0,9);
+  sp.addColorStop(0,'#b3bf7c'); sp.addColorStop(0.4,'#8b9a52'); sp.addColorStop(1,'#5d6a33');
+  g.fillStyle=sp; g.fillRect(-2,-9,300,18);
+  g.fillStyle='rgba(60,70,34,0.45)'; g.fillRect(104,-10,5,20); g.fillRect(206,-10,5,20);
+  g.restore();
+  g.fillStyle='#77864a'; g.fillRect(NOZ.x-9,NOZ.y-19,18,15);
+  g.fillStyle='#39461f'; g.beginPath(); g.ellipse(NOZ.x,NOZ.y-4,9,3.4,0,0,6.284); g.fill();
+}());
+
+function paintTube(g,front){
+  g.save(); g.translate(PIV.x,PIV.y); g.rotate(th);
+  if(!front){
+    // outer shell
+    var sh=g.createLinearGradient(0,-R,0,R);
+    sh.addColorStop(0,'#b6c27a'); sh.addColorStop(0.42,'#8d9c52'); sh.addColorStop(1,'#4f5c2d');
+    g.fillStyle=sh;
+    g.beginPath();
+    g.moveTo(UT+8,-R); g.lineTo(UM,-R); g.lineTo(UM,R); g.lineTo(UT+8,R);
+    g.quadraticCurveTo(UT-6,R,UT-6,0); g.quadraticCurveTo(UT-6,-R,UT+8,-R);
+    g.closePath(); g.fill();
+    // open trough interior
+    var inr=g.createLinearGradient(0,-R,0,R);
+    inr.addColorStop(0,'#3c4724'); inr.addColorStop(0.5,'#5a6a34'); inr.addColorStop(1,'#43512a');
+    g.fillStyle=inr; g.fillRect(UC,-R+3.5,UM-UC,2*R-7);
+    g.fillStyle='rgba(30,38,18,0.5)'; g.fillRect(UC,-R+3.5,7,2*R-7);
+    // node ring + leak hole
+    g.fillStyle='#6d7c3c'; g.beginPath(); g.moveTo(UC-11,-R-8); g.lineTo(UC,-R-8); g.lineTo(UC,R); g.lineTo(UC-11,R); g.closePath(); g.fill();
+    g.fillStyle='rgba(240,244,215,0.35)'; g.fillRect(UC-11,-R-8,11,2.5);
+    g.fillStyle='rgba(45,54,26,0.35)'; g.fillRect(UC-3,-R-8,3,2*R+8);
+    g.fillStyle='rgba(45,54,26,0.6)'; g.fillRect(UT+52,-R,6,2*R);
+    if(P.leak>0.02){
+      g.fillStyle='#2a3318'; g.beginPath(); g.ellipse(HOLE_U,R-2,3.4+P.leak*2.2,2.4,0,0,6.284); g.fill();
+    }
+  } else {
+    // near rim, drawn over the water
+    var rim=g.createLinearGradient(0,-R,0,-R+10);
+    rim.addColorStop(0,'#c6d28b'); rim.addColorStop(0.65,'#94a359'); rim.addColorStop(1,'#63723a');
+    g.fillStyle=rim; g.fillRect(UC-11,-R,UM-UC+11,9);
+    g.fillStyle='rgba(255,255,255,0.4)'; g.fillRect(UC-11,-R,UM-UC+11,1.8);
+    g.fillStyle='rgba(24,32,14,0.22)'; g.fillRect(UC,-R+9,UM-UC,3);
+    // mouth cut
+    g.fillStyle='#43512a'; g.beginPath(); g.ellipse(UM,0,4.5,R,0,0,6.284); g.fill();
+    g.strokeStyle='#98a75c'; g.lineWidth=2.4; g.beginPath(); g.ellipse(UM,0,4.5,R,0,0,6.284); g.stroke();
+    g.fillStyle='rgba(0,0,0,0.16)'; g.fillRect(UC,R-4,UM-UC,4);
+  }
+  g.restore();
+}
+
+function paintWater(){
+  gw.clearRect(0,0,W,H);
+  for(var i=0;i<n;i++){
+    var sp=Math.min(1,Math.sqrt(vx[i]*vx[i]+vy[i]*vy[i])/620);
+    var r=7.6;
+    var gr=gw.createRadialGradient(px[i],py[i],0,px[i],py[i],r);
+    var c1='rgba('+Math.round(120+110*sp)+','+Math.round(212+30*sp)+','+Math.round(222+25*sp)+',1)';
+    var c2='rgba('+Math.round(30+60*sp)+','+Math.round(118+50*sp)+','+Math.round(140+40*sp)+',0.92)';
+    gr.addColorStop(0,c1); gr.addColorStop(0.55,c2); gr.addColorStop(1,'rgba(20,90,110,0)');
+    gw.fillStyle=gr; gw.beginPath(); gw.arc(px[i],py[i],r,0,6.284); gw.fill();
+  }
+}
+
+function paintFront(){
+  gf.clearRect(0,0,W,H);
+  paintTube(gf,true);
+  // pond ripples
+  gf.lineWidth=1.4;
+  for(var i=0;i<ripples.length;i++){
+    var a=(tSim-ripples[i].t)/1.6; if(a<0||a>1) continue;
+    gf.strokeStyle='rgba(226,246,248,'+(0.42*(1-a))+')';
+    gf.beginPath(); gf.ellipse(ripples[i].x,POND+1,4+a*30,1.4+a*7,0,0,6.284); gf.stroke();
+  }
+  // clack shock
+  var ca=(tSim-clackT)/0.55;
+  if(ca>=0&&ca<1){
+    var wx=PIV.x+UT*ct, wy=PIV.y+UT*st;
+    gf.strokeStyle='rgba(255,246,214,'+(0.75*(1-ca))+')'; gf.lineWidth=2.2;
+    for(var k=0;k<3;k++){
+      gf.beginPath(); gf.arc(wx,wy+16,10+ca*46+k*11,-2.5,-0.7); gf.stroke();
+    }
+  }
+}
+
+// ---------------------------------------------------------------- plot
+var PT={};
+function readTheme(){
+  var s=getComputedStyle(document.documentElement);
+  ['ink','muted','line','surface','surface2','accent','accent-2','spike','accent-soft'].forEach(function(k){
+    PT[k]=s.getPropertyValue('--'+k).trim();
+  });
+}
+readTheme();
+if(window.matchMedia) try{ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',readTheme); }catch(e){}
+new MutationObserver(readTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+var PL=46, PRt=12, PTp=26, PB=26, VMAX=1.9;
+function X(t){ return PL+(t-(tSim-WIN))/WIN*(PW-PL-PRt); }
+function Y(v){ return PH-PB-(v/VMAX)*(PH-PTp-PB); }
+
+function paintPlot(){
+  gp.clearRect(0,0,PW,PH);
+  var x0=PL, x1=PW-PRt, y0=PTp, y1=PH-PB;
+  // grid
+  gp.strokeStyle=PT.line; gp.lineWidth=1;
+  gp.font='500 10.5px "IBM Plex Mono",monospace'; gp.textBaseline='middle';
+  [0,0.5,1,1.5].forEach(function(v){
+    var y=Math.round(Y(v))+0.5;
+    gp.globalAlpha=v===0?1:0.45; gp.beginPath(); gp.moveTo(x0,y); gp.lineTo(x1,y); gp.stroke();
+    gp.globalAlpha=1; gp.fillStyle=PT.muted; gp.textAlign='right';
+    gp.fillText(v.toFixed(1),x0-8,y);
+  });
+  // spikes
+  for(var i=0;i<spikes.length;i++){
+    var sx=X(spikes[i]); if(sx<x0-2) continue;
+    gp.strokeStyle=PT.spike; gp.globalAlpha=0.22; gp.lineWidth=1.4;
+    gp.beginPath(); gp.moveTo(sx,y0-6); gp.lineTo(sx,y1); gp.stroke();
+    gp.globalAlpha=1; gp.lineWidth=3;
+    gp.beginPath(); gp.moveTo(sx,y0-14); gp.lineTo(sx,y0-6); gp.stroke();
+  }
+  // threshold
+  gp.setLineDash([5,4]); gp.strokeStyle=PT.spike; gp.globalAlpha=0.9; gp.lineWidth=1.2;
+  gp.beginPath(); gp.moveTo(x0,Math.round(Y(1))+0.5); gp.lineTo(x1,Math.round(Y(1))+0.5); gp.stroke();
+  gp.setLineDash([]); gp.globalAlpha=1;
+  gp.fillStyle=PT.spike; gp.textAlign='left'; gp.font='500 10px "IBM Plex Mono",monospace';
+  gp.fillText('θ',x1-10,Y(1)-9);
+  // trace
+  if(hist.length>=4){
+    gp.save(); gp.beginPath(); gp.rect(x0,y0-18,x1-x0,y1-y0+18); gp.clip();
+    var grd=gp.createLinearGradient(0,y0,0,y1);
+    grd.addColorStop(0,PT['accent-soft']); grd.addColorStop(1,'rgba(0,0,0,0)');
+    gp.beginPath(); gp.moveTo(X(hist[0]),y1);
+    for(var k=0;k<hist.length;k+=2) gp.lineTo(X(hist[k]),Y(hist[k+1]));
+    gp.lineTo(X(hist[hist.length-2]),y1); gp.closePath();
+    gp.fillStyle=grd; gp.fill();
+    gp.beginPath();
+    for(k=0;k<hist.length;k+=2){ var xx=X(hist[k]), yy=Y(hist[k+1]); if(k===0)gp.moveTo(xx,yy); else gp.lineTo(xx,yy); }
+    gp.strokeStyle=PT.accent; gp.lineWidth=1.9; gp.lineJoin='round'; gp.stroke();
+    gp.restore();
+    var lx=X(hist[hist.length-2]), ly=Y(hist[hist.length-1]);
+    gp.fillStyle=PT.accent; gp.beginPath(); gp.arc(lx,ly,3.1,0,6.284); gp.fill();
+  }
+  // time axis
+  gp.strokeStyle=PT.line; gp.beginPath(); gp.moveTo(x0,y1+0.5); gp.lineTo(x1,y1+0.5); gp.stroke();
+  gp.fillStyle=PT.muted; gp.textAlign='center'; gp.font='500 10.5px "IBM Plex Mono",monospace';
+  for(var s=Math.max(0,Math.ceil((tSim-WIN)/2)*2); s<=tSim; s+=2){
+    var xt=X(s); if(xt<x0+8) continue;
+    gp.beginPath(); gp.moveTo(xt,y1); gp.lineTo(xt,y1+4); gp.stroke();
+    gp.fillText(s.toFixed(0)+'s',xt,y1+14);
+  }
+}
+
+// ---------------------------------------------------------------- ui
+function bind(id,out,fmt,set){
+  var el=document.getElementById(id), o=document.getElementById(out);
+  function upd(){ var v=+el.value; set(v); o.textContent=fmt(v); }
+  el.addEventListener('input',upd); upd();
+}
+bind('cFlow','oFlow',function(v){return v.toFixed(0);},function(v){P.flow=v/100;});
+bind('cLeak','oLeak',function(v){return (v/100).toFixed(2);},function(v){P.leak=v/100;});
+bind('cThr','oThr',function(v){return (v/100).toFixed(2);},function(v){P.thr=v/100;});
+var bP=document.getElementById('bPause');
+bP.addEventListener('click',function(){
+  P.paused=!P.paused; bP.setAttribute('aria-pressed',P.paused?'true':'false');
+  bP.textContent=P.paused?'Resume':'Pause';
+});
+document.getElementById('bReset').addEventListener('click',function(){ n=0; th=TH_REST; om=0; ct=Math.cos(th); st=Math.sin(th); });
+var bS=document.getElementById('bSound');
+bS.addEventListener('click',function(){
+  P.sound=!P.sound; bS.setAttribute('aria-pressed',P.sound?'true':'false');
+  if(P.sound&&!actx){ try{ actx=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ P.sound=false; } }
+  if(P.sound&&actx&&actx.state==='suspended') actx.resume();
+});
+var sRate=document.getElementById('sRate'), sIsi=document.getElementById('sIsi'),
+    sV=document.getElementById('sV'), capState=document.getElementById('capState');
+
+// ---------------------------------------------------------------- loop
+for(var wu=0; wu<230; wu++) step(1/60);   // open in a working state
+var last=performance.now(), accT=0;
+function frame(now){
+  var dt=Math.min(0.05,(now-last)/1000); last=now;
+  if(!P.paused){
+    accT+=dt;
+    var guard=0;
+    while(accT>=1/60 && guard<3){ step(1/60); accT-=1/60; guard++; }
+    if(accT>1/60) accT=0;
+  }
+  gb.clearRect(0,0,W,H); gb.drawImage(bgCache,0,0,W,H); paintTube(gb,false);
+  paintWater(); paintFront(); paintPlot();
+  var iv=[], q; for(q=Math.max(1,spikes.length-4); q<spikes.length; q++) iv.push(spikes[q]-spikes[q-1]);
+  var mean=iv.length?iv.reduce(function(a,b){return a+b;},0)/iv.length:0;
+  sRate.innerHTML=(mean>0?(1/mean).toFixed(2):'0.00')+'<span>Hz</span>';
+  sIsi.innerHTML=(spikes.length>1?(spikes[spikes.length-1]-spikes[spikes.length-2]).toFixed(2):'—')+'<span>s</span>';
+  sV.textContent=Vnow.toFixed(2);
+  capState.textContent=state+' · '+inTube+' parcels in the tube';
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
