@@ -8,6 +8,12 @@ emergent rather than scripted.
 `index.html` is completely self-contained — no build step, no dependencies, no data files.
 Double-clicking it works offline (fonts fall back to the system stack without a network).
 
+## Rationale for NeuroAI students
+
+This explainer is relevant because it turns the leaky integrate-and-fire model into a physical system students can reason about. Input, leak, threshold, reset, and refractoriness become visible causes rather than symbols in an equation, which makes the abstraction easier to carry back into spiking neuron models.
+
+For NeuroAI students, it also helps connect mechanistic neuroscience to computation. Spike timing, rheobase, and reset dynamics are core ideas in biological modeling, neuromorphic computing, and event-based AI systems, and this demo gives those ideas a memorable concrete anchor.
+
 ## Put it online with GitHub Pages
 
 1. Create a repository, e.g. `shishi-odoshi-neuron`.

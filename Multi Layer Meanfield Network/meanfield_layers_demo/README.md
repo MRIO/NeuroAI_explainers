@@ -13,6 +13,14 @@ The goal is to make the dynamics **visible and explorable** in real time: you ca
 
 ---
 
+## Rationale for NeuroAI students
+
+Layered neural sheets are a useful middle ground between single-neuron models and full-scale deep networks. This demo shows how local recurrence, random connectivity, feedforward drive, feedback, leak, and nonlinear activation combine to produce structured population dynamics.
+
+For NeuroAI students, the relevance is that it makes architectural assumptions inspectable. By changing connectivity and update parameters directly, students can build intuition for propagation, amplification, stability, and representation in layered neural systems before adding the extra complexity of learning.
+
+---
+
 ## Quick start
 
 1. Clone the repo or download the HTML file (e.g. `index.html`).
