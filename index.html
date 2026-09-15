@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NeuroAI Explainers - Local Index</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f4ee;
+      --surface: #ffffff;
+      --surface-soft: #f0e8db;
+      --text: #202124;
+      --muted: #626870;
+      --line: #d7cfc2;
+      --accent: #0c6b58;
+      --accent-strong: #08483d;
+      --accent-soft: #dceee9;
+      --shadow: 0 14px 38px rgba(40, 34, 24, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        linear-gradient(135deg, rgba(12, 107, 88, 0.10), transparent 38%),
+        linear-gradient(225deg, rgba(178, 86, 30, 0.10), transparent 36%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .page {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 44px 0 56px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 24px;
+      align-items: end;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .eyebrow {
+      margin: 0 0 10px;
+      color: var(--accent-strong);
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 780px;
+      font-size: clamp(2.2rem, 5vw, 4.9rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    .intro {
+      margin: 18px 0 0;
+      max-width: 720px;
+      color: var(--muted);
+      font-size: 1.05rem;
+    }
+
+    .tools {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: min(340px, 100%);
+    }
+
+    .search {
+      width: 100%;
+      height: 44px;
+      padding: 0 14px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      box-shadow: 0 4px 16px rgba(40, 34, 24, 0.06);
+    }
+
+    .search:focus {
+      outline: 3px solid rgba(12, 107, 88, 0.20);
+      border-color: var(--accent);
+    }
+
+    .note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 24px 0 34px;
+    }
+
+    nav a {
+      display: inline-flex;
+      align-items: center;
+      min-height: 36px;
+      padding: 6px 12px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.60);
+      color: var(--accent-strong);
+      font-size: 0.92rem;
+      font-weight: 700;
+      text-decoration: none;
+    }
+
+    main {
+      display: grid;
+      gap: 34px;
+    }
+
+    section {
+      display: grid;
+      gap: 16px;
+    }
+
+    .section-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: baseline;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 10px;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 1.15rem;
+      letter-spacing: 0;
+    }
+
+    .count {
+      color: var(--muted);
+      font-size: 0.88rem;
+      white-space: nowrap;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 14px;
+    }
+
+    .demo {
+      display: grid;
+      gap: 12px;
+      min-height: 176px;
+      padding: 18px;
+      border: 1px solid rgba(215, 207, 194, 0.92);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.82);
+      box-shadow: var(--shadow);
+    }
+
+    .demo h3 {
+      margin: 0;
+      font-size: 1.05rem;
+      letter-spacing: 0;
+    }
+
+    .demo p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .demo-footer {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: end;
+      align-self: end;
+      justify-content: space-between;
+    }
+
+    .path {
+      max-width: 100%;
+      overflow-wrap: anywhere;
+      color: #786f63;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.75rem;
+    }
+
+    .actions {
+      display: inline-flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 36px;
+      padding: 7px 12px;
+      border-radius: 7px;
+      background: var(--accent);
+      color: #ffffff;
+      font-size: 0.9rem;
+      font-weight: 800;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .button.secondary {
+      border: 1px solid rgba(12, 107, 88, 0.35);
+      background: var(--accent-soft);
+      color: var(--accent-strong);
+    }
+
+    .button:focus,
+    .button:hover {
+      background: var(--accent-strong);
+    }
+
+    .button.secondary:focus,
+    .button.secondary:hover {
+      background: #c7e2da;
+      color: var(--accent-strong);
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .empty {
+      display: none;
+      padding: 24px;
+      border: 1px dashed var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.55);
+      color: var(--muted);
+      text-align: center;
+    }
+
+    footer {
+      margin-top: 42px;
+      padding-top: 20px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    @media (max-width: 780px) {
+      .page {
+        width: min(100% - 24px, 1180px);
+        padding-top: 28px;
+      }
+
+      header {
+        grid-template-columns: 1fr;
+        align-items: start;
+      }
+
+      h1 {
+        font-size: clamp(2rem, 13vw, 3.8rem);
+      }
+
+      .demo {
+        min-height: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <p class="eyebrow">Local simulation launcher</p>
+        <h1>NeuroAI Explainers</h1>
+        <p class="intro">Open the local copies of the interactive simulations in this folder. The demos are static HTML files, though some still load libraries from public CDNs.</p>
+      </div>
+      <div class="tools" aria-label="Index tools">
+        <input class="search" id="search" type="search" placeholder="Filter simulations..." aria-label="Filter simulations">
+        <p class="note">Tip: keep this page in the repository root so the relative links resolve correctly.</p>
+      </div>
+    </header>
+
+    <nav aria-label="Sections">
+      <a href="#neurons">Neurons and sensory systems</a>
+      <a href="#networks">Networks and dynamics</a>
+      <a href="#meanfield">Mean-field experiments</a>
+      <a href="#local">Additional local files</a>
+    </nav>
+
+    <main>
+      <section id="neurons" data-section>
+        <div class="section-heading">
+          <h2>Neurons, Sensory Systems, And Receptive Fields</h2>
+          <span class="count" data-count></span>
+        </div>
+        <div class="grid">
+          <article class="demo" data-demo>
+            <h3>Shishi-odoshi Leaky Integrate-And-Fire Neuron</h3>
+            <p>Explore input current, leak, threshold, reset, and refractoriness through a simulated Japanese water clapper.</p>
+            <div class="demo-footer">
+              <span class="path">LIF neuron shishi-odoshi/index.html</span>
+              <span class="actions">
+                <a class="button" href="LIF%20neuron%20shishi-odoshi/index.html">Open</a>
+                <a class="button secondary" href="LIF%20neuron%20shishi-odoshi/README.md">Explanation</a>
+              </span>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Adaptive Exponential Spiking Neuron Phase Space</h3>
+            <p>Explore AdEx trajectories, nullclines, and firing behavior.</p>
+            <div class="demo-footer">
+              <span class="path">Spiking Neuron (AdEx)/adex_phase_space_v5.html</span>
+              <a class="button" href="Spiking%20Neuron%20%28AdEx%29/adex_phase_space_v5.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>LGN ON/OFF Center-Surround Cells</h3>
+            <p>Interact with center-surround receptive fields.</p>
+            <div class="demo-footer">
+              <span class="path">LGN_on_off_cells/lgn_on_off_center_surround.html</span>
+              <a class="button" href="LGN_on_off_cells/lgn_on_off_center_surround.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>DIY Receptive Field</h3>
+            <p>Build and probe a neuron's receptive field.</p>
+            <div class="demo-footer">
+              <span class="path">Receptive Field explainer/receptive_field_explainer.html</span>
+              <a class="button" href="Receptive%20Field%20explainer/receptive_field_explainer.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Reichardt-Hassenstein Motion Detector</h3>
+            <p>See how delay-and-correlate circuits detect visual motion.</p>
+            <div class="demo-footer">
+              <span class="path">motion_detector/reichardt-hassenstein-explainer.html</span>
+              <a class="button" href="motion_detector/reichardt-hassenstein-explainer.html">Open</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="networks" data-section>
+        <div class="section-heading">
+          <h2>Networks And Dynamics</h2>
+          <span class="count" data-count></span>
+        </div>
+        <div class="grid">
+          <article class="demo" data-demo>
+            <h3>E-I Balanced LIF Network</h3>
+            <p>Explore excitation-inhibition balance in a Brunel-style spiking network.</p>
+            <div class="demo-footer">
+              <span class="path">E-I Networks/index.html</span>
+              <a class="button" href="E-I%20Networks/index.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>E-I Balanced Network Standalone</h3>
+            <p>Open the alternate implementation of the balanced-network demo.</p>
+            <div class="demo-footer">
+              <span class="path">E-I Networks/E-I_balanced_network.html</span>
+              <a class="button" href="E-I%20Networks/E-I_balanced_network.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Feedforward Neural Networks</h3>
+            <p>A neuroscientist-oriented guide to feedforward computation.</p>
+            <div class="demo-footer">
+              <span class="path">FFNN explainer/FFNN_explainer.html</span>
+              <a class="button" href="FFNN%20explainer/FFNN_explainer.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Network Propagation</h3>
+            <p>Compare activity propagation through ring and feedforward networks.</p>
+            <div class="demo-footer">
+              <span class="path">Network Propagation Demo/propagation_examples.html</span>
+              <a class="button" href="Network%20Propagation%20Demo/propagation_examples.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Why Delay Kills Stability</h3>
+            <p>Investigate how transmission delays destabilize feedback systems.</p>
+            <div class="demo-footer">
+              <span class="path">Stability and Delays/delay_instability_explainer.html</span>
+              <a class="button" href="Stability%20and%20Delays/delay_instability_explainer.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Vector Field Studio</h3>
+            <p>Create and inspect two-dimensional dynamical systems.</p>
+            <div class="demo-footer">
+              <span class="path">Vector Field Studio/vector-field-studio.html</span>
+              <a class="button" href="Vector%20Field%20Studio/vector-field-studio.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>RNN Eigenspace Explorer</h3>
+            <p>Connect recurrent weights, eigenvalues, and trajectories.</p>
+            <div class="demo-footer">
+              <span class="path">RNN eigen explorer/rnn_eigen_explorer.html</span>
+              <a class="button" href="RNN%20eigen%20explorer/rnn_eigen_explorer.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Small RNN Eigenspace Explorer</h3>
+            <p>Open the compact version of the RNN eigenspace demo.</p>
+            <div class="demo-footer">
+              <span class="path">small RNN eigenspace explorer/index.html</span>
+              <a class="button" href="small%20RNN%20eigenspace%20explorer/index.html">Open</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="meanfield" data-section>
+        <div class="section-heading">
+          <h2>Multilayer And Mean-Field Experiments</h2>
+          <span class="count" data-count></span>
+        </div>
+        <div class="grid">
+          <article class="demo" data-demo>
+            <h3>Multilayer Tanh/Sigmoid Stack</h3>
+            <p>Open the current logging-and-traces version of the multilayer mean-field demo.</p>
+            <div class="demo-footer">
+              <span class="path">Multi Layer Meanfield Network/meanfield_layers_demo/index.html</span>
+              <span class="actions">
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/meanfield_layers_demo/index.html">Open</a>
+                <a class="button secondary" href="Multi%20Layer%20Meanfield%20Network/meanfield_layers_demo/README.md">Explanation</a>
+              </span>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Multilayer Tanh Stack V6</h3>
+            <p>Open the standalone current version of the multilayer tanh stack.</p>
+            <div class="demo-footer">
+              <span class="path">Multi Layer Meanfield Network/multi_layer_tanh_v6.html</span>
+              <a class="button" href="Multi%20Layer%20Meanfield%20Network/multi_layer_tanh_v6.html">Open</a>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Earlier Stack Experiments</h3>
+            <p>Open earlier versions of the multilayer stack experiments.</p>
+            <div class="demo-footer">
+              <span class="path">v1, v2, v3, v4, v5</span>
+              <span>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/multi_layer_v1.html">v1</a>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/multi_layer_v2.html">v2</a>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/multi_layer_tanh_v3.html">v3</a>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/multi_layer_tanh_v4.html">v4</a>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/multi_layer_tanh_v5.html">v5</a>
+              </span>
+            </div>
+          </article>
+
+          <article class="demo" data-demo>
+            <h3>Neural-Grid Experiments</h3>
+            <p>Open the grid-based mean-field experiment variants.</p>
+            <div class="demo-footer">
+              <span class="path">tanh_grid_v1 through tanh_grid_v5</span>
+              <span>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/tanh_grid_v1.html">v1</a>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/tanh_grid_v2.html">v2</a>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/tanh_grid_v3.html">v3</a>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/tanh_grid_v4.html">v4</a>
+                <a class="button" href="Multi%20Layer%20Meanfield%20Network/tanh_grid_v5.html">v5</a>
+              </span>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section id="local" data-section>
+        <div class="section-heading">
+          <h2>Additional Local Files</h2>
+          <span class="count" data-count></span>
+        </div>
+        <div class="grid">
+          <article class="demo" data-demo>
+            <h3>LIF Bird</h3>
+            <p>Open the standalone shishi-odoshi neuron file in the LIF Bird folder.</p>
+            <div class="demo-footer">
+              <span class="path">LIF Bird/shishi-odoshi-neuron.html</span>
+              <a class="button" href="LIF%20Bird/shishi-odoshi-neuron.html">Open</a>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <p class="empty" id="empty">No simulations match this filter.</p>
+    </main>
+
+    <footer>
+      Local index for this repository. Open <strong>README.md</strong> for the public GitHub Pages links.
+    </footer>
+  </div>
+
+  <script>
+    const search = document.querySelector("#search");
+    const demos = Array.from(document.querySelectorAll("[data-demo]"));
+    const sections = Array.from(document.querySelectorAll("[data-section]"));
+    const empty = document.querySelector("#empty");
+
+    function updateCounts() {
+      sections.forEach((section) => {
+        const visible = section.querySelectorAll("[data-demo]:not(.hidden)").length;
+        const total = section.querySelectorAll("[data-demo]").length;
+        const count = section.querySelector("[data-count]");
+        count.textContent = visible === total ? `${total} demos` : `${visible} of ${total} demos`;
+        section.classList.toggle("hidden", visible === 0);
+      });
+
+      empty.style.display = demos.every((demo) => demo.classList.contains("hidden")) ? "block" : "none";
+    }
+
+    search.addEventListener("input", () => {
+      const query = search.value.trim().toLowerCase();
+      demos.forEach((demo) => {
+        const text = demo.textContent.toLowerCase();
+        demo.classList.toggle("hidden", query.length > 0 && !text.includes(query));
+      });
+      updateCounts();
+    });
+
+    updateCounts();
+  </script>
+</body>
+</html>
