@@ -25,6 +25,8 @@ GitHub Pages serves the demos directly from this repository.
   - Explanation: [project README](E-I%20Networks/README.md)
 - [E–I balanced network (standalone version)](https://mrio.github.io/NeuroAI_explainers/E-I%20Networks/E-I_balanced_network.html) — an alternate implementation of the balanced-network demo.
   - Explanation: [project README](E-I%20Networks/README.md)
+- [Two Neuron Recurrent Dynamics](https://mrio.github.io/NeuroAI_explainers/Two%20Neuron%20Recurrent%20Dynamics/two_neuron_dynamics_simulator.html) — analyze small recurrent modules through traces, phase portraits, nullclines, fixed points, and local stability.
+  - Explanation: [project README](Two%20Neuron%20Recurrent%20Dynamics/README.md)
 - [Feedforward neural networks](https://mrio.github.io/NeuroAI_explainers/FFNN%20explainer/FFNN_explainer.html) — a neuroscientist-oriented guide to feedforward computation.
   - Explanation: [project README](FFNN%20explainer/README.md)
 - [Network propagation](https://mrio.github.io/NeuroAI_explainers/Network%20Propagation%20Demo/propagation_examples.html) — compare activity propagation through ring and feedforward networks.

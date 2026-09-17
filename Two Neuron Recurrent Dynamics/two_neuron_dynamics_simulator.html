@@ -1,0 +1,1703 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two Neuron Dynamics Simulator</title>
+  <style>
+    :root {
+      --ink: #151515;
+      --muted: #626262;
+      --paper: #f6f4ee;
+      --panel: #ffffff;
+      --line: #222222;
+      --blue: #1f77b4;
+      --orange: #ff7f0e;
+      --green: #14866d;
+      --violet: #7b4cc2;
+      --red: #c94949;
+      --grid: rgba(20, 20, 20, 0.12);
+      --shadow: 0 10px 24px rgba(32, 28, 18, 0.10);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    main {
+      width: min(1480px, calc(100vw - 28px));
+      margin: 0 auto;
+      padding: 22px 0 34px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.45rem, 2.2vw, 2.35rem);
+      font-weight: 650;
+      letter-spacing: 0;
+    }
+
+    .subtitle {
+      max-width: 760px;
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 0.98rem;
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--ink);
+      min-height: 38px;
+      padding: 7px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08);
+    }
+
+    button:hover,
+    button:focus-visible {
+      background: #f0f0f0;
+      outline: 2px solid rgba(31, 119, 180, 0.22);
+      outline-offset: 2px;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(295px, 350px) minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .controls,
+    .plot-panel,
+    .network-panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: var(--shadow);
+    }
+
+    .controls {
+      padding: 14px;
+      position: sticky;
+      top: 12px;
+    }
+
+    .network-panel {
+      padding: 10px;
+      margin-bottom: 14px;
+    }
+
+    .plots {
+      display: grid;
+      grid-template-columns: minmax(320px, 0.96fr) minmax(360px, 1.04fr);
+      gap: 14px;
+    }
+
+    .plot-panel {
+      min-width: 0;
+      padding: 12px;
+      position: relative;
+    }
+
+    .plot-title {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      font-size: 0.94rem;
+      font-weight: 650;
+    }
+
+    .plot-title span {
+      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    canvas,
+    svg {
+      display: block;
+      width: 100%;
+    }
+
+    #timeCanvas {
+      aspect-ratio: 1 / 1;
+    }
+
+    #phaseCanvas {
+      aspect-ratio: 1 / 1;
+      cursor: crosshair;
+    }
+
+    #networkSvg {
+      height: 290px;
+      touch-action: manipulation;
+    }
+
+    .control-group {
+      border-top: 1px solid rgba(0, 0, 0, 0.16);
+      padding-top: 12px;
+      margin-top: 12px;
+    }
+
+    .control-group:first-child {
+      border-top: 0;
+      padding-top: 0;
+      margin-top: 0;
+    }
+
+    .group-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+
+    .toggle-row,
+    .inline-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .segmented {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      overflow: hidden;
+      width: 100%;
+    }
+
+    .segmented button {
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+      min-height: 34px;
+      background: #f8f8f8;
+    }
+
+    .segmented button.active {
+      background: var(--ink);
+      color: white;
+    }
+
+    .switches {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    label.check {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-height: 34px;
+      font-size: 0.9rem;
+    }
+
+    .slider-row {
+      display: grid;
+      grid-template-columns: 52px 1fr 54px;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0;
+      font-size: 0.9rem;
+    }
+
+    .slider-row.wide {
+      grid-template-columns: 86px 1fr 54px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      margin: 0;
+      accent-color: var(--red);
+    }
+
+    .zero-slider {
+      --pct: 50%;
+      appearance: none;
+      height: 24px;
+      background:
+        linear-gradient(to right, transparent calc(50% - 1px), var(--line) calc(50% - 1px), var(--line) calc(50% + 1px), transparent calc(50% + 1px)),
+        linear-gradient(to right, rgba(31, 119, 180, 0.30) 0%, rgba(31, 119, 180, 0.16) 50%, rgba(201, 73, 73, 0.16) 50%, rgba(201, 73, 73, 0.32) 100%);
+      border-radius: 12px;
+    }
+
+    .zero-slider::-webkit-slider-runnable-track {
+      height: 6px;
+      background: rgba(0, 0, 0, 0.18);
+      border-radius: 999px;
+    }
+
+    .zero-slider::-moz-range-track {
+      height: 6px;
+      background: rgba(0, 0, 0, 0.18);
+      border-radius: 999px;
+    }
+
+    .zero-slider::-webkit-slider-thumb {
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      margin-top: -6px;
+      border-radius: 50%;
+      border: 2px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    .zero-slider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid var(--line);
+      background: var(--panel);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    .xy-control {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .xy-control label {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.88rem;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      min-height: 34px;
+      border: 1px solid rgba(0, 0, 0, 0.38);
+      border-radius: 5px;
+      padding: 5px 7px;
+      background: #fff;
+    }
+
+    .edge-editor {
+      margin-top: 10px;
+      padding: 10px;
+      border: 1px solid rgba(0, 0, 0, 0.22);
+      border-radius: 6px;
+      background: #fbfbfb;
+    }
+
+    .saved-table-wrap {
+      max-height: 210px;
+      overflow: auto;
+      border: 1px solid rgba(0, 0, 0, 0.18);
+      border-radius: 6px;
+      background: #fbfbfb;
+    }
+
+    .saved-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .saved-table th,
+    .saved-table td {
+      padding: 5px 6px;
+      border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    .saved-table th:first-child,
+    .saved-table td:first-child {
+      text-align: left;
+    }
+
+    .saved-table thead {
+      position: sticky;
+      top: 0;
+      background: #f2f2f2;
+      z-index: 1;
+    }
+
+    .edge-editor strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .small-note {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .metric {
+      border: 1px solid rgba(0, 0, 0, 0.18);
+      border-radius: 6px;
+      padding: 7px 8px;
+      min-height: 54px;
+      background: #fbfbfb;
+    }
+
+    .metric b {
+      display: block;
+      font-size: 0.76rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+
+    .metric span {
+      display: block;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+      font-size: 0.96rem;
+    }
+
+    .tooltip {
+      position: fixed;
+      z-index: 20;
+      pointer-events: none;
+      width: max-content;
+      max-width: min(310px, calc(100vw - 28px));
+      background: rgba(21, 21, 21, 0.94);
+      color: white;
+      border-radius: 6px;
+      padding: 9px 10px;
+      font-size: 0.84rem;
+      line-height: 1.35;
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+      opacity: 0;
+      transform: translate(-50%, -115%);
+      transition: opacity 120ms ease;
+    }
+
+    .tooltip.visible {
+      opacity: 1;
+    }
+
+    dialog {
+      width: min(620px, calc(100vw - 28px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 0;
+      box-shadow: 0 18px 70px rgba(0, 0, 0, 0.32);
+    }
+
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.28);
+    }
+
+    .about-body {
+      padding: 18px;
+    }
+
+    .about-body h2 {
+      margin: 0 0 8px;
+      font-size: 1.25rem;
+    }
+
+    .about-body p {
+      margin: 0 0 10px;
+    }
+
+    .about-body footer {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 14px;
+    }
+
+    .edge,
+    .input-edge {
+      cursor: pointer;
+    }
+
+    .edge.hit,
+    .input-edge.hit {
+      fill: none;
+      pointer-events: stroke;
+      stroke: rgba(0, 0, 0, 0.001);
+      stroke-linecap: round;
+      stroke-width: 24;
+    }
+
+    .edge.visible,
+    .input-edge.visible {
+      fill: none;
+      stroke-linecap: round;
+      opacity: 0.86;
+    }
+
+    .edge.selected,
+    .input-edge.selected {
+      filter: drop-shadow(0 0 5px rgba(20, 20, 20, 0.5));
+    }
+
+    .node {
+      cursor: pointer;
+    }
+
+    .node circle {
+      fill: white;
+      stroke: var(--line);
+      stroke-width: 2.2;
+    }
+
+    .node text {
+      pointer-events: none;
+      text-anchor: middle;
+      dominant-baseline: middle;
+      fill: var(--ink);
+      font-weight: 700;
+    }
+
+    .node .tf {
+      font-size: 11px;
+      fill: var(--muted);
+    }
+
+    .legend {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.82rem;
+      margin-top: 8px;
+    }
+
+    .swatch {
+      width: 18px;
+      height: 3px;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 5px;
+      border-radius: 999px;
+    }
+
+    @media (max-width: 980px) {
+      header,
+      .app,
+      .plots {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        position: static;
+      }
+    }
+
+    @media (max-width: 560px) {
+      main {
+        width: min(100vw - 16px, 1480px);
+        padding-top: 12px;
+      }
+
+      .status,
+      .switches,
+      .xy-control {
+        grid-template-columns: 1fr;
+      }
+
+      .slider-row,
+      .slider-row.wide {
+        grid-template-columns: 60px 1fr 52px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Two Neuron Recurrent Dynamics</h1>
+        <p class="subtitle">Tune a small recurrent neural network and watch the time trace, phase portrait, fixed points, and nullclines move together.</p>
+      </div>
+      <button id="aboutBtn" type="button">About</button>
+    </header>
+
+    <div class="app">
+      <aside class="controls" aria-label="Simulator controls">
+        <section class="control-group">
+          <div class="group-title">Dynamics</div>
+          <div class="segmented" role="group" aria-label="Dynamics mode">
+            <button id="continuousBtn" class="active" type="button">Continuous</button>
+            <button id="discreteBtn" type="button">Discrete</button>
+          </div>
+          <div class="switches">
+            <label class="check"><input id="showNullclines" type="checkbox" checked> Nullclines</label>
+            <label class="check"><input id="showFixed" type="checkbox" checked> Fixed points</label>
+          </div>
+        </section>
+
+        <section class="control-group">
+          <div class="group-title">Weights</div>
+          <div id="weightSliders"></div>
+          <div class="slider-row wide">
+            <label for="multiplier">Multiplier</label>
+            <input id="multiplier" class="zero-slider" type="range" min="-10" max="10" step="0.5" value="0.5">
+            <output id="multiplierOut">0.5</output>
+          </div>
+          <p class="small-note">Zero is marked at the center. Click an edge in the network to focus its weight.</p>
+          <div id="edgeEditor" class="edge-editor" aria-live="polite"></div>
+        </section>
+
+        <section class="control-group">
+          <div class="group-title">Input</div>
+          <div class="xy-control">
+            <label>&theta;1 <input id="theta1" type="number" min="-8" max="8" step="0.1" value="0"></label>
+            <label>&theta;2 <input id="theta2" type="number" min="-8" max="8" step="0.1" value="0"></label>
+          </div>
+          <p class="small-note">Click a constant-input arrow in the network to tune it.</p>
+          <div id="inputEditor" class="edge-editor" aria-live="polite"></div>
+        </section>
+
+        <section class="control-group">
+          <div class="group-title">Initial State</div>
+          <div class="xy-control">
+            <label>o1 <input id="init1" type="number" min="-2" max="2" step="0.1" value="0"></label>
+            <label>o2 <input id="init2" type="number" min="-2" max="2" step="0.1" value="0"></label>
+          </div>
+        </section>
+
+        <section class="control-group">
+          <div class="group-title">View</div>
+          <div class="slider-row wide">
+            <label for="iterations">Iterations</label>
+            <input id="iterations" type="range" min="1" max="300" step="1" value="80">
+            <output id="iterationsOut">80</output>
+          </div>
+          <div class="slider-row wide">
+            <label for="zoom">Zoom</label>
+            <input id="zoom" type="range" min="0.1" max="20" step="0.1" value="2">
+            <output id="zoomOut">2.0</output>
+          </div>
+        </section>
+
+        <section class="control-group">
+          <div class="group-title">Readout</div>
+          <div class="status">
+            <div class="metric"><b>Fixed points</b><span id="fixedCount">0</span></div>
+            <div class="metric"><b>Mode</b><span id="modeReadout">Continuous</span></div>
+            <div class="metric"><b>Transfer</b><span id="tfReadout">tanh / tanh</span></div>
+          </div>
+        </section>
+
+        <section class="control-group">
+          <div class="group-title">Saved Sets <button id="saveParams" type="button">Save</button></div>
+          <div class="saved-table-wrap">
+            <table class="saved-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>w11</th><th>w12</th><th>w21</th><th>w22</th><th>&theta;1</th><th>&theta;2</th><th>o1</th><th>o2</th><th>m</th><th>dyn</th><th>TF</th>
+                </tr>
+              </thead>
+              <tbody id="savedBody">
+                <tr><td colspan="12">No saved parameter sets yet.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </aside>
+
+      <section>
+        <figure class="network-panel">
+          <svg id="networkSvg" viewBox="0 0 760 290" role="img" aria-label="Two neuron recurrent network diagram"></svg>
+          <figcaption class="legend">
+            <span><i class="swatch" style="background:#c94949"></i>positive weight/input</span>
+            <span><i class="swatch" style="background:#1f77b4"></i>negative weight/input</span>
+            <span><i class="swatch" style="background:#14866d"></i>fixed point</span>
+            <span>Click in the phase portrait to set the initial condition.</span>
+          </figcaption>
+        </figure>
+
+        <div class="plots">
+          <figure class="plot-panel">
+            <div class="plot-title">Time series <span>o1 and o2 over update steps</span></div>
+            <canvas id="timeCanvas" width="720" height="720" aria-label="Time series plot"></canvas>
+          </figure>
+          <figure class="plot-panel">
+            <div class="plot-title">Phase portrait <span>trajectory, nullclines, fixed points</span></div>
+            <canvas id="phaseCanvas" width="760" height="760" aria-label="Phase portrait"></canvas>
+          </figure>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <div id="tooltip" class="tooltip"></div>
+
+  <dialog id="aboutDialog">
+    <div class="about-body">
+      <h2>About this simulator</h2>
+      <p>This is a browser port of a small two-neuron recurrent network demo. Each neuron receives recurrent input from both neurons, passes it through either a hyperbolic tangent or logistic sigmoid, and updates either as an Euler step of a continuous system or as a discrete map. The input sign follows the original notebook convention: continuous mode uses W o - theta, while discrete mode uses W o + theta.</p>
+      <p>The phase view shows the trajectory from the selected initial condition; click inside it to move that initial condition. Optional nullclines mark where one coordinate stops changing; their intersections are fixed points. Hover near a fixed point to see the local eigenvalues and stability classification.</p>
+      <p>Small recurrent neural networks of this kind were studied extensively by Frank Pasemann and collaborators as minimal models for autonomous neural dynamics and behavior-generating circuits.</p>
+      <footer><button id="closeAbout" type="button">Close</button></footer>
+    </div>
+  </dialog>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const state = {
+        mode: "continuous",
+        weights: { w11: 0, w12: 2.2, w21: -7, w22: -2.7 },
+        multiplier: 0.5,
+        theta: [0, 0],
+        init: [0, 0],
+        iterations: 80,
+        zoom: 2,
+        tf: ["tanh", "tanh"],
+        selectedEdge: "w12",
+        selectedInput: 0,
+        showNullclines: true,
+        showFixed: true,
+        fixedPoints: [],
+        savedSets: []
+      };
+
+      let weightControlsBuilt = false;
+
+      const edgeDefs = [
+        { id: "w11", label: "w11", from: 0, to: 0 },
+        { id: "w12", label: "w12", from: 1, to: 0 },
+        { id: "w21", label: "w21", from: 0, to: 1 },
+        { id: "w22", label: "w22", from: 1, to: 1 }
+      ];
+
+      const dom = {
+        time: document.getElementById("timeCanvas"),
+        phase: document.getElementById("phaseCanvas"),
+        network: document.getElementById("networkSvg"),
+        weightSliders: document.getElementById("weightSliders"),
+        edgeEditor: document.getElementById("edgeEditor"),
+        inputEditor: document.getElementById("inputEditor"),
+        multiplier: document.getElementById("multiplier"),
+        multiplierOut: document.getElementById("multiplierOut"),
+        theta1: document.getElementById("theta1"),
+        theta2: document.getElementById("theta2"),
+        init1: document.getElementById("init1"),
+        init2: document.getElementById("init2"),
+        iterations: document.getElementById("iterations"),
+        iterationsOut: document.getElementById("iterationsOut"),
+        zoom: document.getElementById("zoom"),
+        zoomOut: document.getElementById("zoomOut"),
+        continuousBtn: document.getElementById("continuousBtn"),
+        discreteBtn: document.getElementById("discreteBtn"),
+        showNullclines: document.getElementById("showNullclines"),
+        showFixed: document.getElementById("showFixed"),
+        fixedCount: document.getElementById("fixedCount"),
+        modeReadout: document.getElementById("modeReadout"),
+        tfReadout: document.getElementById("tfReadout"),
+        tooltip: document.getElementById("tooltip"),
+        aboutBtn: document.getElementById("aboutBtn"),
+        aboutDialog: document.getElementById("aboutDialog"),
+        closeAbout: document.getElementById("closeAbout"),
+        saveParams: document.getElementById("saveParams"),
+        savedBody: document.getElementById("savedBody")
+      };
+
+      const colors = {
+        blue: "#1f77b4",
+        orange: "#ff7f0e",
+        green: "#14866d",
+        violet: "#7b4cc2",
+        red: "#c94949",
+        neuron1: "#7b4cc2",
+        neuron2: "#ff7f0e",
+        ink: "#151515",
+        grid: "rgba(20,20,20,0.12)"
+      };
+
+      const nodePos = [
+        { x: 245, y: 145, label: "o1" },
+        { x: 515, y: 145, label: "o2" }
+      ];
+
+      function signColor(value) {
+        if (Math.abs(value) < 0.0005) return "#8a8a8a";
+        return value > 0 ? colors.red : colors.blue;
+      }
+
+      function signId(value) {
+        if (Math.abs(value) < 0.0005) return "zero";
+        return value > 0 ? "pos" : "neg";
+      }
+
+      function matrix() {
+        const m = state.multiplier;
+        return [
+          [m * state.weights.w11, m * state.weights.w12],
+          [m * state.weights.w21, m * state.weights.w22]
+        ];
+      }
+
+      function activation(x, kind) {
+        if (kind === "sigmoid") return 1 / (1 + Math.exp(-x));
+        return Math.tanh(x);
+      }
+
+      function activationDerivativeFromOutput(y, kind) {
+        if (kind === "sigmoid") return y * (1 - y);
+        return Math.max(0, 1 - y * y);
+      }
+
+      function evaluateMap(o) {
+        const W = matrix();
+        const thetaSign = state.mode === "continuous" ? -1 : 1;
+        const u1 = W[0][0] * o[0] + W[0][1] * o[1] + thetaSign * state.theta[0];
+        const u2 = W[1][0] * o[0] + W[1][1] * o[1] + thetaSign * state.theta[1];
+        return [activation(u1, state.tf[0]), activation(u2, state.tf[1])];
+      }
+
+      function vectorField(o) {
+        const next = evaluateMap(o);
+        return [next[0] - o[0], next[1] - o[1]];
+      }
+
+      function step(o) {
+        if (state.mode === "discrete") return evaluateMap(o);
+        const v = vectorField(o);
+        return [o[0] + 0.1 * v[0], o[1] + 0.1 * v[1]];
+      }
+
+      function simulate() {
+        const points = [[state.init[0], state.init[1]]];
+        let current = points[0];
+        for (let i = 0; i < state.iterations; i += 1) {
+          current = step(current);
+          points.push(current);
+        }
+        return points;
+      }
+
+      function residual(o) {
+        const f = evaluateMap(o);
+        return [f[0] - o[0], f[1] - o[1]];
+      }
+
+      function refineFixedPoint(seed) {
+        let x = [seed[0], seed[1]];
+        for (let k = 0; k < 35; k += 1) {
+          const r = residual(x);
+          const err = Math.hypot(r[0], r[1]);
+          if (err < 1e-8) break;
+
+          const eps = 1e-4;
+          const rx = residual([x[0] + eps, x[1]]);
+          const ry = residual([x[0], x[1] + eps]);
+          const a = (rx[0] - r[0]) / eps;
+          const c = (rx[1] - r[1]) / eps;
+          const b = (ry[0] - r[0]) / eps;
+          const d = (ry[1] - r[1]) / eps;
+          const det = a * d - b * c;
+          if (Math.abs(det) < 1e-9) break;
+
+          const dx = (d * r[0] - b * r[1]) / det;
+          const dy = (-c * r[0] + a * r[1]) / det;
+          x = [x[0] - dx, x[1] - dy];
+          if (!Number.isFinite(x[0]) || !Number.isFinite(x[1])) return null;
+          if (Math.abs(x[0]) > 50 || Math.abs(x[1]) > 50) return null;
+        }
+        const finalResidual = residual(x);
+        if (Math.hypot(finalResidual[0], finalResidual[1]) > 1e-5) return null;
+        return x;
+      }
+
+      function jacobianAt(o) {
+        const W = matrix();
+        const f = evaluateMap(o);
+        const d1 = activationDerivativeFromOutput(f[0], state.tf[0]);
+        const d2 = activationDerivativeFromOutput(f[1], state.tf[1]);
+        const jMap = [
+          [d1 * W[0][0], d1 * W[0][1]],
+          [d2 * W[1][0], d2 * W[1][1]]
+        ];
+        if (state.mode === "discrete") return jMap;
+        return [
+          [-1 + jMap[0][0], jMap[0][1]],
+          [jMap[1][0], -1 + jMap[1][1]]
+        ];
+      }
+
+      function eigen2(j) {
+        const tr = j[0][0] + j[1][1];
+        const det = j[0][0] * j[1][1] - j[0][1] * j[1][0];
+        const disc = tr * tr - 4 * det;
+        if (disc >= 0) {
+          const s = Math.sqrt(disc);
+          return [
+            { re: (tr + s) / 2, im: 0 },
+            { re: (tr - s) / 2, im: 0 }
+          ];
+        }
+        return [
+          { re: tr / 2, im: Math.sqrt(-disc) / 2 },
+          { re: tr / 2, im: -Math.sqrt(-disc) / 2 }
+        ];
+      }
+
+      function classify(eigs) {
+        if (state.mode === "discrete") {
+          const maxAbs = Math.max(...eigs.map(e => Math.hypot(e.re, e.im)));
+          return maxAbs < 1 ? "locally stable map" : "unstable map";
+        }
+        const maxRe = Math.max(...eigs.map(e => e.re));
+        const minRe = Math.min(...eigs.map(e => e.re));
+        if (maxRe < 0) return "locally stable flow";
+        if (minRe > 0) return "unstable source";
+        return "saddle or mixed stability";
+      }
+
+      function findFixedPoints() {
+        const span = Math.max(2.25, state.zoom);
+        const seeds = [];
+        for (let i = -6; i <= 6; i += 1) {
+          for (let j = -6; j <= 6; j += 1) {
+            seeds.push([i * span / 6, j * span / 6]);
+          }
+        }
+        const found = [];
+        seeds.forEach(seed => {
+          const p = refineFixedPoint(seed);
+          if (!p) return;
+          const duplicate = found.some(q => Math.hypot(q.x - p[0], q.y - p[1]) < 0.035);
+          if (!duplicate && Math.abs(p[0]) <= state.zoom * 1.25 + 1 && Math.abs(p[1]) <= state.zoom * 1.25 + 1) {
+            const eigs = eigen2(jacobianAt(p));
+            found.push({ x: p[0], y: p[1], eigs, kind: classify(eigs) });
+          }
+        });
+        state.fixedPoints = found.sort((a, b) => a.x - b.x || a.y - b.y);
+      }
+
+      function fmt(n, digits = 2) {
+        if (!Number.isFinite(n)) return "nan";
+        const v = Math.abs(n) < 0.0005 ? 0 : n;
+        return v.toFixed(digits);
+      }
+
+      function fmtEig(e) {
+        if (Math.abs(e.im) < 1e-6) return fmt(e.re, 3);
+        const sign = e.im >= 0 ? "+" : "-";
+        return `${fmt(e.re, 3)} ${sign} ${fmt(Math.abs(e.im), 3)}i`;
+      }
+
+      function resizeCanvas(canvas) {
+        const dpr = window.devicePixelRatio || 1;
+        const rect = canvas.getBoundingClientRect();
+        const width = Math.max(320, Math.round(rect.width * dpr));
+        const height = Math.max(320, Math.round(rect.height * dpr));
+        if (canvas.width !== width || canvas.height !== height) {
+          canvas.width = width;
+          canvas.height = height;
+        }
+        const ctx = canvas.getContext("2d");
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        return { ctx, w: rect.width, h: rect.height };
+      }
+
+      function phaseProject(w, h) {
+        const pad = 48;
+        const z = state.zoom;
+        return {
+          x: v => pad + ((v + z) / (2 * z)) * (w - 2 * pad),
+          y: v => h - pad - ((v + z) / (2 * z)) * (h - 2 * pad),
+          invX: px => ((px - pad) / (w - 2 * pad)) * (2 * z) - z,
+          invY: py => ((h - pad - py) / (h - 2 * pad)) * (2 * z) - z,
+          pad,
+          z
+        };
+      }
+
+      function drawAxes(ctx, w, h, project, labels) {
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = colors.ink;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(project.pad, project.pad, w - 2 * project.pad, h - 2 * project.pad);
+
+        ctx.strokeStyle = colors.grid;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = -4; i <= 4; i += 1) {
+          const xv = i * project.z / 4;
+          const yv = i * project.z / 4;
+          const x = project.x(xv);
+          const y = project.y(yv);
+          ctx.moveTo(x, project.pad);
+          ctx.lineTo(x, h - project.pad);
+          ctx.moveTo(project.pad, y);
+          ctx.lineTo(w - project.pad, y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(0,0,0,0.42)";
+        ctx.beginPath();
+        ctx.moveTo(project.x(0), project.pad);
+        ctx.lineTo(project.x(0), h - project.pad);
+        ctx.moveTo(project.pad, project.y(0));
+        ctx.lineTo(w - project.pad, project.y(0));
+        ctx.stroke();
+
+        ctx.fillStyle = colors.ink;
+        ctx.font = "13px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+        ctx.fillText(labels.x, w - project.pad + 10, project.y(0) + 4);
+        ctx.fillText(labels.y, project.x(0) + 7, project.pad - 12);
+      }
+
+      function rainbow(t) {
+        const hue = 250 - 250 * Math.max(0, Math.min(1, t));
+        return `hsl(${hue}, 82%, 46%)`;
+      }
+
+      function drawTime(points) {
+        const { ctx, w, h } = resizeCanvas(dom.time);
+        const pad = 48;
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = colors.ink;
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(pad, pad, w - 2 * pad, h - 2 * pad);
+
+        const minY = -1;
+        const maxY = 1;
+        const xScale = i => pad + (i / Math.max(1, points.length - 1)) * (w - 2 * pad);
+        const yScale = y => h - pad - ((y - minY) / (maxY - minY)) * (h - 2 * pad);
+
+        ctx.strokeStyle = colors.grid;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let i = 0; i <= 4; i += 1) {
+          const y = yScale(-1 + i * 0.5);
+          ctx.moveTo(pad, y);
+          ctx.lineTo(w - pad, y);
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(0,0,0,0.45)";
+        ctx.beginPath();
+        ctx.moveTo(pad, yScale(0));
+        ctx.lineTo(w - pad, yScale(0));
+        ctx.stroke();
+
+        drawSeries(ctx, points.map(p => p[0]), xScale, yScale, colors.neuron1);
+        drawSeries(ctx, points.map(p => p[1]), xScale, yScale, colors.neuron2);
+
+        ctx.fillStyle = "rgba(123,76,194,0.13)";
+        fillToAxis(ctx, points.map(p => p[0]), xScale, yScale, yScale(0));
+        ctx.fillStyle = "rgba(255,127,14,0.13)";
+        fillToAxis(ctx, points.map(p => p[1]), xScale, yScale, yScale(0));
+
+        ctx.fillStyle = colors.ink;
+        ctx.font = "13px -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif";
+        ctx.fillText("step", w - pad + 8, h - pad + 4);
+        ctx.fillText("o", pad - 22, pad - 12);
+        legendLine(ctx, pad + 8, pad + 16, colors.neuron1, "o1");
+        legendLine(ctx, pad + 64, pad + 16, colors.neuron2, "o2");
+      }
+
+      function drawSeries(ctx, values, xScale, yScale, color) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        values.forEach((v, i) => {
+          const x = xScale(i);
+          const y = yScale(v);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+      }
+
+      function fillToAxis(ctx, values, xScale, yScale, axisY) {
+        ctx.beginPath();
+        values.forEach((v, i) => {
+          const x = xScale(i);
+          const y = yScale(v);
+          if (i === 0) ctx.moveTo(x, axisY);
+          ctx.lineTo(x, y);
+        });
+        ctx.lineTo(xScale(values.length - 1), axisY);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      function legendLine(ctx, x, y, color, text) {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 4);
+        ctx.lineTo(x + 22, y - 4);
+        ctx.stroke();
+        ctx.fillStyle = colors.ink;
+        ctx.fillText(text, x + 28, y);
+      }
+
+      function drawNullcline(ctx, project, coord, color) {
+        const w = ctx.canvas.width / (window.devicePixelRatio || 1);
+        const h = ctx.canvas.height / (window.devicePixelRatio || 1);
+        const steps = 100;
+        const samples = [];
+        for (let i = 0; i <= steps; i += 1) {
+          const x = -project.z + (2 * project.z * i) / steps;
+          let low = -project.z;
+          let high = project.z;
+          let prevY = low;
+          let prevVal = residual([x, low])[coord];
+          for (let j = 1; j <= steps; j += 1) {
+            const y = low + (high - low) * j / steps;
+            const val = residual([x, y])[coord];
+            if (prevVal === 0 || val === 0 || prevVal * val < 0) {
+              let a = prevY;
+              let b = y;
+              let aVal = prevVal;
+              for (let k = 0; k < 18; k += 1) {
+                const mid = (a + b) / 2;
+                const mv = residual([x, mid])[coord];
+                if (aVal * mv <= 0) {
+                  b = mid;
+                } else {
+                  a = mid;
+                  aVal = mv;
+                }
+              }
+              samples.push([x, (a + b) / 2]);
+            }
+            prevY = y;
+            prevVal = val;
+          }
+        }
+
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.setLineDash(coord === 0 ? [8, 5] : [2, 6]);
+        let last = null;
+        samples.forEach(p => {
+          const sx = project.x(p[0]);
+          const sy = project.y(p[1]);
+          if (sx < project.pad || sx > w - project.pad || sy < project.pad || sy > h - project.pad) return;
+          if (!last || Math.hypot(sx - last[0], sy - last[1]) > 30) {
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+          } else {
+            ctx.lineTo(sx, sy);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+          }
+          last = [sx, sy];
+        });
+        ctx.restore();
+      }
+
+      function drawVectorField(ctx, project) {
+        const density = 13;
+        ctx.save();
+        ctx.strokeStyle = "rgba(20,20,20,0.30)";
+        ctx.fillStyle = "rgba(20,20,20,0.30)";
+        ctx.lineWidth = 1;
+        for (let ix = 0; ix < density; ix += 1) {
+          for (let iy = 0; iy < density; iy += 1) {
+            const x = -project.z + (2 * project.z * (ix + 0.5)) / density;
+            const y = -project.z + (2 * project.z * (iy + 0.5)) / density;
+            const v = vectorField([x, y]);
+            const mag = Math.hypot(v[0], v[1]) || 1;
+            const len = Math.min(13, 5 + mag * 7);
+            const sx = project.x(x);
+            const sy = project.y(y);
+            const ex = sx + (v[0] / mag) * len;
+            const ey = sy - (v[1] / mag) * len;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(ex, ey);
+            ctx.stroke();
+            const angle = Math.atan2(ey - sy, ex - sx);
+            ctx.beginPath();
+            ctx.moveTo(ex, ey);
+            ctx.lineTo(ex - 4 * Math.cos(angle - 0.55), ey - 4 * Math.sin(angle - 0.55));
+            ctx.lineTo(ex - 4 * Math.cos(angle + 0.55), ey - 4 * Math.sin(angle + 0.55));
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+      }
+
+      function drawPhase(points) {
+        const { ctx, w, h } = resizeCanvas(dom.phase);
+        const project = phaseProject(w, h);
+        drawAxes(ctx, w, h, project, { x: "o1", y: "o2" });
+        drawVectorField(ctx, project);
+        if (state.showNullclines) {
+          drawNullcline(ctx, project, 0, colors.neuron1);
+          drawNullcline(ctx, project, 1, colors.neuron2);
+          legendLine(ctx, project.pad + 8, project.pad + 16, colors.neuron1, "o1 nullcline");
+          legendLine(ctx, project.pad + 132, project.pad + 16, colors.neuron2, "o2 nullcline");
+        }
+
+        ctx.lineWidth = 2.3;
+        for (let i = 1; i < points.length; i += 1) {
+          ctx.strokeStyle = rainbow(i / Math.max(1, points.length - 1));
+          ctx.beginPath();
+          ctx.moveTo(project.x(points[i - 1][0]), project.y(points[i - 1][1]));
+          ctx.lineTo(project.x(points[i][0]), project.y(points[i][1]));
+          ctx.stroke();
+        }
+
+        points.forEach((p, i) => {
+          if (i % Math.max(1, Math.floor(points.length / 28)) !== 0 && i !== points.length - 1) return;
+          ctx.fillStyle = rainbow(i / Math.max(1, points.length - 1));
+          ctx.beginPath();
+          ctx.arc(project.x(p[0]), project.y(p[1]), i === points.length - 1 ? 4.5 : 3, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+        if (state.showFixed) {
+          state.fixedPoints.forEach(fp => {
+            const x = project.x(fp.x);
+            const y = project.y(fp.y);
+            ctx.fillStyle = "#fff";
+            ctx.strokeStyle = colors.green;
+            ctx.lineWidth = 2.8;
+            ctx.beginPath();
+            ctx.arc(x, y, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x - 4, y);
+            ctx.lineTo(x + 4, y);
+            ctx.moveTo(x, y - 4);
+            ctx.lineTo(x, y + 4);
+            ctx.stroke();
+          });
+        }
+
+        ctx.fillStyle = "#fff";
+        ctx.strokeStyle = colors.ink;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(project.x(state.init[0]), project.y(state.init[1]), 6, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      function renderNetwork() {
+        const ns = "http://www.w3.org/2000/svg";
+        dom.network.innerHTML = "";
+
+        const defs = document.createElementNS(ns, "defs");
+        ["pos", "neg", "zero"].forEach(id => {
+          const marker = document.createElementNS(ns, "marker");
+          marker.setAttribute("id", `arrow-${id}`);
+          marker.setAttribute("viewBox", "0 0 10 10");
+          marker.setAttribute("refX", "8");
+          marker.setAttribute("refY", "5");
+          marker.setAttribute("markerWidth", "6");
+          marker.setAttribute("markerHeight", "6");
+          marker.setAttribute("orient", "auto-start-reverse");
+          const path = document.createElementNS(ns, "path");
+          path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+          path.setAttribute("fill", id === "pos" ? colors.red : id === "neg" ? colors.blue : "#8a8a8a");
+          marker.appendChild(path);
+          defs.appendChild(marker);
+        });
+        dom.network.appendChild(defs);
+
+        const bgText = document.createElementNS(ns, "text");
+        bgText.setAttribute("x", "20");
+        bgText.setAttribute("y", "28");
+        bgText.setAttribute("fill", "#626262");
+        bgText.setAttribute("font-size", "15");
+        bgText.textContent = "Click an edge or input arrow to tune it; click a node to switch its transfer function.";
+        dom.network.appendChild(bgText);
+
+        edgeDefs.forEach(edge => {
+          const group = document.createElementNS(ns, "g");
+          group.setAttribute("class", "edge");
+          group.dataset.edge = edge.id;
+          const pathData = edgePath(edge);
+          const value = state.multiplier * state.weights[edge.id];
+          const color = signColor(value);
+          const width = 1.5 + Math.min(15, Math.abs(value) * 0.65);
+
+          const visible = document.createElementNS(ns, "path");
+          visible.setAttribute("class", `edge visible${state.selectedEdge === edge.id ? " selected" : ""}`);
+          visible.setAttribute("d", pathData);
+          visible.setAttribute("fill", "none");
+          visible.setAttribute("stroke", color);
+          visible.setAttribute("stroke-width", width.toFixed(2));
+          visible.setAttribute("stroke-linecap", "round");
+          visible.setAttribute("pointer-events", "none");
+          visible.setAttribute("marker-end", `url(#arrow-${signId(value)})`);
+
+          const hit = document.createElementNS(ns, "path");
+          hit.setAttribute("class", "edge hit");
+          hit.setAttribute("d", pathData);
+          hit.setAttribute("fill", "none");
+          hit.setAttribute("stroke", "rgba(0,0,0,0.001)");
+          hit.setAttribute("stroke-width", "28");
+          hit.setAttribute("stroke-linecap", "round");
+          hit.setAttribute("pointer-events", "stroke");
+
+          const label = document.createElementNS(ns, "text");
+          const labelPos = edgeLabelPos(edge);
+          label.setAttribute("x", labelPos.x);
+          label.setAttribute("y", labelPos.y);
+          label.setAttribute("text-anchor", "middle");
+          label.setAttribute("font-size", "14");
+          label.setAttribute("font-weight", "700");
+          label.setAttribute("fill", state.selectedEdge === edge.id ? colors.ink : "#626262");
+          label.setAttribute("pointer-events", "none");
+          label.textContent = `${edge.label}=${fmt(state.weights[edge.id], 1)}`;
+
+          group.appendChild(visible);
+          group.appendChild(hit);
+          group.appendChild(label);
+          group.addEventListener("click", () => {
+            state.selectedEdge = edge.id;
+            renderAll();
+          });
+          dom.network.appendChild(group);
+        });
+
+        [0, 1].forEach(idx => renderInputArrow(ns, idx));
+
+        nodePos.forEach((node, idx) => {
+          const group = document.createElementNS(ns, "g");
+          group.setAttribute("class", "node");
+          group.setAttribute("transform", `translate(${node.x} ${node.y})`);
+          group.addEventListener("click", () => {
+            state.tf[idx] = state.tf[idx] === "tanh" ? "sigmoid" : "tanh";
+            renderAll();
+          });
+          const circle = document.createElementNS(ns, "circle");
+          circle.setAttribute("r", "38");
+          const label = document.createElementNS(ns, "text");
+          label.textContent = node.label;
+          label.setAttribute("font-size", "21");
+          const tf = document.createElementNS(ns, "text");
+          tf.setAttribute("class", "tf");
+          tf.setAttribute("y", "24");
+          tf.textContent = state.tf[idx];
+          group.appendChild(circle);
+          group.appendChild(label);
+          group.appendChild(tf);
+          dom.network.appendChild(group);
+        });
+      }
+
+      function renderInputArrow(ns, idx) {
+        const group = document.createElementNS(ns, "g");
+        group.setAttribute("class", "input-edge");
+        const value = state.theta[idx];
+        const color = signColor(value);
+        const width = 1.8 + Math.min(12, Math.abs(value) * 1.05);
+        const d = inputPath(idx);
+
+        const visible = document.createElementNS(ns, "path");
+        visible.setAttribute("class", `input-edge visible${state.selectedInput === idx ? " selected" : ""}`);
+        visible.setAttribute("d", d);
+        visible.setAttribute("fill", "none");
+        visible.setAttribute("stroke", color);
+        visible.setAttribute("stroke-width", width.toFixed(2));
+        visible.setAttribute("stroke-linecap", "round");
+        visible.setAttribute("pointer-events", "none");
+        visible.setAttribute("marker-end", `url(#arrow-${signId(value)})`);
+
+        const hit = document.createElementNS(ns, "path");
+        hit.setAttribute("class", "input-edge hit");
+        hit.setAttribute("d", d);
+        hit.setAttribute("fill", "none");
+        hit.setAttribute("stroke", "rgba(0,0,0,0.001)");
+        hit.setAttribute("stroke-width", "28");
+        hit.setAttribute("stroke-linecap", "round");
+        hit.setAttribute("pointer-events", "stroke");
+
+        const label = document.createElementNS(ns, "text");
+        const pos = idx === 0 ? { x: 122, y: 132 } : { x: 638, y: 132 };
+        label.setAttribute("x", pos.x);
+        label.setAttribute("y", pos.y);
+        label.setAttribute("text-anchor", "middle");
+        label.setAttribute("font-size", "14");
+        label.setAttribute("font-weight", "700");
+        label.setAttribute("fill", state.selectedInput === idx ? colors.ink : "#626262");
+        label.setAttribute("pointer-events", "none");
+        label.textContent = `theta${idx + 1}=${fmt(value, 1)}`;
+
+        group.append(visible, hit, label);
+        group.addEventListener("click", () => {
+          state.selectedInput = idx;
+          renderAll();
+        });
+        dom.network.appendChild(group);
+      }
+
+      function inputPath(idx) {
+        if (idx === 0) return "M 92 145 C 124 145, 160 145, 202 145";
+        return "M 668 145 C 636 145, 600 145, 558 145";
+      }
+
+      function edgePath(edge) {
+        const a = nodePos[edge.from];
+        const b = nodePos[edge.to];
+        if (edge.id === "w11") return `M ${a.x - 6} ${a.y - 39} C ${a.x - 86} ${a.y - 112}, ${a.x + 82} ${a.y - 112}, ${a.x + 18} ${a.y - 38}`;
+        if (edge.id === "w22") return `M ${a.x + 6} ${a.y + 39} C ${a.x + 86} ${a.y + 112}, ${a.x - 82} ${a.y + 112}, ${a.x - 18} ${a.y + 38}`;
+        if (edge.id === "w12") return `M ${a.x - 40} ${a.y - 17} C ${a.x - 118} ${a.y - 92}, ${b.x + 118} ${b.y - 92}, ${b.x + 40} ${b.y - 17}`;
+        return `M ${a.x + 40} ${a.y + 17} C ${a.x + 116} ${a.y + 88}, ${b.x - 116} ${b.y + 88}, ${b.x - 40} ${b.y + 17}`;
+      }
+
+      function edgeLabelPos(edge) {
+        if (edge.id === "w11") return { x: nodePos[0].x, y: 54 };
+        if (edge.id === "w22") return { x: nodePos[1].x, y: 250 };
+        if (edge.id === "w12") return { x: 380, y: 63 };
+        return { x: 380, y: 230 };
+      }
+
+      function buildWeightControls() {
+        dom.weightSliders.innerHTML = "";
+        edgeDefs.forEach(edge => {
+          const row = document.createElement("div");
+          row.className = "slider-row";
+          const label = document.createElement("label");
+          label.setAttribute("for", edge.id);
+          label.textContent = edge.label;
+          const input = document.createElement("input");
+          input.type = "range";
+          input.min = "-20";
+          input.max = "20";
+          input.step = "0.1";
+          input.value = state.weights[edge.id];
+          input.id = edge.id;
+          input.className = "zero-slider";
+          const out = document.createElement("output");
+          out.textContent = fmt(state.weights[edge.id], 1);
+          input.addEventListener("input", () => {
+            state.weights[edge.id] = Number(input.value);
+            state.selectedEdge = edge.id;
+            out.textContent = fmt(state.weights[edge.id], 1);
+            renderAll();
+          });
+          row.append(label, input, out);
+          dom.weightSliders.appendChild(row);
+        });
+      }
+
+      function syncWeightControls() {
+        edgeDefs.forEach(edge => {
+          const input = document.getElementById(edge.id);
+          if (!input) return;
+          if (document.activeElement !== input) input.value = state.weights[edge.id];
+          const out = input.parentElement.querySelector("output");
+          if (out) out.textContent = fmt(state.weights[edge.id], 1);
+        });
+      }
+
+      function renderEdgeEditor() {
+        const edge = edgeDefs.find(e => e.id === state.selectedEdge);
+        const raw = state.weights[edge.id];
+        const effective = raw * state.multiplier;
+        dom.edgeEditor.innerHTML = "";
+        const title = document.createElement("strong");
+        title.textContent = `${edge.label}: neuron ${edge.from + 1} to neuron ${edge.to + 1}`;
+        const row = document.createElement("div");
+        row.className = "slider-row";
+        const label = document.createElement("label");
+        label.textContent = "weight";
+        const input = document.createElement("input");
+        input.type = "range";
+        input.min = "-20";
+        input.max = "20";
+        input.step = "0.1";
+        input.value = raw;
+        input.className = "zero-slider";
+        const out = document.createElement("output");
+        out.textContent = fmt(raw, 1);
+        input.addEventListener("input", () => {
+          state.weights[edge.id] = Number(input.value);
+          out.textContent = fmt(state.weights[edge.id], 1);
+          note.textContent = `Effective strength with multiplier: ${fmt(state.weights[edge.id] * state.multiplier, 2)}. Width in the network diagram follows this effective value.`;
+          renderAll({ preserveEdgeEditor: true });
+        });
+        row.append(label, input, out);
+        const note = document.createElement("p");
+        note.className = "small-note";
+        note.textContent = `Effective strength with multiplier: ${fmt(effective, 2)}. Width in the network diagram follows this effective value.`;
+        dom.edgeEditor.append(title, row, note);
+      }
+
+      function renderInputEditor() {
+        const idx = state.selectedInput;
+        const value = state.theta[idx];
+        dom.inputEditor.innerHTML = "";
+        const title = document.createElement("strong");
+        title.textContent = `theta${idx + 1}: constant input to neuron ${idx + 1}`;
+        const row = document.createElement("div");
+        row.className = "slider-row";
+        const label = document.createElement("label");
+        label.textContent = "input";
+        const input = document.createElement("input");
+        input.type = "range";
+        input.min = "-8";
+        input.max = "8";
+        input.step = "0.1";
+        input.value = value;
+        input.className = "zero-slider";
+        const out = document.createElement("output");
+        out.textContent = fmt(value, 1);
+        const note = document.createElement("p");
+        note.className = "small-note";
+        note.textContent = state.mode === "continuous"
+          ? "Continuous mode follows the notebook convention: this enters as -theta."
+          : "Discrete mode follows the notebook convention: this enters as +theta.";
+        input.addEventListener("input", () => {
+          state.theta[idx] = Number(input.value);
+          out.textContent = fmt(state.theta[idx], 1);
+          renderAll({ preserveInputEditor: true });
+        });
+        row.append(label, input, out);
+        dom.inputEditor.append(title, row, note);
+      }
+
+      function saveCurrentSet() {
+        state.savedSets.push({
+          weights: { ...state.weights },
+          theta: [...state.theta],
+          init: [...state.init],
+          multiplier: state.multiplier,
+          mode: state.mode,
+          tf: [...state.tf]
+        });
+        renderSavedRows();
+      }
+
+      function renderSavedRows() {
+        dom.savedBody.innerHTML = "";
+        if (!state.savedSets.length) {
+          const row = document.createElement("tr");
+          const cell = document.createElement("td");
+          cell.colSpan = 12;
+          cell.textContent = "No saved parameter sets yet.";
+          row.appendChild(cell);
+          dom.savedBody.appendChild(row);
+          return;
+        }
+        state.savedSets.forEach((set, idx) => {
+          const row = document.createElement("tr");
+          [
+            idx + 1,
+            fmt(set.weights.w11, 1),
+            fmt(set.weights.w12, 1),
+            fmt(set.weights.w21, 1),
+            fmt(set.weights.w22, 1),
+            fmt(set.theta[0], 1),
+            fmt(set.theta[1], 1),
+            fmt(set.init[0], 2),
+            fmt(set.init[1], 2),
+            fmt(set.multiplier, 1),
+            set.mode === "continuous" ? "C" : "D",
+            `${set.tf[0][0]}/${set.tf[1][0]}`
+          ].forEach(value => {
+            const cell = document.createElement("td");
+            cell.textContent = value;
+            row.appendChild(cell);
+          });
+          dom.savedBody.appendChild(row);
+        });
+      }
+
+      function syncOutputs() {
+        dom.multiplier.value = state.multiplier;
+        dom.multiplierOut.textContent = fmt(state.multiplier, 1);
+        dom.iterations.value = state.iterations;
+        dom.iterationsOut.textContent = state.iterations;
+        dom.zoom.value = state.zoom;
+        dom.zoomOut.textContent = fmt(state.zoom, 1);
+        if (document.activeElement !== dom.theta1) dom.theta1.value = fmt(state.theta[0], 1);
+        if (document.activeElement !== dom.theta2) dom.theta2.value = fmt(state.theta[1], 1);
+        if (document.activeElement !== dom.init1) dom.init1.value = fmt(state.init[0], 1);
+        if (document.activeElement !== dom.init2) dom.init2.value = fmt(state.init[1], 1);
+        dom.continuousBtn.classList.toggle("active", state.mode === "continuous");
+        dom.discreteBtn.classList.toggle("active", state.mode === "discrete");
+        dom.showNullclines.checked = state.showNullclines;
+        dom.showFixed.checked = state.showFixed;
+        dom.fixedCount.textContent = String(state.fixedPoints.length);
+        dom.modeReadout.textContent = state.mode === "continuous" ? "Continuous" : "Discrete";
+        dom.tfReadout.textContent = `${state.tf[0]} / ${state.tf[1]}`;
+      }
+
+      function renderAll(options = {}) {
+        findFixedPoints();
+        const points = simulate();
+        syncOutputs();
+        if (!weightControlsBuilt) {
+          buildWeightControls();
+          weightControlsBuilt = true;
+        }
+        syncWeightControls();
+        if (!options.preserveEdgeEditor) renderEdgeEditor();
+        if (!options.preserveInputEditor) renderInputEditor();
+        renderNetwork();
+        drawTime(points);
+        drawPhase(points);
+      }
+
+      function numberInput(el, get, set, min, max) {
+        el.addEventListener("change", () => {
+          const next = Math.max(min, Math.min(max, Number(el.value)));
+          set(Number.isFinite(next) ? next : get());
+          renderAll();
+        });
+      }
+
+      function bindControls() {
+        dom.continuousBtn.addEventListener("click", () => {
+          state.mode = "continuous";
+          renderAll();
+        });
+        dom.discreteBtn.addEventListener("click", () => {
+          state.mode = "discrete";
+          renderAll();
+        });
+        dom.showNullclines.addEventListener("change", () => {
+          state.showNullclines = dom.showNullclines.checked;
+          renderAll();
+        });
+        dom.showFixed.addEventListener("change", () => {
+          state.showFixed = dom.showFixed.checked;
+          renderAll();
+        });
+        dom.multiplier.addEventListener("input", () => {
+          state.multiplier = Number(dom.multiplier.value);
+          renderAll();
+        });
+        dom.iterations.addEventListener("input", () => {
+          state.iterations = Number(dom.iterations.value);
+          renderAll();
+        });
+        dom.zoom.addEventListener("input", () => {
+          state.zoom = Number(dom.zoom.value);
+          renderAll();
+        });
+        numberInput(dom.theta1, () => state.theta[0], v => { state.theta[0] = v; }, -8, 8);
+        numberInput(dom.theta2, () => state.theta[1], v => { state.theta[1] = v; }, -8, 8);
+        numberInput(dom.init1, () => state.init[0], v => { state.init[0] = v; }, -2, 2);
+        numberInput(dom.init2, () => state.init[1], v => { state.init[1] = v; }, -2, 2);
+        dom.aboutBtn.addEventListener("click", () => dom.aboutDialog.showModal());
+        dom.closeAbout.addEventListener("click", () => dom.aboutDialog.close());
+        dom.saveParams.addEventListener("click", saveCurrentSet);
+        dom.phase.addEventListener("mousemove", showFixedTooltip);
+        dom.phase.addEventListener("click", setInitialFromPhase);
+        dom.phase.addEventListener("mouseleave", hideTooltip);
+        dom.phase.addEventListener("touchstart", event => {
+          const touch = event.touches[0];
+          if (touch) {
+            showFixedTooltip(touch);
+            setInitialFromPhase(touch);
+          }
+        }, { passive: true });
+        window.addEventListener("resize", renderAll);
+      }
+
+      function setInitialFromPhase(event) {
+        const rect = dom.phase.getBoundingClientRect();
+        const x = event.clientX - rect.left;
+        const y = event.clientY - rect.top;
+        const project = phaseProject(rect.width, rect.height);
+        if (x < project.pad || x > rect.width - project.pad || y < project.pad || y > rect.height - project.pad) return;
+        state.init = [
+          Math.max(-2, Math.min(2, project.invX(x))),
+          Math.max(-2, Math.min(2, project.invY(y)))
+        ];
+        hideTooltip();
+        renderAll();
+      }
+
+      function showFixedTooltip(event) {
+        if (!state.showFixed || !state.fixedPoints.length) {
+          hideTooltip();
+          return;
+        }
+        const rect = dom.phase.getBoundingClientRect();
+        const mx = event.clientX - rect.left;
+        const my = event.clientY - rect.top;
+        const project = phaseProject(rect.width, rect.height);
+        let best = null;
+        state.fixedPoints.forEach(fp => {
+          const px = project.x(fp.x);
+          const py = project.y(fp.y);
+          const dist = Math.hypot(px - mx, py - my);
+          if (dist < 22 && (!best || dist < best.dist)) best = { fp, dist };
+        });
+        if (!best) {
+          hideTooltip();
+          return;
+        }
+        const fp = best.fp;
+        dom.tooltip.innerHTML = [
+          `<b>Fixed point (${fmt(fp.x, 3)}, ${fmt(fp.y, 3)})</b>`,
+          `Eigenvalues: ${fmtEig(fp.eigs[0])}, ${fmtEig(fp.eigs[1])}`,
+          fp.kind
+        ].join("<br>");
+        dom.tooltip.style.left = `${event.clientX}px`;
+        dom.tooltip.style.top = `${event.clientY}px`;
+        dom.tooltip.classList.add("visible");
+      }
+
+      function hideTooltip() {
+        dom.tooltip.classList.remove("visible");
+      }
+
+      bindControls();
+      renderAll();
+    })();
+  </script>
+</body>
+</html>
