@@ -159,82 +159,53 @@
     font-size: 0.95em;
   }
 
-  /* ── NEURON DIAGRAM ──────────────────────────────── */
-  .neuron-demo {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.2rem;
+  /* ── FLATTENING EQUATION BLOCK ───────────────────── */
+  .flatten-math {
+    border: 1px solid var(--rule);
+    background: var(--paper-warm);
+    margin: 1.8rem 0;
+    padding: 0.4rem 0 0;
   }
-  .neuron-row {
+  .fm-row {
     display: flex;
     align-items: center;
     gap: 1rem;
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: center;
+    padding: 0.5rem 1.2rem;
+    border-bottom: 1px solid var(--rule);
   }
-  .input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: center;
-  }
-  .input-slider-block {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.2rem;
-  }
-  .input-val {
-    width: 3rem;
-    text-align: center;
+  .fm-tag {
     font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-light);
+    flex: 0 0 4.5rem;
+    text-align: right;
+  }
+  .fm-eq {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  /* KaTeX display blocks default to large vertical margins; trim them
+     so each row stays compact inside its own band. */
+  .fm-eq .katex-display { margin: 0.2rem 0; text-align: left; }
+  .fm-eq .katex { font-size: 0.92em; }
+  .fm-note {
+    font-family: var(--serif);
+    font-style: italic;
     font-size: 0.85rem;
-    background: var(--paper);
-    border: 1px solid var(--rule);
-    padding: 0.15rem 0.3rem;
+    color: var(--ink-light);
+    margin: 0;
+    padding: 0.7rem 1.2rem;
+    line-height: 1.6;
   }
-  .arrow-line {
-    height: 2px;
-    background: var(--ink);
-    flex: 1;
-    min-width: 20px;
-    max-width: 60px;
-    position: relative;
+  @media (max-width: 560px) {
+    .fm-row { flex-direction: column; align-items: flex-start; gap: 0.25rem; }
+    .fm-tag { text-align: left; flex: 0 0 auto; }
+    .fm-eq  { width: 100%; }
   }
-  .arrow-line::after {
-    content: '▶';
-    font-size: 0.6rem;
-    position: absolute;
-    right: -8px;
-    top: -7px;
-  }
-  .neuron-body {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    border: 2px solid var(--ink);
-    background: var(--paper);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    text-align: center;
-    transition: background 0.3s;
-  }
-  .neuron-body.firing { background: var(--ink); color: var(--paper); }
-  .neuron-sum { font-size: 0.65rem; color: var(--ink-light); margin-top: 2px; }
-  .neuron-output {
-    font-family: var(--mono);
-    font-size: 1.5rem;
-    font-weight: 500;
-    transition: color 0.3s;
-  }
-  .neuron-output.on { color: var(--success); }
-  .neuron-output.off { color: var(--fail); }
 
   /* ── SLIDER STYLES ───────────────────────────────── */
   .slider-row {
@@ -298,6 +269,9 @@
     border: 1px solid var(--rule);
     display: block;
     background: var(--paper);
+    max-width: 100%;
+    height: auto;   /* preserves intrinsic aspect ratio from width/height attrs */
+    touch-action: manipulation;
   }
 
   /* ── WEIGHT GRID ─────────────────────────────────── */
@@ -459,9 +433,6 @@
   /* ── RETINA DIAGRAM ──────────────────────────────── */
   #retina-canvas { margin: 0 auto; display: block; }
 
-  /* ── TOPOGRAPHY DEMO ─────────────────────────────── */
-  .topo-demo { display: flex; gap: 2rem; align-items: center; justify-content: center; flex-wrap: wrap; }
-
   @media (max-width: 600px) {
     body { font-size: 17px; padding: 0 1rem 4rem; }
     h1 { font-size: 2rem; }
@@ -469,6 +440,7 @@
     .grid-section { flex-direction: column; align-items: center; }
   }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
 
@@ -481,10 +453,18 @@
 <!-- ════════════════════════════════════════════════════
      HEADER
 ════════════════════════════════════════════════════ -->
-<p class="part-label" style="margin-top:3rem;">An Interactive Explainer</p>
-<h1>DIY Receptive Field</h1>
-<p class="subtitle">From a single neuron to visual pattern recognition</p>
-<p style="color:var(--ink-light); font-size:0.88rem; font-style:italic; margin-bottom:2rem;">Based on Negrello, Cornelise & Santoro · Erasmus MC Neuroscience</p>
+<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1.5rem; margin-top:3rem; flex-wrap:wrap;">
+  <div style="flex:1 1 0;">
+    <p class="part-label" style="margin-top:0;">An Interactive Explainer</p>
+    <h1 style="margin-top:0.4rem;">DIY Receptive Field</h1>
+    <p class="subtitle">From a single neuron to visual pattern recognition</p>
+    <p style="color:var(--ink-light); font-size:0.88rem; font-style:italic; margin-bottom:0;">Based on Negrello, Cornelise & Santoro · Erasmus MC Neuroscience</p>
+  </div>
+  <div style="flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:0.35rem; padding-top:0.5rem;">
+    <div id="qr-code"></div>
+    <span style="font-family:var(--mono); font-size:0.65rem; color:var(--ink-light); letter-spacing:0.04em; text-align:center;">scan to open<br>interactive version</span>
+  </div>
+</div>
 
 <p>Your visual cortex contains neurons that fire selectively — some for edges tilted left, others for tilted right, others for horizontal bars. This selectivity, called a <strong>receptive field</strong>, emerges from something surprisingly simple: weighted sums and a threshold. This explainer builds that intuition from scratch.</p>
 
@@ -519,7 +499,7 @@
 <div class="interactive reveal">
   <span class="interactive-label">Interactive — Heaviside function</span>
   <p style="font-size:0.9em; margin-bottom:1rem;">Drag the slider to move the input value \(z\). Watch the function switch at zero.</p>
-  <canvas id="heaviside-canvas" width="580" height="160"></canvas>
+  <canvas id="heaviside-canvas" width="580" height="160" style="width:100%;"></canvas>
   <div class="slider-row" style="margin-top:1rem;">
     <span class="slider-label">input <em>z</em></span>
     <input type="range" id="hz-slider" min="-5" max="5" step="0.05" value="-3">
@@ -577,7 +557,7 @@
 
     <!-- Canvas -->
     <div style="flex:0 0 auto;">
-      <canvas id="nd-canvas" width="290" height="290" style="display:block;"></canvas>
+      <canvas id="nd-canvas" width="300" height="300" style="width:300px; max-width:100%;"></canvas>
     </div>
 
   </div>
@@ -597,8 +577,8 @@
 
 <p>A neuron's <strong>receptive field</strong> is the region of sensory space — and the set of stimuli within it — that causes it to fire. In vision, this means a tiny patch of retina: a few photoreceptors whose signals converge onto one neuron.</p>
 
-<canvas id="retina-canvas" width="560" height="160" style="width:100%; border:1px solid var(--rule);"></canvas>
-<p style="text-align:center; font-size:0.82em; color:var(--ink-light); margin-top:0.5rem; font-style:italic;">A patch of retina — each square is one photoreceptor (filled = illuminated). The outlined region is the neuron's 3×3 receptive field.</p>
+<canvas id="retina-canvas" width="512" height="512" style="width:100%;"></canvas>
+<p style="text-align:center; font-size:0.82em; color:var(--ink-light); margin-top:0.5rem; font-style:italic;">A 16×16 retinal patch — each square is one photoreceptor (filled = illuminated). The outlined region is the neuron's 3×3 receptive field, positioned over a vertical edge of the house wall.</p>
 
 <h3>Topographic projections</h3>
 
@@ -606,30 +586,42 @@
 
 <div class="interactive reveal">
   <span class="interactive-label">Concept — Topographic mapping</span>
-  <canvas id="topo-canvas" width="560" height="180"></canvas>
-  <p style="font-size:0.85em; color:var(--ink-light); margin-top:0.5rem; text-align:center; font-style:italic;">Hover over a retinal pixel to trace its projection. Spatial order is approximately preserved.</p>
+  <canvas id="topo-canvas" width="560" height="180" style="width:100%;"></canvas>
+  <p style="font-size:0.85em; color:var(--ink-light); margin-top:0.5rem; text-align:center; font-style:italic;">Hover over, or tap, a retinal pixel to trace its projection. Spatial order is approximately preserved.</p>
 </div>
 
 <h3>From 2D grid to 1D vector</h3>
 
-<p>Topography tells us <em>which</em> pixel connects to <em>which</em> weight. But a neuron doesn't "see" a grid — it receives a list of currents along its dendrites. To compute the dot product, both the stimulus and the weight matrix must be <strong>flattened</strong> into 9-element vectors, reading the grid row by row.</p>
+<p>Topography tells us <em>which</em> pixel connects to <em>which</em> weight. A neuron, however, never sees a grid; it receives a list of currents arriving along its dendrites, so both the stimulus and the weight matrix must be <strong>flattened</strong> into nine-element vectors, read row by row, before the dot product can be taken.</p>
 
-<p>This flattening is a bookkeeping convention, not a biological operation. What matters is that the <em>correspondence is preserved</em>: pixel \((r, c)\) always maps to the same position in the vector — and to the same weight.</p>
+<p>This flattening is a bookkeeping convention with no biological counterpart, and what matters is only that the <em>correspondence is preserved</em>, so that pixel \((r, c)\) always lands at the same position in the vector, and therefore on the same weight.</p>
 
 <div class="interactive reveal">
   <span class="interactive-label">Interactive — Flattening a 3×3 grid into a 9×1 vector</span>
-  <p style="font-size:0.9em; margin-bottom:1rem;">Hover over any cell to see its position in the flattened vector. The index is read <em>row by row</em>, left to right, top to bottom.</p>
-  <canvas id="flatten-canvas" width="560" height="220"></canvas>
+  <p style="font-size:0.9em; margin-bottom:1rem;">Hover over, or tap, any cell to see its position in the flattened vector. The index is read <em>row by row</em>, left to right, top to bottom.</p>
+  <canvas id="flatten-canvas" width="560" height="220" style="width:100%;"></canvas>
   <div style="margin-top:0.9rem; font-family:var(--mono); font-size:0.82rem; color:var(--ink-light); text-align:center;" id="flatten-label">
-    hover a cell to inspect its index
+    hover or tap a cell to inspect its index
   </div>
 </div>
 
-<div class="math-block">
-  \[\mathbf{x} = \begin{bmatrix} x_0 \\ x_1 \\ x_2 \\ x_3 \\ x_4 \\ x_5 \\ x_6 \\ x_7 \\ x_8 \end{bmatrix} \leftarrow \begin{bmatrix} x_{00} & x_{01} & x_{02} \\ x_{10} & x_{11} & x_{12} \\ x_{20} & x_{21} & x_{22} \end{bmatrix} \qquad \mathbf{w} = \begin{bmatrix} w_0 \\ w_1 \\ \vdots \\ w_8 \end{bmatrix} \leftarrow \begin{bmatrix} w_{00} & w_{01} & w_{02} \\ w_{10} & w_{11} & w_{12} \\ w_{20} & w_{21} & w_{22} \end{bmatrix}\]
+<div class="flatten-math">
+  <div class="fm-row">
+    <span class="fm-tag">stimulus</span>
+    <div class="fm-eq">
+      \[\begin{bmatrix} x_{00} & x_{01} & x_{02} \\[2pt] x_{10} & x_{11} & x_{12} \\[2pt] x_{20} & x_{21} & x_{22} \end{bmatrix} \;\longrightarrow\; \begin{bmatrix} x_0 & x_1 & x_2 & x_3 & x_4 & x_5 & x_6 & x_7 & x_8 \end{bmatrix}^{\!\top}\]
+    </div>
+  </div>
+  <div class="fm-row">
+    <span class="fm-tag">weights</span>
+    <div class="fm-eq">
+      \[\begin{bmatrix} w_{00} & w_{01} & w_{02} \\[2pt] w_{10} & w_{11} & w_{12} \\[2pt] w_{20} & w_{21} & w_{22} \end{bmatrix} \;\longrightarrow\; \begin{bmatrix} w_0 & w_1 & w_2 & w_3 & w_4 & w_5 & w_6 & w_7 & w_8 \end{bmatrix}^{\!\top}\]
+    </div>
+  </div>
+  <p class="fm-note">Each 3 × 3 matrix becomes a 9 × 1 column vector, read row by row. The transpose keeps the printed form compact; both results are columns.</p>
 </div>
 
-<p>Both vectors have the same length (9), so their dot product is well-defined. The weight at position \(i\) multiplies the pixel at position \(i\) — the spatial correspondence that topography established is now encoded in the <em>order</em> of the vector.</p>
+<p>Both vectors have the same length, nine, so their dot product is well defined; the weight at position \(i\) multiplies the pixel at position \(i\), and the spatial correspondence that topography established is now carried entirely by the ordering of the vector.</p>
 
 <div class="pseudocode">// Flattening: 3×3 matrix → 9×1 vector (row-major order)
 flatten(M):
@@ -720,7 +712,7 @@ function FFNN(W, x, θ):
         y_i ← H( dot(w_i, x) − θ )
     return [y_1, y_2, y_3, y_4]</div>
 
-<p>This is the basic operation of a convolutional filter — slide this 3×3 neuron over a larger image and you get a feature map showing where vertical bars appear. Stack multiple such layers, and you have the beginning of a deep convolutional network.</p>
+<p>Notice that the four rows of \(\mathbf{W}\) describe four different neurons reading the same nine inputs, which amounts to a fully connected layer over a single patch. A convolution inverts that arrangement, applying one weight vector at every position of a larger image, with the same nine numbers reused throughout, so that a single detector reports wherever its preferred feature happens to occur. That reuse, known as <em>weight sharing</em>, is what turns the neuron you have just tuned into a convolutional filter, and layers of such filters stacked on one another are where deep convolutional networks begin. Working out what your vertical-bar detector would report as it passed across the house above, and why the roof edges would leave it silent, is a good way into that literature.</p>
 
 <!-- ════════════════════════════════════════════════════
      PART III — REFLECTIONS
@@ -781,24 +773,83 @@ function FFNN(W, x, θ):
 <script>
 // ── KaTeX render ──────────────────────────────────
 document.addEventListener("DOMContentLoaded", () => {
-  renderMathInElement(document.body, {
-    delimiters: [
-      {left:"\\[", right:"\\]", display:true},
-      {left:"\\(", right:"\\)", display:false},
-    ]
-  });
+  // KaTeX is optional: if the CDN is unavailable the page still works,
+  // it simply shows the raw \( ... \) source for the formulae.
+  try {
+    if (typeof renderMathInElement === 'function') {
+      renderMathInElement(document.body, {
+        delimiters: [
+          {left:"\\[", right:"\\]", display:true},
+          {left:"\\(", right:"\\)", display:false},
+        ]
+      });
+    }
+  } catch (e) { console.warn('KaTeX unavailable:', e); }
+
   initAll();
 });
 
+// Run each initialiser in isolation so that one failure cannot
+// take down the rest of the page's interactivity.
+function safely(name, fn) {
+  try { fn(); } catch (e) { console.warn('init failed:', name, e); }
+}
+
 function initAll() {
-  initNav();
-  initHeaviside();
-  initNeuronDemo();
-  initRetinaCanvas();
-  initTopoCanvas();
-  initFlattenCanvas();
-  initRFExercise();
-  initReveal();
+  safely('qr', () => {
+    if (typeof QRCode !== 'function') return;
+    new QRCode(document.getElementById('qr-code'), {
+      text: 'https://claude.ai/public/artifacts/c7fcad94-864c-41a0-a9bf-b5ce6f4477c2',
+      width: 96,
+      height: 96,
+      colorDark: '#111111',
+      colorLight: '#faf9f7',
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  });
+  safely('nav',      initNav);
+  safely('heaviside',initHeaviside);
+  safely('neuron',   initNeuronDemo);
+  safely('retina',   initRetinaCanvas);
+  safely('topo',     initTopoCanvas);
+  safely('flatten',  initFlattenCanvas);
+  safely('rf',       initRFExercise);
+  safely('reveal',   initReveal);
+}
+
+// ── POINTER HELPER (mouse hover + touch tap) ──────
+// Canvases are drawn at their attribute resolution but displayed at CSS size,
+// so pointer coordinates must be scaled back into canvas space.
+function canvasPoint(canvas, evt) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (evt.clientX - rect.left) * (canvas.width  / rect.width),
+    y: (evt.clientY - rect.top)  * (canvas.height / rect.height)
+  };
+}
+
+// hitTest(x, y) -> index or -1 ; onChange(index) called only when it changes.
+function attachPointerHover(canvas, hitTest, onChange) {
+  let current = -1;
+  function set(i) { if (i !== current) { current = i; onChange(i); } }
+
+  canvas.addEventListener('pointermove', e => {
+    if (e.pointerType === 'touch') return;      // touch handled on tap
+    const {x, y} = canvasPoint(canvas, e);
+    set(hitTest(x, y));
+  });
+
+  canvas.addEventListener('pointerdown', e => {
+    const {x, y} = canvasPoint(canvas, e);
+    const hit = hitTest(x, y);
+    // Tapping the same cell again clears it, so touch users can toggle off.
+    set(hit === current ? -1 : hit);
+  });
+
+  canvas.addEventListener('pointerleave', e => {
+    if (e.pointerType === 'touch') return;
+    set(-1);
+  });
 }
 
 // ── NAV ───────────────────────────────────────────
@@ -936,14 +987,15 @@ function initNeuronDemo() {
     ctx.clearRect(0, 0, CW, CH);
 
     // ── shaded regions ──
-    // Sample a grid, shade firing region very lightly
+    // Invert toCanvas exactly: px = PAD + (x1-XMIN)/(XMAX-XMIN)*(CW-2*PAD)
+    //                          py = CH - PAD - (x2-YMIN)/(YMAX-YMIN)*(CH-2*PAD)
     const step = 4;
     for (let px = 0; px < CW; px += step) {
       for (let py = 0; py < CH; py += step) {
-        const x1 = XMIN + (px / (CW - 2*PAD - PAD)) * (XMAX - XMIN);
-        const x2 = YMAX - (py / (CH - 2*PAD - PAD)) * (YMAX - YMIN);
+        const x1 = XMIN + (px - PAD) / (CW - 2*PAD) * (XMAX - XMIN);
+        const x2 = YMIN + (CH - PAD - py) / (CH - 2*PAD) * (YMAX - YMIN);
         if (fires(x1, x2, w1, w2, theta)) {
-          ctx.fillStyle = 'rgba(0,0,0,0.045)';
+          ctx.fillStyle = 'rgba(0,0,0,0.055)';
           ctx.fillRect(px, py, step, step);
         }
       }
@@ -1054,55 +1106,68 @@ function initNeuronDemo() {
 function initRetinaCanvas() {
   const canvas = document.getElementById('retina-canvas');
   const ctx = canvas.getContext('2d');
-  const ROWS = 4, COLS = 14;
-  const W = canvas.width, H = canvas.height;
-  const CELL = Math.floor(H / ROWS);
-  const PAD = Math.floor((W - COLS * CELL) / 2);
+  const N = 16;
+  const CELL = Math.floor(canvas.width / N);
 
-  // Hand-crafted scene: a sparse but meaningful retinal activation
-  // Columns 0-13, rows 0-3. RF sits at rows 0-2, cols 5-7.
-  // The RF contains a vertical bar (col 6 lit, cols 5 & 7 dark).
+  // 16×16 house pixel art
+  // 1 = dark (photoreceptor activated), 0 = light (silent)
+  // Row 0 = top, row 15 = bottom
   const scene = [
-    // row 0
-    [0,0,1,0,0, 0,1,0, 0,0,1,0,0,0],
-    // row 1
-    [0,1,0,0,0, 0,1,0, 0,1,0,0,1,0],
-    // row 2
-    [0,0,0,1,0, 0,1,0, 0,0,0,1,0,0],
-    // row 3 (below RF)
-    [1,0,0,0,1, 0,0,1, 0,0,1,0,0,1],
+  // 0         1         2         3         4         5         6         7         8         9        10        11        12        13        14        15
+    [0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0], // 0  — roof apex
+    [0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0], // 1  — roof
+    [0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0], // 2  — roof
+    [0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0], // 3  — roof
+    [0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0], // 4  — roof
+    [0,0,1,1,1,1,1,1,1,1,1,1,1,0,0,0], // 5  — eaves (full horizontal line)
+    [0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0], // 6  — top of walls       ← RF row 0
+    [0,0,1,0,1,1,0,0,0,1,1,0,1,0,0,0], // 7  — window row 1       ← RF row 1
+    [0,0,1,0,1,1,0,0,0,1,1,0,1,0,0,0], // 8  — window row 2       ← RF row 2
+    [0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0], // 9  — wall
+    [0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0], // 10 — wall
+    [0,0,1,0,0,0,1,1,1,0,0,0,1,0,0,0], // 11 — door top
+    [0,0,1,0,0,0,1,0,1,0,0,0,1,0,0,0], // 12 — door mid
+    [0,0,1,0,0,0,1,0,1,0,0,0,1,0,0,0], // 13 — door mid
+    [0,0,1,1,1,1,1,0,1,1,1,1,1,0,0,0], // 14 — ground line
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0], // 15 — empty
   ];
 
-  const rfR = 0, rfC = 5; // top-left corner of RF
+  // RF top-left corner: rows 6–8, cols 11–13.
+  // Col 12 is the lit right wall; cols 11 and 13 are dark on all three rows,
+  // so the patch reads exactly [0,1,0 / 0,1,0 / 0,1,0] — the vertical stimulus.
+  const rfR = 6, rfC = 11;
 
   function draw() {
-    ctx.clearRect(0, 0, W, H);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const x = PAD + c * CELL;
-        const y = r * CELL;
+    for (let r = 0; r < N; r++) {
+      for (let c = 0; c < N; c++) {
+        const x = c * CELL, y = r * CELL;
         const inRF = r >= rfR && r <= rfR + 2 && c >= rfC && c <= rfC + 2;
         const on   = scene[r][c] === 1;
 
-        // Cell fill
-        ctx.fillStyle = on ? '#111' : (inRF ? '#f5f3ef' : '#eae7e0');
+        ctx.fillStyle = on ? '#111111' : (inRF ? '#f0ede6' : '#e4e0d8');
         ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
       }
     }
 
-    // RF bounding box — drawn on top, clean and prominent
-    const rfX = PAD + rfC * CELL;
-    const rfY = rfR * CELL;
+    // RF bounding box
     ctx.strokeStyle = '#111';
     ctx.lineWidth = 2.5;
-    ctx.strokeRect(rfX + 1, rfY + 1, 3 * CELL - 2, 3 * CELL - 2);
+    ctx.strokeRect(rfC * CELL + 1, rfR * CELL + 1, 3 * CELL - 2, 3 * CELL - 2);
 
-    // Small "RF" label tucked neatly below the box
+    // Label sits below the box, clear of the grid's right edge
+    const boxCX = (rfC + 1.5) * CELL;
+    const boxBottom = (rfR + 3) * CELL;
+    ctx.strokeStyle = '#555'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(boxCX, boxBottom + 2);
+    ctx.lineTo(boxCX, boxBottom + 10);
+    ctx.stroke();
     ctx.fillStyle = '#555';
-    ctx.font = '10px IBM Plex Mono, monospace';
+    ctx.font = '11px IBM Plex Mono, monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('receptive field', rfX + 1.5 * CELL, rfY + 3 * CELL + 13);
+    ctx.fillText('receptive field', boxCX, boxBottom + 24);
   }
 
   draw();
@@ -1175,17 +1240,16 @@ function initTopoCanvas() {
     }
   }
 
-  canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    let found = -1;
-    for (let i=0; i<9; i++) {
-      const r = cellRect(retina, i);
-      if (mx>=r.x && mx<=r.x+r.w && my>=r.y && my<=r.y+r.h) { found=i; break; }
-    }
-    if (found !== hoveredCell) { hoveredCell=found; draw(hoveredCell); }
-  });
-  canvas.addEventListener('mouseleave', () => { hoveredCell=-1; draw(-1); });
+  attachPointerHover(canvas,
+    (mx, my) => {
+      for (let i = 0; i < 9; i++) {
+        const r = cellRect(retina, i);
+        if (mx >= r.x && mx <= r.x + r.w && my >= r.y && my <= r.y + r.h) return i;
+      }
+      return -1;
+    },
+    i => { hoveredCell = i; draw(i); }
+  );
   draw(-1);
 }
 
@@ -1308,36 +1372,38 @@ function initFlattenCanvas() {
     }
   }
 
-  canvas.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-    let found = -1;
-    // check grid cells
-    for (let i = 0; i < 9; i++) {
-      const r = Math.floor(i/3), c = i%3;
-      const x = gridX + c*(CELL+GAP), y = gridY + r*(CELL+GAP);
-      if (mx>=x && mx<=x+CELL && my>=y && my<=y+CELL) { found=i; break; }
-    }
-    // check vector cells
-    if (found === -1) {
+  const labelEl = document.getElementById('flatten-label');
+  const IDLE = 'hover or tap a cell to inspect its index';
+  labelEl.textContent = IDLE;
+
+  attachPointerHover(canvas,
+    (mx, my) => {
+      // grid cells
+      for (let i = 0; i < 9; i++) {
+        const r = Math.floor(i/3), c = i%3;
+        const x = gridX + c*(CELL+GAP), y = gridY + r*(CELL+GAP);
+        if (mx >= x && mx <= x+CELL && my >= y && my <= y+CELL) return i;
+      }
+      // vector cells
       for (let i = 0; i < 9; i++) {
         const vy = VEC_TOP + i*VEC_H;
-        if (mx>=VEC_X && mx<=VEC_X+VEC_W && my>=vy && my<=vy+VEC_H) { found=i; break; }
+        if (mx >= VEC_X && mx <= VEC_X+VEC_W && my >= vy && my <= vy+VEC_H) return i;
       }
-    }
-    if (found !== hovered) {
-      hovered = found;
-      draw(hovered);
-      const label = document.getElementById('flatten-label');
-      if (hovered >= 0) {
-        const r = Math.floor(hovered/3), c = hovered%3;
-        label.textContent = `cell (row ${r}, col ${c})  →  vector index ${hovered}  =  3·${r} + ${c}   |   value: ${grid[hovered]}`;
+      return -1;
+    },
+    i => {
+      hovered = i;
+      draw(i);
+      if (i >= 0) {
+        const r = Math.floor(i/3), c = i%3;
+        labelEl.textContent =
+          `cell (row ${r}, col ${c})  →  vector index ${i}  =  3·${r} + ${c}   |   value: ${grid[i]}`;
       } else {
-        label.textContent = 'hover a cell to inspect its index';
+        labelEl.textContent = IDLE;
       }
     }
-  });
-  canvas.addEventListener('mouseleave', () => { hovered=-1; draw(-1); document.getElementById('flatten-label').textContent='hover a cell to inspect its index'; });
+  );
+
   draw(-1);
 }
 
