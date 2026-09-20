@@ -219,7 +219,7 @@
     }
 
     .lab {
-      margin-top: -9vh;
+      margin-top: 24px;
       border: 1px solid var(--line);
       background: rgba(10, 13, 24, 0.9);
       border-radius: var(--radius);
@@ -255,13 +255,13 @@
 
     .views {
       display: grid;
-      grid-template-columns: minmax(300px, 0.9fr) minmax(300px, 1.1fr);
-      min-height: 440px;
+      grid-template-columns: minmax(300px, 0.82fr) minmax(360px, 1.18fr);
+      min-height: 520px;
     }
 
     .view {
       position: relative;
-      min-height: 390px;
+      min-height: 485px;
       border-right: 1px solid var(--line);
     }
 
@@ -855,6 +855,7 @@
     }
 
     const model = trainReadout();
+    const inputLinks = buildInputLinks();
     const readoutLinks = buildReadoutLinks(model.Wout);
     const restAngles = inverseKinematics(pathCenter);
     const state = {
@@ -1032,6 +1033,19 @@
         : `rgba(87, 215, 255, ${alpha})`;
     }
 
+    function buildInputLinks() {
+      const ranked = [];
+      let maxAbs = 0;
+      for (let i = 0; i < N; i++) {
+        const value = Math.hypot(reservoir.Win[i * 2], reservoir.Win[i * 2 + 1]);
+        const sign = reservoir.Win[i * 2] + reservoir.Win[i * 2 + 1] >= 0 ? 1 : -1;
+        ranked.push({ neuron: i, value: value * sign, abs: value });
+        maxAbs = Math.max(maxAbs, value);
+      }
+      ranked.sort((a, b) => b.abs - a.abs);
+      return { links: ranked.slice(0, 18), maxAbs };
+    }
+
     function buildReadoutLinks(Wout) {
       const links = [[], []];
       let maxAbs = 0;
@@ -1090,71 +1104,102 @@
       ctx.restore();
     }
 
-    function drawReadoutWeights(ctx, layout, compact) {
-      if (state.stage === "make") return;
-      const outputX = layout.panelX + layout.panelW * 0.68;
-      const outputY1 = layout.outputY;
-      const outputY2 = layout.outputY + (compact ? 42 : 54);
+    function drawInputAndReadoutWeights(ctx, layout, compact) {
+      const input = { x: layout.inputX, y: layout.cy };
       const outputs = [
-        { x: outputX, y: outputY1, label: "q1", color: colors.cyan },
-        { x: outputX, y: outputY2, label: "q2", color: colors.amber }
+        { x: layout.outputX, y: layout.cy - layout.outputGap, label: "q1", name: "shoulder", color: colors.cyan },
+        { x: layout.outputX, y: layout.cy + layout.outputGap, label: "q2", name: "elbow", color: colors.amber }
       ];
 
       ctx.save();
       ctx.lineCap = "round";
+      for (const link of inputLinks.links) {
+        const node = reservoir.nodes[link.neuron];
+        const toX = layout.cx + (node.x - 0.5) * layout.radius * 2;
+        const toY = layout.cy + (node.y - 0.5) * layout.radius * 2;
+        const normalized = clamp(link.abs / (inputLinks.maxAbs || 1), 0, 1);
+        ctx.strokeStyle = signedWeightColor(link.value, inputLinks.maxAbs, 0.12, 0.56);
+        ctx.lineWidth = 0.7 + normalized * (compact ? 1.8 : 2.4);
+        ctx.beginPath();
+        ctx.moveTo(input.x + (compact ? 12 : 15), input.y);
+        ctx.bezierCurveTo(input.x + 58, input.y, toX - 58, toY, toX, toY);
+        ctx.stroke();
+      }
+
+      const readoutMinAlpha = state.stage === "make" ? 0.11 : 0.22;
+      const readoutMaxAlpha = state.stage === "make" ? 0.38 : 0.78;
       for (const link of readoutLinks.links) {
         const node = reservoir.nodes[link.neuron];
         const fromX = layout.cx + (node.x - 0.5) * layout.radius * 2;
         const fromY = layout.cy + (node.y - 0.5) * layout.radius * 2;
         const out = outputs[link.output];
         const normalized = clamp(link.abs / (readoutLinks.maxAbs || 1), 0, 1);
-        ctx.strokeStyle = signedWeightColor(link.value, readoutLinks.maxAbs, 0.18, 0.72);
-        ctx.lineWidth = 0.7 + normalized * (compact ? 2.1 : 3.1);
+        ctx.strokeStyle = signedWeightColor(link.value, readoutLinks.maxAbs, readoutMinAlpha, readoutMaxAlpha);
+        ctx.lineWidth = 0.8 + normalized * (compact ? 2.3 : 3.4);
         ctx.beginPath();
-        const bendX = layout.panelX - 14;
         ctx.moveTo(fromX, fromY);
-        ctx.bezierCurveTo(bendX, fromY, bendX, out.y, out.x - 17, out.y);
+        ctx.bezierCurveTo(fromX + 62, fromY, out.x - 62, out.y, out.x - 17, out.y);
         ctx.stroke();
       }
 
+      ctx.fillStyle = "rgba(5,7,13,0.9)";
+      ctx.strokeStyle = colors.green;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(input.x, input.y, compact ? 13 : 16, 0, TAU);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = colors.green;
+      ctx.font = "700 12px IBM Plex Mono, ui-monospace, monospace";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText("u", input.x, input.y);
+      ctx.fillStyle = colors.muted;
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText("input drive", input.x, input.y - (compact ? 20 : 25));
+
       outputs.forEach((out, index) => {
-        ctx.fillStyle = "rgba(5,7,13,0.86)";
-        ctx.strokeStyle = out.color;
+        ctx.fillStyle = "rgba(5,7,13,0.9)";
+        ctx.strokeStyle = state.stage === "make" ? "rgba(154,167,188,0.72)" : out.color;
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(out.x, out.y, compact ? 14 : 17, 0, TAU);
+        ctx.arc(out.x, out.y, compact ? 15 : 18, 0, TAU);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = out.color;
+        ctx.fillStyle = state.stage === "make" ? colors.muted : out.color;
         ctx.font = "700 12px IBM Plex Mono, ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(out.label, out.x, out.y);
-        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
         ctx.fillStyle = colors.muted;
-        ctx.fillText(index === 0 ? "shoulder" : "elbow", out.x + 22, out.y + 1);
+        ctx.fillText(out.name, out.x, out.y + (compact ? 30 : 34));
       });
 
       ctx.fillStyle = colors.green;
       ctx.font = "700 12px IBM Plex Mono, ui-monospace, monospace";
-      ctx.fillText("Wout", layout.panelX, layout.outputY - 24);
+      ctx.textAlign = "center";
+      ctx.fillText("Wout", layout.outputX, layout.cy - layout.outputGap - (compact ? 34 : 42));
       ctx.fillStyle = colors.muted;
       ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-      ctx.fillText("largest readout weights", layout.panelX, layout.outputY - 8);
+      ctx.fillText("signed output weights", layout.outputX, layout.cy - layout.outputGap - (compact ? 18 : 25));
       ctx.restore();
     }
 
     function drawReservoir(canvas, compact) {
       const { ctx, w, h } = setupCanvas(canvas);
       drawBackground(ctx, w, h);
-      const panelW = Math.min(compact ? 190 : 235, Math.max(155, w * 0.38));
+      const panelW = Math.min(compact ? 172 : 215, Math.max(148, w * 0.30));
       const panelX = w - panelW - 12;
       const graphLeft = 16;
-      const graphRight = Math.max(graphLeft + 180, panelX - 18);
-      const graphW = graphRight - graphLeft;
-      const cx = graphLeft + graphW * 0.5;
-      const cy = h * 0.5;
-      const radius = Math.min(graphW, h) * (compact ? 0.40 : 0.43);
+      const outputX = panelX - (compact ? 48 : 62);
+      const inputX = graphLeft + (compact ? 30 : 38);
+      const reservoirLeft = inputX + (compact ? 58 : 72);
+      const reservoirRight = Math.max(reservoirLeft + 130, outputX - (compact ? 56 : 72));
+      const graphW = reservoirRight - reservoirLeft;
+      const cx = reservoirLeft + graphW * 0.5;
+      const cy = h * (compact ? 0.50 : 0.52);
+      const radius = Math.min(graphW * 0.48, h * (compact ? 0.35 : 0.36));
       const matrixSize = Math.min(panelW - 34, h * (compact ? 0.36 : 0.34), compact ? 124 : 154);
       const matrixX = panelX + 6;
       const matrixY = compact ? 48 : 60;
@@ -1164,7 +1209,9 @@
         radius,
         panelX,
         panelW,
-        outputY: Math.min(h - (compact ? 72 : 88), matrixY + matrixSize + (compact ? 72 : 88))
+        inputX,
+        outputX,
+        outputGap: Math.min(compact ? 46 : 58, Math.max(compact ? 34 : 42, h * 0.115))
       };
       const stageOpacity = state.stage === "make" ? 0.2 : state.stage === "train" ? 0.09 : 0.06;
 
@@ -1181,7 +1228,7 @@
         ctx.stroke();
       }
 
-      drawReadoutWeights(ctx, layout, compact);
+      drawInputAndReadoutWeights(ctx, layout, compact);
 
       for (let i = 0; i < N; i++) {
         const n = reservoir.nodes[i];
