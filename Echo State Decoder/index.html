@@ -1,0 +1,1401 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Echo State Decoder: Reservoir to Figure Eight Arm</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #080914;
+      --panel: #101421;
+      --panel-2: #151323;
+      --line: rgba(214, 226, 255, 0.16);
+      --text: #edf2ff;
+      --muted: #9aa7bc;
+      --cyan: #57d7ff;
+      --amber: #ffbd66;
+      --green: #70e08f;
+      --magenta: #d78cff;
+      --red: #ff6b7a;
+      --ink: #05070d;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "IBM Plex Sans", "Source Sans 3", Inter, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      line-height: 1.55;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        linear-gradient(180deg, rgba(87, 215, 255, 0.08), transparent 34rem),
+        linear-gradient(120deg, rgba(255, 189, 102, 0.05), transparent 40rem);
+      opacity: 0.9;
+    }
+
+    main {
+      position: relative;
+      z-index: 1;
+    }
+
+    article {
+      width: min(1180px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 60px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: minmax(0, 0.84fr) minmax(300px, 0.46fr);
+      gap: 22px;
+      align-items: stretch;
+      min-height: clamp(620px, calc(100vh - 56px), 760px);
+    }
+
+    .intro {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 18px;
+      padding: 10px 0;
+    }
+
+    .eyebrow {
+      color: var(--green);
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 780px;
+      font-size: clamp(2.2rem, 6vw, 5.45rem);
+      line-height: 0.96;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: clamp(1.55rem, 3vw, 2.45rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 8px;
+      font-size: 1.04rem;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 66ch;
+    }
+
+    .lede {
+      font-size: clamp(1rem, 1.8vw, 1.22rem);
+      color: #cbd6eb;
+    }
+
+    .concept-strip {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      max-width: 820px;
+      margin-top: 2px;
+    }
+
+    .concept {
+      border: 1px solid var(--line);
+      background: rgba(16, 20, 33, 0.62);
+      border-radius: var(--radius);
+      padding: 12px;
+    }
+
+    .concept b {
+      display: block;
+      color: var(--text);
+      font-size: 0.92rem;
+      margin-bottom: 3px;
+    }
+
+    .concept span {
+      color: var(--muted);
+      font-size: 0.86rem;
+    }
+
+    .control-panel {
+      align-self: center;
+      border: 1px solid var(--line);
+      background: rgba(16, 20, 33, 0.82);
+      border-radius: var(--radius);
+      padding: 18px;
+      backdrop-filter: blur(14px);
+    }
+
+    .control-panel label {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .value-pill {
+      color: var(--green);
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 700;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      min-height: 42px;
+      margin: 8px 0 2px;
+      accent-color: var(--green);
+      cursor: pointer;
+    }
+
+    .hint {
+      font-size: 0.92rem;
+      color: var(--muted);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid rgba(214, 226, 255, 0.18);
+      background: #161c2b;
+      color: var(--text);
+      border-radius: 7px;
+      padding: 9px 12px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    }
+
+    button:hover,
+    button:focus-visible {
+      transform: translateY(-1px);
+      border-color: rgba(87, 215, 255, 0.65);
+      outline: none;
+    }
+
+    button.active {
+      background: rgba(87, 215, 255, 0.14);
+      border-color: var(--cyan);
+      color: #eafaff;
+    }
+
+    button.primary {
+      background: var(--green);
+      border-color: var(--green);
+      color: var(--ink);
+    }
+
+    .lab {
+      margin-top: -9vh;
+      border: 1px solid var(--line);
+      background: rgba(10, 13, 24, 0.9);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.36);
+    }
+
+    .lab-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.025);
+    }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      color: var(--muted);
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.84rem;
+    }
+
+    .status strong {
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .views {
+      display: grid;
+      grid-template-columns: minmax(300px, 0.9fr) minmax(300px, 1.1fr);
+      min-height: 440px;
+    }
+
+    .view {
+      position: relative;
+      min-height: 390px;
+      border-right: 1px solid var(--line);
+    }
+
+    .view:last-child {
+      border-right: none;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    .caption {
+      position: absolute;
+      left: 14px;
+      right: 14px;
+      bottom: 12px;
+      color: rgba(237, 242, 255, 0.84);
+      font-size: 0.88rem;
+      pointer-events: none;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+    }
+
+    .trace-wrap {
+      height: 236px;
+      border-top: 1px solid var(--line);
+      position: relative;
+    }
+
+    .legend {
+      position: absolute;
+      right: 14px;
+      top: 10px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      font-size: 0.82rem;
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    .swatch {
+      display: inline-block;
+      width: 20px;
+      height: 3px;
+      margin-right: 5px;
+      vertical-align: middle;
+      border-radius: 10px;
+    }
+
+    .section {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.38fr) minmax(0, 0.62fr);
+      gap: 34px;
+      padding: 64px 0 0;
+      align-items: start;
+    }
+
+    .section-copy {
+      position: sticky;
+      top: 22px;
+    }
+
+    .mini-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .explain-panel {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(16, 20, 33, 0.74);
+      padding: 16px;
+    }
+
+    .equation {
+      margin-top: 12px;
+      padding: 12px;
+      border-left: 3px solid var(--cyan);
+      background: rgba(87, 215, 255, 0.08);
+      color: #d8ecff;
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.88rem;
+      overflow-x: auto;
+    }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .metric {
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    .metric b {
+      display: block;
+      color: var(--text);
+      font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 1.12rem;
+    }
+
+    .metric span {
+      color: var(--muted);
+      font-size: 0.84rem;
+    }
+
+    .mini-canvas {
+      height: 300px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: rgba(5, 7, 13, 0.65);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .callout {
+      border-left: 3px solid var(--green);
+      padding: 2px 0 2px 14px;
+      color: #cfe9d5;
+      margin-top: 16px;
+    }
+
+    footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.94rem;
+    }
+
+    @media (max-width: 860px) {
+      article {
+        width: min(100vw - 22px, 720px);
+        padding-top: 16px;
+      }
+
+      header,
+      .views,
+      .section {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        min-height: auto;
+      }
+
+      .lab {
+        margin-top: 24px;
+      }
+
+      .view {
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+        min-height: 340px;
+      }
+
+      .section-copy {
+        position: static;
+      }
+
+      .concept-strip {
+        grid-template-columns: 1fr;
+      }
+
+      .metric-row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <article>
+      <header>
+        <div class="intro">
+          <div class="eyebrow">Echo state decoder</div>
+          <h1>Can a fixed random reservoir learn a figure eight?</h1>
+          <p class="lede">The interesting trick is that the recurrent network is random and stays random. Its intrinsic dynamics expand a simple time signal into a high-dimensional neural state; learning is the low-dimensional readout back down to two arm angles.</p>
+          <div class="concept-strip" aria-label="Core reservoir computing ideas">
+            <div class="concept">
+              <b>Random recurrence</b>
+              <span>A fixed recurrent network creates a rich temporal basis.</span>
+            </div>
+            <div class="concept">
+              <b>Transfer function</b>
+              <span>Each unit passes input through tanh, adding nonlinear mixing.</span>
+            </div>
+            <div class="concept">
+              <b>Linear readout</b>
+              <span>Only Wout is learned, by ridge regression onto q1 and q2.</span>
+            </div>
+          </div>
+        </div>
+
+        <aside class="control-panel" aria-label="Main controls">
+          <label for="amplitude">
+            Figure-eight drive
+            <span class="value-pill"><span id="ampReadout">1.00</span></span>
+          </label>
+          <input id="amplitude" type="range" min="0" max="1" step="0.01" value="1" aria-describedby="ampHint">
+          <p id="ampHint" class="hint">At 0 the readout returns the rest pose. At 1 the trained decoder drives the full path.</p>
+          <div class="button-row" role="group" aria-label="Explainer stage">
+            <button class="active" type="button" data-stage="make">1. Make</button>
+            <button type="button" data-stage="train">2. Train</button>
+            <button type="button" data-stage="run">3. Run</button>
+            <button class="primary" type="button" id="playPause">Pause</button>
+          </div>
+        </aside>
+      </header>
+
+      <section class="lab" aria-label="Interactive echo state network lab">
+        <div class="lab-toolbar">
+          <div class="status">
+            <span>stage <strong id="stageLabel">making reservoir</strong></span>
+            <span>neurons <strong id="neuronCount">96</strong></span>
+            <span>readout error <strong id="errorReadout">...</strong></span>
+          </div>
+          <div class="status">
+            <span style="color: var(--cyan)">shoulder</span>
+            <span style="color: var(--amber)">elbow</span>
+            <span style="color: var(--green)">hand path</span>
+          </div>
+        </div>
+
+        <div class="views">
+          <figure class="view" aria-label="Two-link arm view">
+            <canvas id="armCanvas"></canvas>
+            <figcaption class="caption" id="armCaption">The decoder outputs two angles; forward kinematics turns them into a hand path.</figcaption>
+          </figure>
+          <figure class="view" aria-label="Reservoir state view">
+            <canvas id="reservoirCanvas"></canvas>
+            <figcaption class="caption" id="reservoirCaption">The reservoir weights are fixed after initialization. The live colors are neuron activations.</figcaption>
+          </figure>
+        </div>
+
+        <figure class="trace-wrap" aria-label="Decoded joint-angle traces">
+          <canvas id="traceCanvas"></canvas>
+          <figcaption class="legend">
+            <span><i class="swatch" style="background: var(--cyan)"></i>decoded shoulder</span>
+            <span><i class="swatch" style="background: var(--amber)"></i>decoded elbow</span>
+            <span><i class="swatch" style="background: rgba(237, 242, 255, 0.38)"></i>target</span>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="section" id="make">
+        <div class="section-copy">
+          <div class="eyebrow">1. Make the reservoir</div>
+          <h2>Start with a random dynamical system.</h2>
+          <p>The reservoir is a sparse recurrent network. Its weights are scaled below runaway instability, so recent input leaves a fading but useful trace across many neurons.</p>
+        </div>
+        <div class="mini-grid">
+          <div class="explain-panel">
+            <h3>Why this is useful</h3>
+            <p>The reservoir turns a low-dimensional drive into many nonlinear traces of recent history. The decoder then reduces that state back to the two numbers the arm needs.</p>
+            <div class="equation">x[t+1] = (1 - leak) x[t] + leak tanh(W x[t] + W_in u[t])</div>
+          </div>
+          <div class="mini-canvas"><canvas id="makeCanvas"></canvas></div>
+        </div>
+      </section>
+
+      <section class="section" id="train">
+        <div class="section-copy">
+          <div class="eyebrow">2. Train the decoder</div>
+          <h2>The target path becomes target angles.</h2>
+          <p>A figure-eight hand path is converted into shoulder and elbow angles with inverse kinematics. Ridge regression then fits a linear readout from the reservoir state to those target angles.</p>
+        </div>
+        <div class="mini-grid">
+          <div class="explain-panel">
+            <h3>Two-link inverse kinematics</h3>
+            <p>The path is deliberately reachable. Inverse kinematics gives the training targets, then linear regression finds the output weights from reservoir state to shoulder and elbow.</p>
+            <div class="equation">W_out = (X^T X + lambda I)^-1 X^T Y</div>
+            <div class="metric-row">
+              <div class="metric"><b id="trainSamples">620</b><span>training states</span></div>
+              <div class="metric"><b id="ridgeValue">1e-3</b><span>ridge penalty</span></div>
+              <div class="metric"><b id="rmseValue">...</b><span>angle RMSE</span></div>
+            </div>
+          </div>
+          <div class="mini-canvas"><canvas id="trainCanvas"></canvas></div>
+        </div>
+      </section>
+
+      <section class="section" id="run">
+        <div class="section-copy">
+          <div class="eyebrow">3. Run the arm</div>
+          <h2>The slider gates the learned motion.</h2>
+          <p>The trained decoder knows the full pattern. The slider blends decoded motion around the rest pose, so you can watch the same reservoir state contract toward stillness or expand into the figure eight.</p>
+        </div>
+        <div class="mini-grid">
+          <div class="explain-panel">
+            <h3>The useful surprise</h3>
+            <p>The internal network did not learn the arm. It only created a rich, time-varying basis through recurrence and transfer functions. A small trained readout is enough to turn that basis into joint angles.</p>
+            <p class="callout">Try pausing, lowering the drive, then raising it again. The decoded traces and arm path shrink and recover together.</p>
+          </div>
+          <div class="mini-canvas"><canvas id="runCanvas"></canvas></div>
+        </div>
+      </section>
+
+      <footer>
+        This is a schematic ESN: sparse recurrent reservoir, sinusoidal phase drive, inverse-kinematics targets, and a ridge-regression readout. The linked views are live; changing the drive changes the reservoir state, arm, and traces together.
+      </footer>
+    </article>
+  </main>
+
+  <script>
+    "use strict";
+
+    const TAU = Math.PI * 2;
+    const N = 96;
+    const trainLen = 700;
+    const washout = 80;
+    const ridge = 1e-3;
+    const leak = 0.32;
+    const spectralRadius = 0.88;
+    const inputScale = 0.72;
+    const link1 = 118;
+    const link2 = 92;
+    const pathCenter = { x: 118, y: 34 };
+    const pathAmp = { x: 62, y: 46 };
+
+    const colors = {
+      bg: "#080914",
+      panel: "#101421",
+      grid: "rgba(214,226,255,0.11)",
+      line: "rgba(214,226,255,0.16)",
+      text: "#edf2ff",
+      muted: "#9aa7bc",
+      cyan: "#57d7ff",
+      amber: "#ffbd66",
+      green: "#70e08f",
+      magenta: "#d78cff",
+      red: "#ff6b7a"
+    };
+
+    const els = {
+      amp: document.getElementById("amplitude"),
+      ampReadout: document.getElementById("ampReadout"),
+      playPause: document.getElementById("playPause"),
+      stageLabel: document.getElementById("stageLabel"),
+      errorReadout: document.getElementById("errorReadout"),
+      neuronCount: document.getElementById("neuronCount"),
+      trainSamples: document.getElementById("trainSamples"),
+      ridgeValue: document.getElementById("ridgeValue"),
+      rmseValue: document.getElementById("rmseValue"),
+      armCaption: document.getElementById("armCaption"),
+      reservoirCaption: document.getElementById("reservoirCaption")
+    };
+
+    const canvases = {
+      arm: document.getElementById("armCanvas"),
+      reservoir: document.getElementById("reservoirCanvas"),
+      trace: document.getElementById("traceCanvas"),
+      make: document.getElementById("makeCanvas"),
+      train: document.getElementById("trainCanvas"),
+      run: document.getElementById("runCanvas")
+    };
+
+    let seed = 42;
+    function rand() {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 4294967296;
+    }
+
+    function randSigned() {
+      return rand() * 2 - 1;
+    }
+
+    function clamp(v, lo, hi) {
+      return Math.max(lo, Math.min(hi, v));
+    }
+
+    function setupCanvas(canvas) {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.max(2, Math.floor(rect.width * dpr));
+      const height = Math.max(2, Math.floor(rect.height * dpr));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      const ctx = canvas.getContext("2d");
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { ctx, w: rect.width, h: rect.height, dpr };
+    }
+
+    function makeReservoir() {
+      const W = new Float32Array(N * N);
+      const edges = [];
+      const density = 0.075;
+      for (let i = 0; i < N; i++) {
+        for (let j = 0; j < N; j++) {
+          if (rand() < density) {
+            const value = randSigned();
+            W[i * N + j] = value;
+            if (edges.length < 430) edges.push([j, i, value]);
+          }
+        }
+      }
+
+      let v = new Float32Array(N);
+      for (let i = 0; i < N; i++) v[i] = randSigned();
+      for (let iter = 0; iter < 34; iter++) {
+        const y = new Float32Array(N);
+        for (let i = 0; i < N; i++) {
+          let sum = 0;
+          const row = i * N;
+          for (let j = 0; j < N; j++) sum += W[row + j] * v[j];
+          y[i] = sum;
+        }
+        let norm = 0;
+        for (let i = 0; i < N; i++) norm += y[i] * y[i];
+        norm = Math.sqrt(norm) || 1;
+        for (let i = 0; i < N; i++) v[i] = y[i] / norm;
+      }
+
+      const y = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        let sum = 0;
+        const row = i * N;
+        for (let j = 0; j < N; j++) sum += W[row + j] * v[j];
+        y[i] = sum;
+      }
+      let rho = 0;
+      for (let i = 0; i < N; i++) rho += y[i] * y[i];
+      rho = Math.sqrt(rho) || 1;
+      const scale = spectralRadius / rho;
+      for (let i = 0; i < W.length; i++) W[i] *= scale;
+      for (const edge of edges) edge[2] *= scale;
+      let maxAbsW = 0;
+      for (let i = 0; i < W.length; i++) maxAbsW = Math.max(maxAbsW, Math.abs(W[i]));
+
+      const Win = new Float32Array(N * 2);
+      const bias = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        Win[i * 2] = randSigned() * inputScale;
+        Win[i * 2 + 1] = randSigned() * inputScale;
+        bias[i] = randSigned() * 0.035;
+      }
+
+      const nodes = [];
+      for (let i = 0; i < N; i++) {
+        const ring = i % 3;
+        const angle = (i / N) * TAU * 5 + randSigned() * 0.17;
+        const radius = 0.22 + ring * 0.115 + rand() * 0.04;
+        nodes.push({ x: 0.5 + Math.cos(angle) * radius, y: 0.5 + Math.sin(angle) * radius });
+      }
+
+      return { W, Win, bias, edges, nodes, maxAbsW };
+    }
+
+    const reservoir = makeReservoir();
+
+    function stepReservoir(x, u0, u1) {
+      const next = new Float32Array(N);
+      for (let i = 0; i < N; i++) {
+        let sum = reservoir.bias[i] + reservoir.Win[i * 2] * u0 + reservoir.Win[i * 2 + 1] * u1;
+        const row = i * N;
+        for (let j = 0; j < N; j++) sum += reservoir.W[row + j] * x[j];
+        next[i] = (1 - leak) * x[i] + leak * Math.tanh(sum);
+      }
+      return next;
+    }
+
+    function desiredPoint(phase) {
+      return {
+        x: pathCenter.x + pathAmp.x * Math.sin(phase),
+        y: pathCenter.y + pathAmp.y * Math.sin(phase * 2)
+      };
+    }
+
+    function inverseKinematics(point) {
+      const x = point.x;
+      const y = point.y;
+      const r2 = x * x + y * y;
+      const c2 = clamp((r2 - link1 * link1 - link2 * link2) / (2 * link1 * link2), -0.999, 0.999);
+      const q2 = Math.acos(c2);
+      const q1 = Math.atan2(y, x) - Math.atan2(link2 * Math.sin(q2), link1 + link2 * Math.cos(q2));
+      return [q1, q2];
+    }
+
+    function forwardKinematics(q1, q2) {
+      const elbow = {
+        x: link1 * Math.cos(q1),
+        y: link1 * Math.sin(q1)
+      };
+      const hand = {
+        x: elbow.x + link2 * Math.cos(q1 + q2),
+        y: elbow.y + link2 * Math.sin(q1 + q2)
+      };
+      return { elbow, hand };
+    }
+
+    function solveLinearSystem(A, B) {
+      const n = A.length;
+      const m = B[0].length;
+      const M = A.map((row, i) => row.concat(B[i]));
+      for (let col = 0; col < n; col++) {
+        let pivot = col;
+        let maxAbs = Math.abs(M[col][col]);
+        for (let r = col + 1; r < n; r++) {
+          const value = Math.abs(M[r][col]);
+          if (value > maxAbs) {
+            maxAbs = value;
+            pivot = r;
+          }
+        }
+        if (pivot !== col) {
+          const tmp = M[col];
+          M[col] = M[pivot];
+          M[pivot] = tmp;
+        }
+        const div = M[col][col] || 1e-12;
+        for (let c = col; c < n + m; c++) M[col][c] /= div;
+        for (let r = 0; r < n; r++) {
+          if (r === col) continue;
+          const factor = M[r][col];
+          if (Math.abs(factor) < 1e-12) continue;
+          for (let c = col; c < n + m; c++) M[r][c] -= factor * M[col][c];
+        }
+      }
+      return M.map(row => row.slice(n));
+    }
+
+    function trainReadout() {
+      let x = new Float32Array(N);
+      const X = [];
+      const Y = [];
+      const phases = [];
+      for (let t = 0; t < trainLen; t++) {
+        const phase = (t / (trainLen - washout)) * TAU * 1.24;
+        x = stepReservoir(x, Math.sin(phase), Math.cos(phase));
+        if (t >= washout) {
+          const feature = new Array(N + 1);
+          feature[0] = 1;
+          for (let i = 0; i < N; i++) feature[i + 1] = x[i];
+          X.push(feature);
+          Y.push(inverseKinematics(desiredPoint(phase)));
+          phases.push(phase);
+        }
+      }
+
+      const d = N + 1;
+      const A = Array.from({ length: d }, () => Array(d).fill(0));
+      const B = Array.from({ length: d }, () => [0, 0]);
+      for (let r = 0; r < X.length; r++) {
+        const feature = X[r];
+        const target = Y[r];
+        for (let i = 0; i < d; i++) {
+          B[i][0] += feature[i] * target[0];
+          B[i][1] += feature[i] * target[1];
+          for (let j = 0; j < d; j++) A[i][j] += feature[i] * feature[j];
+        }
+      }
+      for (let i = 0; i < d; i++) A[i][i] += ridge;
+      const Wout = solveLinearSystem(A, B);
+      let sse = 0;
+      const decoded = [];
+      for (let r = 0; r < X.length; r++) {
+        const pred = decodeFeature(Wout, X[r]);
+        decoded.push(pred);
+        const e0 = pred[0] - Y[r][0];
+        const e1 = pred[1] - Y[r][1];
+        sse += e0 * e0 + e1 * e1;
+      }
+      const rmse = Math.sqrt(sse / (X.length * 2));
+      return { Wout, X, Y, phases, decoded, rmse };
+    }
+
+    function decodeFeature(Wout, feature) {
+      let q1 = 0;
+      let q2 = 0;
+      for (let i = 0; i < feature.length; i++) {
+        q1 += Wout[i][0] * feature[i];
+        q2 += Wout[i][1] * feature[i];
+      }
+      return [q1, q2];
+    }
+
+    function decodeState(x) {
+      const feature = new Array(N + 1);
+      feature[0] = 1;
+      for (let i = 0; i < N; i++) feature[i + 1] = x[i];
+      return decodeFeature(model.Wout, feature);
+    }
+
+    const model = trainReadout();
+    const readoutLinks = buildReadoutLinks(model.Wout);
+    const restAngles = inverseKinematics(pathCenter);
+    const state = {
+      amplitude: 1,
+      stage: "make",
+      playing: true,
+      phase: 0,
+      x: new Float32Array(N),
+      q: restAngles.slice(),
+      targetQ: restAngles.slice(),
+      handTrail: [],
+      trace: []
+    };
+
+    els.neuronCount.textContent = String(N);
+    els.trainSamples.textContent = String(trainLen - washout);
+    els.ridgeValue.textContent = ridge.toExponential(0);
+    els.rmseValue.textContent = model.rmse.toFixed(3) + " rad";
+    els.errorReadout.textContent = model.rmse.toFixed(3) + " rad";
+
+    function setStage(stage) {
+      state.stage = stage;
+      document.querySelectorAll("[data-stage]").forEach(button => {
+        button.classList.toggle("active", button.dataset.stage === stage);
+      });
+      const labels = {
+        make: "making reservoir",
+        train: "training readout",
+        run: "running arm"
+      };
+      els.stageLabel.textContent = labels[stage];
+      els.armCaption.textContent = stage === "make"
+        ? "The arm waits at the rest pose until decoded angles begin to vary."
+        : stage === "train"
+          ? "The faint path is the target. The bright path is produced from decoded angles."
+          : "The drive slider scales motion around the learned rest pose.";
+      els.reservoirCaption.textContent = stage === "make"
+        ? "Sparse random recurrent connections make a fading memory of the input."
+        : stage === "train"
+          ? "Only the colored readout from state to joint angles is fitted."
+          : "Live activations expand and contract as the drive changes.";
+    }
+
+    document.querySelectorAll("[data-stage]").forEach(button => {
+      button.addEventListener("click", () => setStage(button.dataset.stage));
+    });
+
+    els.amp.addEventListener("input", () => {
+      state.amplitude = Number(els.amp.value);
+      els.ampReadout.textContent = state.amplitude.toFixed(2);
+    });
+
+    els.playPause.addEventListener("click", () => {
+      state.playing = !state.playing;
+      els.playPause.textContent = state.playing ? "Pause" : "Play";
+    });
+
+    function transformArm(w, h) {
+      const scale = Math.min(w / 360, h / 320);
+      return {
+        scale,
+        ox: w * 0.36,
+        oy: h * 0.62
+      };
+    }
+
+    function worldToScreen(point, tx) {
+      return {
+        x: tx.ox + point.x * tx.scale,
+        y: tx.oy - point.y * tx.scale
+      };
+    }
+
+    function drawBackground(ctx, w, h) {
+      ctx.fillStyle = colors.bg;
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = colors.grid;
+      ctx.lineWidth = 1;
+      for (let x = 0; x < w; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 0; y < h; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+    }
+
+    function drawArm() {
+      const { ctx, w, h } = setupCanvas(canvases.arm);
+      drawBackground(ctx, w, h);
+      const tx = transformArm(w, h);
+      const origin = worldToScreen({ x: 0, y: 0 }, tx);
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "rgba(237,242,255,0.22)";
+      ctx.beginPath();
+      for (let i = 0; i <= 240; i++) {
+        const p = desiredPoint((i / 240) * TAU);
+        const s = worldToScreen(p, tx);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      }
+      ctx.stroke();
+
+      if (state.handTrail.length > 1) {
+        ctx.strokeStyle = colors.green;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        state.handTrail.forEach((p, i) => {
+          const s = worldToScreen(p, tx);
+          if (i === 0) ctx.moveTo(s.x, s.y);
+          else ctx.lineTo(s.x, s.y);
+        });
+        ctx.stroke();
+      }
+
+      const target = desiredPoint(state.phase);
+      const targetS = worldToScreen(target, tx);
+      ctx.fillStyle = "rgba(237,242,255,0.55)";
+      ctx.beginPath();
+      ctx.arc(targetS.x, targetS.y, 5, 0, TAU);
+      ctx.fill();
+
+      const fk = forwardKinematics(state.q[0], state.q[1]);
+      const elbow = worldToScreen(fk.elbow, tx);
+      const hand = worldToScreen(fk.hand, tx);
+
+      ctx.lineCap = "round";
+      ctx.lineWidth = 15;
+      ctx.strokeStyle = colors.cyan;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.stroke();
+      ctx.strokeStyle = colors.amber;
+      ctx.beginPath();
+      ctx.moveTo(elbow.x, elbow.y);
+      ctx.lineTo(hand.x, hand.y);
+      ctx.stroke();
+
+      [origin, elbow, hand].forEach((p, i) => {
+        ctx.fillStyle = i === 2 ? colors.green : colors.text;
+        ctx.strokeStyle = colors.bg;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, i === 2 ? 8 : 7, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      });
+
+      ctx.fillStyle = colors.text;
+      ctx.font = "700 13px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("shoulder", origin.x + 10, origin.y + 18);
+      ctx.fillStyle = colors.cyan;
+      ctx.fillText("q1 " + state.q[0].toFixed(2), 18, 26);
+      ctx.fillStyle = colors.amber;
+      ctx.fillText("q2 " + state.q[1].toFixed(2), 18, 46);
+    }
+
+    function stateColor(v) {
+      const a = clamp(Math.abs(v), 0, 1);
+      if (v >= 0) return `rgba(255, 189, 102, ${0.20 + 0.80 * a})`;
+      return `rgba(87, 215, 255, ${0.20 + 0.80 * a})`;
+    }
+
+    function signedWeightColor(value, maxAbs, minAlpha, maxAlpha) {
+      const alpha = minAlpha + (maxAlpha - minAlpha) * clamp(Math.abs(value) / (maxAbs || 1), 0, 1);
+      return value >= 0
+        ? `rgba(255, 189, 102, ${alpha})`
+        : `rgba(87, 215, 255, ${alpha})`;
+    }
+
+    function buildReadoutLinks(Wout) {
+      const links = [[], []];
+      let maxAbs = 0;
+      for (let output = 0; output < 2; output++) {
+        const ranked = [];
+        for (let i = 1; i < Wout.length; i++) {
+          const value = Wout[i][output];
+          ranked.push({ neuron: i - 1, output, value, abs: Math.abs(value) });
+          maxAbs = Math.max(maxAbs, Math.abs(value));
+        }
+        ranked.sort((a, b) => b.abs - a.abs);
+        links[output] = ranked.slice(0, 16);
+      }
+      return { links: links.flat(), maxAbs };
+    }
+
+    function drawAdjacencyMatrix(ctx, x, y, size) {
+      ctx.save();
+      ctx.fillStyle = "rgba(5,7,13,0.72)";
+      ctx.strokeStyle = "rgba(214,226,255,0.18)";
+      ctx.lineWidth = 1;
+      ctx.fillRect(x, y, size, size);
+      ctx.strokeRect(x, y, size, size);
+
+      const cell = size / N;
+      for (let row = 0; row < N; row++) {
+        for (let col = 0; col < N; col++) {
+          const value = reservoir.W[row * N + col];
+          if (value === 0) continue;
+          ctx.fillStyle = signedWeightColor(value, reservoir.maxAbsW, 0.18, 0.94);
+          ctx.fillRect(x + col * cell, y + row * cell, Math.max(1, cell), Math.max(1, cell));
+        }
+      }
+
+      ctx.fillStyle = colors.text;
+      ctx.font = "700 12px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("W recurrent", x, y - 9);
+      ctx.fillStyle = colors.muted;
+      ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("source ->", x, y + size + 16);
+      ctx.save();
+      ctx.translate(x - 8, y + size);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText("target ->", 0, 0);
+      ctx.restore();
+
+      const legendY = y + size + 33;
+      ctx.fillStyle = signedWeightColor(-1, 1, 0.72, 0.72);
+      ctx.fillRect(x, legendY, 18, 3);
+      ctx.fillStyle = colors.muted;
+      ctx.fillText("negative", x + 23, legendY + 4);
+      ctx.fillStyle = signedWeightColor(1, 1, 0.72, 0.72);
+      ctx.fillRect(x + 86, legendY, 18, 3);
+      ctx.fillStyle = colors.muted;
+      ctx.fillText("positive", x + 109, legendY + 4);
+      ctx.restore();
+    }
+
+    function drawReadoutWeights(ctx, layout, compact) {
+      if (state.stage === "make") return;
+      const outputX = layout.panelX + layout.panelW * 0.68;
+      const outputY1 = layout.outputY;
+      const outputY2 = layout.outputY + (compact ? 42 : 54);
+      const outputs = [
+        { x: outputX, y: outputY1, label: "q1", color: colors.cyan },
+        { x: outputX, y: outputY2, label: "q2", color: colors.amber }
+      ];
+
+      ctx.save();
+      ctx.lineCap = "round";
+      for (const link of readoutLinks.links) {
+        const node = reservoir.nodes[link.neuron];
+        const fromX = layout.cx + (node.x - 0.5) * layout.radius * 2;
+        const fromY = layout.cy + (node.y - 0.5) * layout.radius * 2;
+        const out = outputs[link.output];
+        const normalized = clamp(link.abs / (readoutLinks.maxAbs || 1), 0, 1);
+        ctx.strokeStyle = signedWeightColor(link.value, readoutLinks.maxAbs, 0.18, 0.72);
+        ctx.lineWidth = 0.7 + normalized * (compact ? 2.1 : 3.1);
+        ctx.beginPath();
+        const bendX = layout.panelX - 14;
+        ctx.moveTo(fromX, fromY);
+        ctx.bezierCurveTo(bendX, fromY, bendX, out.y, out.x - 17, out.y);
+        ctx.stroke();
+      }
+
+      outputs.forEach((out, index) => {
+        ctx.fillStyle = "rgba(5,7,13,0.86)";
+        ctx.strokeStyle = out.color;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(out.x, out.y, compact ? 14 : 17, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = out.color;
+        ctx.font = "700 12px IBM Plex Mono, ui-monospace, monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(out.label, out.x, out.y);
+        ctx.textAlign = "left";
+        ctx.fillStyle = colors.muted;
+        ctx.fillText(index === 0 ? "shoulder" : "elbow", out.x + 22, out.y + 1);
+      });
+
+      ctx.fillStyle = colors.green;
+      ctx.font = "700 12px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("Wout", layout.panelX, layout.outputY - 24);
+      ctx.fillStyle = colors.muted;
+      ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("largest readout weights", layout.panelX, layout.outputY - 8);
+      ctx.restore();
+    }
+
+    function drawReservoir(canvas, compact) {
+      const { ctx, w, h } = setupCanvas(canvas);
+      drawBackground(ctx, w, h);
+      const panelW = Math.min(compact ? 190 : 235, Math.max(155, w * 0.38));
+      const panelX = w - panelW - 12;
+      const graphLeft = 16;
+      const graphRight = Math.max(graphLeft + 180, panelX - 18);
+      const graphW = graphRight - graphLeft;
+      const cx = graphLeft + graphW * 0.5;
+      const cy = h * 0.5;
+      const radius = Math.min(graphW, h) * (compact ? 0.40 : 0.43);
+      const matrixSize = Math.min(panelW - 34, h * (compact ? 0.36 : 0.34), compact ? 124 : 154);
+      const matrixX = panelX + 6;
+      const matrixY = compact ? 48 : 60;
+      const layout = {
+        cx,
+        cy,
+        radius,
+        panelX,
+        panelW,
+        outputY: Math.min(h - (compact ? 72 : 88), matrixY + matrixSize + (compact ? 72 : 88))
+      };
+      const stageOpacity = state.stage === "make" ? 0.2 : state.stage === "train" ? 0.09 : 0.06;
+
+      ctx.lineWidth = 1;
+      for (const edge of reservoir.edges) {
+        const a = reservoir.nodes[edge[0]];
+        const b = reservoir.nodes[edge[1]];
+        ctx.strokeStyle = edge[2] > 0
+          ? `rgba(255,189,102,${stageOpacity})`
+          : `rgba(87,215,255,${stageOpacity})`;
+        ctx.beginPath();
+        ctx.moveTo(cx + (a.x - 0.5) * radius * 2, cy + (a.y - 0.5) * radius * 2);
+        ctx.lineTo(cx + (b.x - 0.5) * radius * 2, cy + (b.y - 0.5) * radius * 2);
+        ctx.stroke();
+      }
+
+      drawReadoutWeights(ctx, layout, compact);
+
+      for (let i = 0; i < N; i++) {
+        const n = reservoir.nodes[i];
+        const x = cx + (n.x - 0.5) * radius * 2;
+        const y = cy + (n.y - 0.5) * radius * 2;
+        const value = state.x[i] || 0;
+        ctx.fillStyle = stateColor(value);
+        ctx.strokeStyle = "rgba(5,7,13,0.72)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(x, y, compact ? 4.2 : 5.4, 0, TAU);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      drawAdjacencyMatrix(ctx, matrixX, matrixY, matrixSize);
+
+      ctx.fillStyle = colors.text;
+      ctx.font = "700 13px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("u(t) = drive x [sin t, cos t]", 16, 26);
+      ctx.fillStyle = colors.muted;
+      ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText(state.stage === "make" ? "fixed W, fixed Win" : "fixed W, trained Wout", 16, 45);
+    }
+
+    function drawTrace() {
+      const { ctx, w, h } = setupCanvas(canvases.trace);
+      ctx.fillStyle = "#090b15";
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = colors.grid;
+      ctx.lineWidth = 1;
+      for (let x = 38; x < w; x += 54) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, h);
+        ctx.stroke();
+      }
+      for (let y = 30; y < h; y += 42) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+      }
+
+      const data = state.trace;
+      const margin = { l: 42, r: 16, t: 24, b: 24 };
+      const minV = -1.5;
+      const maxV = 2.6;
+      function px(i) {
+        return margin.l + (i / Math.max(1, data.length - 1)) * (w - margin.l - margin.r);
+      }
+      function py(v) {
+        return margin.t + (1 - (v - minV) / (maxV - minV)) * (h - margin.t - margin.b);
+      }
+      function line(key, color, width, dashed) {
+        if (data.length < 2) return;
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        if (dashed) ctx.setLineDash([5, 6]);
+        ctx.beginPath();
+        data.forEach((d, i) => {
+          const x = px(i);
+          const y = py(d[key]);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
+      line("tq1", "rgba(237,242,255,0.34)", 1.6, true);
+      line("tq2", "rgba(237,242,255,0.34)", 1.6, true);
+      line("q1", colors.cyan, 2.5, false);
+      line("q2", colors.amber, 2.5, false);
+
+      ctx.fillStyle = colors.muted;
+      ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("decoded joint angles over time", 12, 19);
+      ctx.fillText("rad", 10, margin.t + 8);
+    }
+
+    function drawMiniTraining(canvas) {
+      const { ctx, w, h } = setupCanvas(canvas);
+      drawBackground(ctx, w, h);
+      const margin = { l: 38, r: 18, t: 24, b: 34 };
+      const minV = -1.5;
+      const maxV = 2.6;
+      const samples = model.Y.length;
+      function px(i) {
+        return margin.l + (i / Math.max(1, samples - 1)) * (w - margin.l - margin.r);
+      }
+      function py(v) {
+        return margin.t + (1 - (v - minV) / (maxV - minV)) * (h - margin.t - margin.b);
+      }
+      function plot(source, index, color, width, dash) {
+        ctx.save();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        if (dash) ctx.setLineDash([4, 7]);
+        ctx.beginPath();
+        for (let i = 0; i < samples; i++) {
+          const y = py(source[i][index]);
+          const x = px(i);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
+      plot(model.Y, 0, "rgba(237,242,255,0.38)", 1.4, true);
+      plot(model.Y, 1, "rgba(237,242,255,0.38)", 1.4, true);
+      plot(model.decoded, 0, colors.cyan, 2.2, false);
+      plot(model.decoded, 1, colors.amber, 2.2, false);
+      ctx.fillStyle = colors.text;
+      ctx.font = "700 13px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("target vs decoded angles", 14, 22);
+      ctx.fillStyle = colors.muted;
+      ctx.fillText("one trained readout, two outputs", 14, h - 14);
+    }
+
+    function drawRunMini() {
+      const { ctx, w, h } = setupCanvas(canvases.run);
+      drawBackground(ctx, w, h);
+      const tx = transformArm(w, h);
+      ctx.strokeStyle = "rgba(237,242,255,0.18)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i <= 260; i++) {
+        const p = desiredPoint((i / 260) * TAU);
+        const scaled = {
+          x: pathCenter.x + (p.x - pathCenter.x) * state.amplitude,
+          y: pathCenter.y + (p.y - pathCenter.y) * state.amplitude
+        };
+        const s = worldToScreen(scaled, tx);
+        if (i === 0) ctx.moveTo(s.x, s.y);
+        else ctx.lineTo(s.x, s.y);
+      }
+      ctx.stroke();
+      const fk = forwardKinematics(state.q[0], state.q[1]);
+      const origin = worldToScreen({ x: 0, y: 0 }, tx);
+      const elbow = worldToScreen(fk.elbow, tx);
+      const hand = worldToScreen(fk.hand, tx);
+      ctx.lineCap = "round";
+      ctx.lineWidth = 12;
+      ctx.strokeStyle = colors.cyan;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(elbow.x, elbow.y);
+      ctx.stroke();
+      ctx.strokeStyle = colors.amber;
+      ctx.beginPath();
+      ctx.moveTo(elbow.x, elbow.y);
+      ctx.lineTo(hand.x, hand.y);
+      ctx.stroke();
+      ctx.fillStyle = colors.green;
+      ctx.beginPath();
+      ctx.arc(hand.x, hand.y, 7, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = colors.text;
+      ctx.font = "700 13px IBM Plex Mono, ui-monospace, monospace";
+      ctx.fillText("drive " + state.amplitude.toFixed(2), 16, 25);
+    }
+
+    function drawMakeMini() {
+      drawReservoir(canvases.make, true);
+    }
+
+    function updateSimulation(dt) {
+      if (state.playing) state.phase = (state.phase + dt * 0.00155) % TAU;
+      const amp = state.amplitude;
+      const drive = state.playing ? amp : amp;
+      state.x = stepReservoir(state.x, drive * Math.sin(state.phase), drive * Math.cos(state.phase));
+      const decoded = decodeState(state.x);
+      state.targetQ = inverseKinematics(desiredPoint(state.phase));
+      state.q = [
+        restAngles[0] + amp * (decoded[0] - restAngles[0]),
+        restAngles[1] + amp * (decoded[1] - restAngles[1])
+      ];
+      const fk = forwardKinematics(state.q[0], state.q[1]);
+      state.handTrail.push(fk.hand);
+      if (state.handTrail.length > 180) state.handTrail.shift();
+      state.trace.push({
+        q1: state.q[0],
+        q2: state.q[1],
+        tq1: restAngles[0] + amp * (state.targetQ[0] - restAngles[0]),
+        tq2: restAngles[1] + amp * (state.targetQ[1] - restAngles[1])
+      });
+      if (state.trace.length > 360) state.trace.shift();
+    }
+
+    let last = performance.now();
+    function loop(now) {
+      const dt = Math.min(34, now - last);
+      last = now;
+      updateSimulation(dt);
+      drawArm();
+      drawReservoir(canvases.reservoir, false);
+      drawTrace();
+      drawMakeMini();
+      drawMiniTraining(canvases.train);
+      drawRunMini();
+      requestAnimationFrame(loop);
+    }
+
+    function resizeAll() {
+      Object.values(canvases).forEach(canvas => {
+        canvas.width = 0;
+        canvas.height = 0;
+      });
+    }
+
+    window.addEventListener("resize", resizeAll);
+    setStage("make");
+    requestAnimationFrame(loop);
+  </script>
+</body>
+</html>
