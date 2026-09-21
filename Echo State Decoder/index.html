@@ -478,9 +478,9 @@
           <input id="amplitude" type="range" min="0" max="1" step="0.01" value="1" aria-describedby="ampHint">
           <p id="ampHint" class="hint">At 0 the readout returns the rest pose. At 1 the trained decoder drives the full path.</p>
           <div class="button-row" role="group" aria-label="Explainer stage">
-            <button class="active" type="button" data-stage="make">1. Make</button>
-            <button type="button" data-stage="train">2. Train</button>
-            <button type="button" data-stage="run">3. Run</button>
+            <button class="active" type="button" data-stage="make">0. Random</button>
+            <button type="button" data-stage="train">1. Train</button>
+            <button type="button" data-stage="run">2. Run</button>
             <button class="primary" type="button" id="playPause">Pause</button>
           </div>
         </aside>
@@ -489,7 +489,7 @@
       <section class="lab" aria-label="Interactive echo state network lab">
         <div class="lab-toolbar">
           <div class="status">
-            <span>stage <strong id="stageLabel">making reservoir</strong></span>
+            <span>stage <strong id="stageLabel">random readout</strong></span>
             <span>neurons <strong id="neuronCount">96</strong></span>
             <span>readout error <strong id="errorReadout">...</strong></span>
           </div>
@@ -523,14 +523,14 @@
 
       <section class="section" id="make">
         <div class="section-copy">
-          <div class="eyebrow">1. Make the reservoir</div>
-          <h2>Start with a random dynamical system.</h2>
-          <p>The reservoir is a sparse recurrent network. Its weights are scaled below runaway instability, so recent input leaves a fading but useful trace across many neurons.</p>
+          <div class="eyebrow">0. Random readout</div>
+          <h2>Start before learning.</h2>
+          <p>The reservoir is random, and so is the first readout. The recurrent weights already create a rich state, but random output weights do not yet decode the arm angles needed for the figure eight.</p>
         </div>
         <div class="mini-grid">
           <div class="explain-panel">
-            <h3>Why this is useful</h3>
-            <p>The reservoir turns a low-dimensional drive into many nonlinear traces of recent history. The decoder then reduces that state back to the two numbers the arm needs.</p>
+            <h3>What exists before training?</h3>
+            <p>The reservoir turns a low-dimensional drive into many nonlinear traces of recent history. Stage 0 connects those traces to q1 and q2 with random output weights, so you can see why learning the readout matters.</p>
             <div class="equation">x[t+1] = (1 - leak) x[t] + leak tanh(W x[t] + W_in u[t])</div>
           </div>
           <div class="mini-canvas"><canvas id="makeCanvas"></canvas></div>
@@ -854,17 +854,47 @@
       return [q1, q2];
     }
 
+    function buildRandomReadout(biasAngles) {
+      const scale = 0.26 / Math.sqrt(N);
+      return Array.from({ length: N + 1 }, (_, i) => {
+        if (i === 0) return [biasAngles[0], biasAngles[1]];
+        return [randSigned() * scale, randSigned() * scale];
+      });
+    }
+
+    function readoutRmse(Wout, X, Y) {
+      let sse = 0;
+      for (let r = 0; r < X.length; r++) {
+        const pred = decodeFeature(Wout, X[r]);
+        const e0 = pred[0] - Y[r][0];
+        const e1 = pred[1] - Y[r][1];
+        sse += e0 * e0 + e1 * e1;
+      }
+      return Math.sqrt(sse / (X.length * 2));
+    }
+
+    function activeReadoutWeights() {
+      return state.stage === "make" ? randomWout : model.Wout;
+    }
+
+    function activeReadoutLinks() {
+      return state.stage === "make" ? randomReadoutLinks : trainedReadoutLinks;
+    }
+
     function decodeState(x) {
       const feature = new Array(N + 1);
       feature[0] = 1;
       for (let i = 0; i < N; i++) feature[i + 1] = x[i];
-      return decodeFeature(model.Wout, feature);
+      return decodeFeature(activeReadoutWeights(), feature);
     }
 
     const model = trainReadout();
     const inputLinks = buildInputLinks();
-    const readoutLinks = buildReadoutLinks(model.Wout);
     const restAngles = inverseKinematics(pathCenter);
+    const randomWout = buildRandomReadout(restAngles);
+    const randomReadoutLinks = buildReadoutLinks(randomWout);
+    const trainedReadoutLinks = buildReadoutLinks(model.Wout);
+    const randomRmse = readoutRmse(randomWout, model.X, model.Y);
     const state = {
       amplitude: 1,
       stage: "make",
@@ -881,26 +911,31 @@
     els.trainSamples.textContent = String(trainLen - washout);
     els.ridgeValue.textContent = ridge.toExponential(0);
     els.rmseValue.textContent = model.rmse.toFixed(3) + " rad";
-    els.errorReadout.textContent = model.rmse.toFixed(3) + " rad";
+    els.errorReadout.textContent = randomRmse.toFixed(3) + " rad";
 
     function setStage(stage) {
       state.stage = stage;
+      state.handTrail = [];
+      state.trace = [];
       document.querySelectorAll("[data-stage]").forEach(button => {
         button.classList.toggle("active", button.dataset.stage === stage);
       });
       const labels = {
-        make: "making reservoir",
+        make: "random readout",
         train: "training readout",
         run: "running arm"
       };
       els.stageLabel.textContent = labels[stage];
+      els.errorReadout.textContent = stage === "make"
+        ? randomRmse.toFixed(3) + " rad"
+        : model.rmse.toFixed(3) + " rad";
       els.armCaption.textContent = stage === "make"
-        ? "The arm waits at the rest pose until decoded angles begin to vary."
+        ? "Random output weights decode the reservoir into arbitrary shoulder and elbow angles."
         : stage === "train"
           ? "The faint path is the target. The bright path is produced from decoded angles."
           : "The drive slider scales motion around the learned rest pose.";
       els.reservoirCaption.textContent = stage === "make"
-        ? "Sparse random recurrent connections make a fading memory of the input."
+        ? "Stage 0 uses random Wout, so the output edges are not yet task-aligned."
         : stage === "train"
           ? "Only the colored readout from state to joint angles is fitted."
           : "Live activations expand and contract as the drive changes.";
@@ -1133,15 +1168,16 @@
         ctx.stroke();
       }
 
-      const readoutMinAlpha = state.stage === "make" ? 0.11 : 0.22;
-      const readoutMaxAlpha = state.stage === "make" ? 0.38 : 0.78;
-      for (const link of readoutLinks.links) {
+      const visibleReadout = activeReadoutLinks();
+      const readoutMinAlpha = state.stage === "make" ? 0.18 : 0.22;
+      const readoutMaxAlpha = state.stage === "make" ? 0.62 : 0.78;
+      for (const link of visibleReadout.links) {
         const node = reservoir.nodes[link.neuron];
         const fromX = layout.cx + (node.x - 0.5) * layout.radius * 2;
         const fromY = layout.cy + (node.y - 0.5) * layout.radius * 2;
         const out = outputs[link.output];
-        const normalized = clamp(link.abs / (readoutLinks.maxAbs || 1), 0, 1);
-        ctx.strokeStyle = signedWeightColor(link.value, readoutLinks.maxAbs, readoutMinAlpha, readoutMaxAlpha);
+        const normalized = clamp(link.abs / (visibleReadout.maxAbs || 1), 0, 1);
+        ctx.strokeStyle = signedWeightColor(link.value, visibleReadout.maxAbs, readoutMinAlpha, readoutMaxAlpha);
         ctx.lineWidth = 0.8 + normalized * (compact ? 2.3 : 3.4);
         ctx.beginPath();
         ctx.moveTo(fromX, fromY);
@@ -1167,13 +1203,13 @@
 
       outputs.forEach((out, index) => {
         ctx.fillStyle = "rgba(5,7,13,0.9)";
-        ctx.strokeStyle = state.stage === "make" ? "rgba(154,167,188,0.72)" : out.color;
+        ctx.strokeStyle = out.color;
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(out.x, out.y, compact ? 15 : 18, 0, TAU);
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = state.stage === "make" ? colors.muted : out.color;
+        ctx.fillStyle = out.color;
         ctx.font = "700 12px IBM Plex Mono, ui-monospace, monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -1186,10 +1222,10 @@
       ctx.fillStyle = colors.green;
       ctx.font = "700 12px IBM Plex Mono, ui-monospace, monospace";
       ctx.textAlign = "center";
-      ctx.fillText("Wout", layout.outputX, layout.cy - layout.outputGap - (compact ? 34 : 42));
+      ctx.fillText(state.stage === "make" ? "random Wout" : "trained Wout", layout.outputX, layout.cy - layout.outputGap - (compact ? 34 : 42));
       ctx.fillStyle = colors.muted;
       ctx.font = "11px IBM Plex Mono, ui-monospace, monospace";
-      ctx.fillText("signed output weights", layout.outputX, layout.cy - layout.outputGap - (compact ? 18 : 25));
+      ctx.fillText(state.stage === "make" ? "untrained output weights" : "signed output weights", layout.outputX, layout.cy - layout.outputGap - (compact ? 18 : 25));
       ctx.restore();
     }
 
@@ -1258,7 +1294,7 @@
       ctx.fillText("u(t) = drive x [sin t, cos t]", 16, 26);
       ctx.fillStyle = colors.muted;
       ctx.font = "12px IBM Plex Mono, ui-monospace, monospace";
-      ctx.fillText(state.stage === "make" ? "fixed W, fixed Win" : "fixed W, trained Wout", 16, 45);
+      ctx.fillText(state.stage === "make" ? "fixed W, random Wout" : "fixed W, trained Wout", 16, 45);
     }
 
     function drawTrace() {
