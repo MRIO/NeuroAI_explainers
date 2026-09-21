@@ -479,8 +479,7 @@
           <p id="ampHint" class="hint">At 0 the readout returns the rest pose. At 1 the trained decoder drives the full path.</p>
           <div class="button-row" role="group" aria-label="Explainer stage">
             <button class="active" type="button" data-stage="make">0. Random</button>
-            <button type="button" data-stage="train">1. Train</button>
-            <button type="button" data-stage="run">2. Run</button>
+            <button type="button" data-stage="train">1. Trained</button>
             <button class="primary" type="button" id="playPause">Pause</button>
           </div>
         </aside>
@@ -539,8 +538,8 @@
 
       <section class="section" id="train">
         <div class="section-copy">
-          <div class="eyebrow">2. Train the decoder</div>
-          <h2>The target path becomes target angles.</h2>
+          <div class="eyebrow">1. Trained readout</div>
+          <h2>Linear regression learns the output weights.</h2>
           <p>A figure-eight hand path is converted into shoulder and elbow angles with inverse kinematics. Ridge regression then fits a linear readout from the reservoir state to those target angles.</p>
         </div>
         <div class="mini-grid">
@@ -560,7 +559,7 @@
 
       <section class="section" id="run">
         <div class="section-copy">
-          <div class="eyebrow">3. Run the arm</div>
+          <div class="eyebrow">Trained playground</div>
           <h2>The slider gates the learned motion.</h2>
           <p>The trained decoder knows the full pattern. The slider blends decoded motion around the rest pose, so you can watch the same reservoir state contract toward stillness or expand into the figure eight.</p>
         </div>
@@ -922,8 +921,7 @@
       });
       const labels = {
         make: "random readout",
-        train: "training readout",
-        run: "running arm"
+        train: "trained readout"
       };
       els.stageLabel.textContent = labels[stage];
       els.errorReadout.textContent = stage === "make"
@@ -931,14 +929,10 @@
         : model.rmse.toFixed(3) + " rad";
       els.armCaption.textContent = stage === "make"
         ? "Random output weights decode the reservoir into arbitrary shoulder and elbow angles."
-        : stage === "train"
-          ? "The faint path is the target. The bright path is produced from decoded angles."
-          : "The drive slider scales motion around the learned rest pose.";
+        : "The faint path is the target. The bright path is produced from trained decoded angles.";
       els.reservoirCaption.textContent = stage === "make"
         ? "Stage 0 uses random Wout, so the output edges are not yet task-aligned."
-        : stage === "train"
-          ? "Only the colored readout from state to joint angles is fitted."
-          : "Live activations expand and contract as the drive changes.";
+        : "Only the colored readout from state to joint angles is fitted.";
     }
 
     document.querySelectorAll("[data-stage]").forEach(button => {
