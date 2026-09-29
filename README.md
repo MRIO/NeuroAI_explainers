@@ -42,6 +42,11 @@ GitHub Pages serves the demos directly from this repository.
 - [Small RNN Eigenspace Explorer](https://mrio.github.io/NeuroAI_explainers/small%20RNN%20eigenspace%20explorer/) — a compact version of the RNN eigenspace demo.
   - Explanation: [project README](small%20RNN%20eigenspace%20explorer/README.md)
 
+### Learning and plasticity
+
+- [Stabilizing Hebbian Learning: Oja's Rule](https://mrio.github.io/NeuroAI_explainers/Stabilizing%20Hebbian%20Learning/oja_rule.html) — see how Oja's rule keeps Hebbian weights bounded while extracting the strongest correlated input direction.
+  - Explanation: [project README](Stabilizing%20Hebbian%20Learning/README.md)
+
 ### Multilayer and mean-field experiments
 
 - [Multilayer tanh/sigmoid stack](https://mrio.github.io/NeuroAI_explainers/Multi%20Layer%20Meanfield%20Network/meanfield_layers_demo/) — the current logging-and-traces version.
