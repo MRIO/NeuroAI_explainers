@@ -44,6 +44,8 @@ GitHub Pages serves the demos directly from this repository.
 
 ### Learning and plasticity
 
+- [Through the Keyhole: Autoencoders](https://mrio.github.io/NeuroAI_explainers/Autoencoder/autoencoder_explainer.html) — explore how a network learns compact latent codes by reconstructing pictures through a narrow bottleneck.
+  - Explanation: [project README](Autoencoder/README.md)
 - [Stabilizing Hebbian Learning: Oja's Rule](https://mrio.github.io/NeuroAI_explainers/Stabilizing%20Hebbian%20Learning/oja_rule.html) — see how Oja's rule keeps Hebbian weights bounded while extracting the strongest correlated input direction.
   - Explanation: [project README](Stabilizing%20Hebbian%20Learning/README.md)
 

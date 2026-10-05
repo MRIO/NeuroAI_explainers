@@ -1,0 +1,1047 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Through the Keyhole</title>
+<meta name="description" content="An interactive explainer on autoencoders: how a network learns to rebuild pictures through a narrow bottleneck, step by step.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<style>
+:root{
+  --bg:#0b0f1a; --panel:#10162a; --panel2:#151c33; --line:#232b45; --ink:#dfe3ec; --muted:#8c96ab; --faint:#5b6580;
+  --pos:#4fc3e8; --neg:#f0915a; --gold:#ffd166; --pink:#ff6b9d;
+  --serif:'Fraunces',Georgia,serif; --sans:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17.5px;line-height:1.7;-webkit-font-smoothing:antialiased}
+.col{max-width:720px;margin:0 auto;padding:0 20px}
+.wide{max-width:1140px;margin:28px auto 34px;padding:0 16px}
+p{margin:0 0 1.05em}
+a{color:var(--pos)}
+h1,h2,h3{font-family:var(--serif);font-weight:600;letter-spacing:-.01em;line-height:1.2}
+h2{font-size:1.85rem;margin:3.2em 0 .7em}
+h2 .num{display:block;font-family:var(--mono);font-size:.78rem;font-weight:500;letter-spacing:.12em;color:var(--gold);margin-bottom:.5em}
+h3{font-size:1.15rem;margin:1.6em 0 .5em}
+.m{font-family:KaTeX_Math,'Times New Roman',serif;font-style:italic;white-space:nowrap}
+.m sub{font-size:.72em}
+.pos{color:var(--pos)} .neg{color:var(--neg)} .gold{color:var(--gold)} .pink{color:var(--pink)}
+header.hero{padding:9vh 0 2vh}
+.kicker{font-family:var(--mono);font-size:.78rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:clamp(2.4rem,6vw,3.6rem);margin:.25em 0 .2em}
+.sub{font-family:var(--serif);font-size:1.3rem;color:var(--muted);font-weight:400;margin-bottom:1.6em;line-height:1.45}
+figure{margin:0;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+figcaption{font-size:.86rem;color:var(--muted);margin-top:12px;line-height:1.55}
+canvas{display:block;touch-action:none}
+.eq{margin:1.2em 0 1.4em;text-align:center;font-size:1.05em;overflow-x:auto}
+.ctrls{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;margin-top:14px}
+.grp{display:flex;align-items:center;gap:8px}
+.lbl{font-size:.8rem;color:var(--muted);font-family:var(--mono)}
+.val{font-family:var(--mono);font-size:.86rem;color:var(--ink);min-width:58px}
+button{font-family:var(--sans);font-size:.88rem;color:var(--ink);background:var(--panel2);border:1px solid #2d3657;border-radius:999px;padding:7px 15px;cursor:pointer;transition:background .15s,border-color .15s}
+button:hover{background:#1e2744;border-color:#425083}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+button.primary{color:var(--gold);border-color:#6b5a2b}
+button.on{background:#2b2512;border-color:var(--gold);color:var(--gold)}
+button:disabled{opacity:.4;cursor:default}
+.seg{display:inline-flex;border:1px solid #2d3657;border-radius:999px;overflow:hidden}
+.seg button{border:none;border-radius:0;background:transparent;padding:6px 13px}
+.seg button.on{background:#2b2512;color:var(--gold)}
+.switch{display:inline-flex;align-items:center;gap:9px;cursor:pointer;user-select:none;font-size:.88rem}
+.switch input{display:none}
+.switch .tr{width:38px;height:21px;border-radius:12px;background:#283152;position:relative;transition:background .2s}
+.switch .tr::after{content:"";position:absolute;left:3px;top:3px;width:15px;height:15px;border-radius:50%;background:var(--muted);transition:transform .2s,background .2s}
+.switch input:checked+.tr{background:#5c4b1d}
+.switch input:checked+.tr::after{transform:translateX(17px);background:var(--gold)}
+input[type=range]{-webkit-appearance:none;appearance:none;width:150px;height:24px;background:transparent;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:#2b3454}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:#2b3454}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--gold);margin-top:-8px;border:3px solid #3a3115;cursor:grab}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--gold);border:3px solid #3a3115;cursor:grab}
+input[type=range]:active::-webkit-slider-thumb{cursor:grabbing}
+.pickers{display:flex;gap:6px;flex-wrap:wrap}
+.pickers canvas{border-radius:5px;border:2px solid transparent;cursor:pointer}
+.pickers canvas.sel{border-color:var(--gold)}
+.readout{font-family:var(--mono);font-size:.82rem;color:var(--muted);min-height:1.4em;margin-top:8px}
+.try{list-style:none;padding:0;margin:1em 0 1.4em}
+.try li{position:relative;padding-left:1.5em;margin-bottom:.55em}
+.try li::before{content:"→";position:absolute;left:0;color:var(--gold)}
+.aside{border-left:3px solid var(--gold);background:var(--panel);padding:14px 18px;border-radius:0 10px 10px 0;margin:1.6em 0;font-size:.95rem;color:#c7ccd8}
+.aside b{color:var(--gold);font-weight:500}
+.warn{display:none;margin-top:10px;padding:9px 14px;border-radius:9px;background:#3a1622;border:1px solid #7a2a44;color:#ffb3c6;font-size:.88rem}
+.warn.show{display:block}
+/* lab */
+.lab{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:18px}
+.side{display:flex;flex-direction:column;gap:12px}
+.box{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.box h4{margin:0 0 6px;font-family:var(--mono);font-weight:500;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.phases{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
+.phases span{font-family:var(--mono);font-size:.76rem;padding:4px 11px;border-radius:999px;border:1px solid var(--line);color:var(--faint);transition:all .2s}
+.phases span.on{color:var(--bg);background:var(--gold);border-color:var(--gold)}
+.eqrows{display:grid;grid-template-columns:96px 1fr;gap:4px 12px;margin-top:10px;font-size:.92rem;align-items:center}
+.eqrows .k{font-family:var(--mono);font-size:.74rem;color:var(--faint);transition:color .2s}
+.eqrows .e{color:#7c86a0;transition:color .2s;overflow-x:auto}
+.eqrows .on{color:var(--ink)} .eqrows .k.on{color:var(--gold)}
+pre.code{font-family:var(--mono);font-size:.82rem;line-height:1.75;background:#0d1222;border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow-x:auto;margin:0}
+pre.code .ln{display:block;padding:0 6px;border-radius:4px;transition:background .2s,color .2s;color:#aab3c8}
+pre.code .ln.on{background:#2b2512;color:var(--gold)}
+pre.code .cm{color:#5f6a86}
+.stat{font-family:var(--mono);font-size:.8rem;color:var(--muted);display:flex;justify-content:space-between}
+.stat b{color:var(--ink);font-weight:500}
+/* fields */
+.f5{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;align-items:start}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:10px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 8px 6px;cursor:pointer;transition:border-color .15s}
+.card.sel{border-color:var(--gold)}
+.card .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.card .hd span{font-family:var(--mono);font-size:.76rem;color:var(--gold)}
+.card .hd button{font-size:.7rem;padding:2px 9px}
+.card .hd button.on{background:#3a1622;border-color:#7a2a44;color:#ffb3c6}
+.card.bias .hd span{color:var(--muted)}
+.sticky{position:sticky;top:14px}
+.sticky .pickers{gap:5px}.sticky .pickers canvas{width:25px!important;height:25px!important}
+footer{margin:90px 0 60px;padding-top:28px;border-top:1px solid var(--line);display:flex;gap:22px;align-items:center;color:var(--muted);font-size:.9rem}
+footer canvas{border-radius:8px;background:#fff;flex:none}
+@media (max-width:900px){.lab,.f5,.f4grid{grid-template-columns:1fr!important}.sticky{position:static}}
+</style>
+</head>
+<body>
+
+<header class="hero col">
+  <div class="kicker">NeuroAI · interactive explainers</div>
+  <h1>Through the Keyhole</h1>
+  <div class="sub">How an autoencoder learns to rebuild pictures from a handful of numbers, and what its bottleneck units end up standing for</div>
+  <p>Here are eight small pictures of a house in a landscape. Some have a door, windows or a chimney, some have a sun, a tree or a cloud, always in different combinations, and each picture is made of 256 gray pixels.</p>
+</header>
+
+<div class="wide" style="max-width:820px"><figure><canvas id="heroCv" style="width:100%;height:122px"></canvas>
+<figcaption>The training set: eight 16 × 16 grayscale pictures. Hover over one to see what it contains.</figcaption></figure></div>
+
+<div class="col">
+  <p>Suppose every picture has to pass through a channel that carries only six numbers, and on the other side a machine has to paint the picture again from those six numbers alone. Which six numbers would you send?</p>
+  <p>An autoencoder is a network that works out the answer by itself. Nobody tells it what a door or a cloud is; it receives the pictures, tries to copy them through the narrow channel, and corrects its connections a little each time the copy comes out wrong. At the end of this page we will open the channel and look at what each of its six units has learned to do.</p>
+
+  <h2><span class="num">01</span>A picture is a list of numbers</h2>
+  <p>To a network, a picture is a list. Each pixel holds a gray value between 0 (black) and 1 (white), and the 16 × 16 grid is read out into a single column of 256 numbers, the input vector <span class="m">x</span> with entries <span class="m">x<sub>1</sub></span> to <span class="m">x<sub>256</sub></span>. Press <b>unroll</b> and watch the grid become a vector.</p>
+</div>
+
+<div class="wide" style="max-width:1000px"><figure>
+  <canvas id="f1cv" style="width:100%;height:380px"></canvas>
+  <div class="readout" id="f1read">Hover over a pixel or over the vector.</div>
+  <div class="ctrls">
+    <div class="pickers" data-picker></div>
+    <div class="grp"><span class="lbl">reading order</span>
+      <div class="seg" id="f1order"><button data-o="row" class="on">row by row</button><button data-o="snake">snake</button><button data-o="random">scrambled</button></div></div>
+    <button class="primary" id="f1play">unroll ▶</button>
+  </div>
+  <figcaption>Left: the picture. Middle: the same 256 values stacked into a column, slot 1 at the top. Right: the values drawn as bars, which is how the network "sees" the picture. The gold line traces the order in which pixels are read.</figcaption>
+</figure></div>
+
+<div class="col">
+  <p>The order in which the pixels are read is a convention. Reading row by row is the usual choice, but a snake that turns around at the end of each row, or a completely scrambled order, give lists that hold exactly the same information. Switch between the orders: the column changes its pattern while the picture stays the same. Whether the network cares about this order is a question we will return to once it has learned something.</p>
+
+  <h2><span class="num">02</span>A funnel with a narrow neck</h2>
+  <p>An autoencoder has two halves. The <b>encoder</b> connects all 256 input pixels to a small number of latent units, six to begin with. Latent unit <span class="m">j</span> adds up its inputs, each multiplied by the weight of its connection:</p>
+  <div class="eq" data-tex="z_j \;=\; b_j + \sum_{i=1}^{256} w_{ij}\, x_i">z_j = b_j + Σ_i w_ij x_i</div>
+  <p>Here <span class="m">w<sub>ij</sub></span> is the weight of the connection from pixel <span class="m">i</span> to latent unit <span class="m">j</span>, and <span class="m">b<sub>j</sub></span> is a bias. The latent units are linear: the activity of a unit is this weighted sum itself, and no threshold or saturating function (a sigmoid, for instance) is applied to it. The <b>decoder</b> fans out again, from the latent units to 256 output pixels, with weights <span class="m">v<sub>jm</sub></span> from latent unit <span class="m">j</span> to output pixel <span class="m">m</span>:</p>
+  <div class="eq" data-tex="\hat x_m \;=\; c_m + \sum_{j=1}^{k} v_{jm}\, z_j">x̂_m = c_m + Σ_j v_jm z_j</div>
+  <p>The output <span class="m">x̂</span> (read "x hat") is the network's attempt at a copy of the picture. Input and output have the same size and the latent units sit in between, so the network has the shape of a funnel that narrows and widens again. The output units are linear as well, so the whole network is a chain of two linear maps; section 05 returns to what this choice implies. The six numbers <span class="m">z<sub>1</sub></span> to <span class="m">z<sub>6</sub></span> are the message that passes through the neck.</p>
+</div>
+
+<div class="wide" style="max-width:1000px"><figure>
+  <canvas id="f2cv" style="width:100%;height:min(470px,62vw)"></canvas>
+  <div class="ctrls">
+    <div class="pickers" data-picker></div>
+    <button class="primary" id="f2go">send the picture through ▶</button>
+    <div class="grp"><span class="lbl">show weights as</span><div class="seg" data-view><button data-v="wires" class="on">wires</button><button data-v="images">images</button></div></div>
+  </div>
+  <figcaption>Each picture sits next to its vector, and the wires run between the entries of the vectors and the latent units, because the vectors are all the network ever sees. Every line is one weight: <span class="pos">cyan</span> for positive, <span class="neg">orange</span> for negative, and thicker for larger values. While a picture travels through, each line shows the signal it carries, its weight times the activity at its start. Hover over a pixel to see its connections, or over a latent unit to isolate its own. With <b>images</b>, the 256 weights into each unit and the 256 weights out of it are drawn as two small 16 × 16 pictures in place of the wires.</figcaption>
+</figure></div>
+
+<div class="col">
+  <p>All weights start out random, so the latent units receive a meaningless mixture of the pixels and the output is a gray smudge with no resemblance to the input. Notice also that nothing in the wiring knows which pixels are neighbours: every pixel is connected to every latent unit in the same way.</p>
+
+  <h2><span class="num">03</span>Learning from the difference</h2>
+  <p>Learning starts with a comparison, pixel by pixel. The error <span class="m">e<sub>m</sub> = x̂<sub>m</sub> − x<sub>m</sub></span> is positive where the copy is too bright and negative where it is too dark. Squaring the errors and adding them gives a single number, the loss <span class="m">L</span>, which is zero only for a perfect copy.</p>
+  <p>Each weight is then nudged in the direction that makes the loss smaller. For a decoder weight the rule is short: <span class="m">v<sub>jm</sub></span> changes in proportion to the activity of latent unit <span class="m">j</span> times the error at output pixel <span class="m">m</span>. An encoder weight influences the error only through the decoder, so the errors are first sent backwards through the decoder weights, which gives every latent unit its share of the blame <span class="m">δ<sub>j</sub></span>; the weight <span class="m">w<sub>ij</sub></span> then changes in proportion to <span class="m">x<sub>i</sub> δ<sub>j</sub></span>. This backward sweep is called backpropagation, and the learning rate <span class="m">η</span> scales every change.</p>
+  <p>Press <b>step</b> to watch a single update in its four phases, shown for the picture you have selected. The update itself averages the corrections asked for by all eight pictures. Press <b>run</b> to let the network train on its own.</p>
+</div>
+
+<div class="wide"><figure>
+  <div class="lab">
+    <div>
+      <canvas id="labcv" style="width:100%;height:min(440px,62vw)"></canvas>
+      <div class="phases" id="phases"><span data-p="0">1 · forward</span><span data-p="1">2 · error</span><span data-p="2">3 · backward</span><span data-p="3">4 · update</span></div>
+      <div class="eqrows" id="eqrows">
+        <div class="k" data-p="0">forward</div><div class="e" data-p="0" data-tex="z_j = b_j + \textstyle\sum_i w_{ij}\,x_i \qquad \hat x_m = c_m + \textstyle\sum_j v_{jm}\,z_j">z_j = b_j + Σ w_ij x_i ; x̂_m = c_m + Σ v_jm z_j</div>
+        <div class="k" data-p="1">error</div><div class="e" data-p="1" data-tex="e_m = \hat x_m - x_m \qquad L = \tfrac12 \textstyle\sum_m e_m^2">e_m = x̂_m − x_m ; L = ½ Σ e_m²</div>
+        <div class="k" data-p="2">backward</div><div class="e" data-p="2" data-tex="\delta_j = \textstyle\sum_m v_{jm}\, e_m">δ_j = Σ_m v_jm e_m</div>
+        <div class="k" data-p="3">update</div><div class="e" data-p="3" data-tex="\Delta v_{jm} = -\eta\, z_j\, e_m \qquad \Delta w_{ij} = -\eta\, x_i\, \delta_j">Δv_jm = −η z_j e_m ; Δw_ij = −η x_i δ_j</div>
+      </div>
+    </div>
+    <div class="side">
+      <div class="box"><h4>selected picture</h4><canvas id="labimgs" style="width:100%;height:118px"></canvas></div>
+      <div class="box"><h4>loss L (mean over 8 pictures)</h4><canvas id="labloss" style="width:100%;height:170px"></canvas>
+        <div class="stat"><span>step <b id="labT">0</b></span><span>L = <b id="labL">–</b></span></div></div>
+      <div class="box"><h4>all eight: target and copy</h4><canvas id="labgal" style="width:100%;height:76px"></canvas></div>
+    </div>
+  </div>
+  <div class="ctrls">
+    <button id="labStep">step</button>
+    <button class="primary" id="labRun" data-run>run ▶</button>
+    <button id="labReset" data-reset>reset</button>
+    <div class="grp"><span class="lbl">learning rate η</span><input type="range" id="labEta" min="0" max="1000" value="500" aria-label="learning rate"><span class="val" id="labEtaV">0.015</span></div>
+    <div class="grp"><span class="lbl">steps per frame</span><input type="range" id="labSpeed" min="1" max="40" value="4" aria-label="training speed" style="width:100px"><span class="val" id="labSpeedV">4</span></div>
+    <div class="grp"><span class="lbl">latent units k</span><input type="range" id="labK" min="1" max="12" value="6" aria-label="number of latent units" style="width:110px"><span class="val" id="labKV">6</span></div>
+    <label class="switch"><input type="checkbox" data-sparse><span class="tr"></span><span>sparsity penalty</span></label>
+    <div class="grp"><span class="lbl">show weights as</span><div class="seg" data-view><button data-v="wires" class="on">wires</button><button data-v="images">images</button></div></div>
+  </div>
+  <div class="warn" data-warn>The loss blew up. Each step overshoots so far that the weights grow without bound. Lower the learning rate and press reset.</div>
+  <figcaption>The network view shows the picture selected below (click any picture in "all eight" to change it). Selected picture panel, from left to right: the target <span class="m">x</span>, the copy <span class="m">x̂</span>, and their difference <span class="m">x̂ − x</span> in <span class="pos">cyan</span> where the copy is too bright and <span class="neg">orange</span> where it is too dark.</figcaption>
+</figure></div>
+
+<div class="col">
+  <ul class="try">
+    <li>Run the network and watch the copy. Which parts of the scene appear first, and which take longest?</li>
+    <li>Push the learning rate to the right while the network runs. At what value does training stop working, and what does the loss curve do then?</li>
+    <li>Switch the weights to <b>images</b> and run again. Each unit's two small pictures are its incoming and outgoing weights arranged as a 16 × 16 grid. What do they turn into as the loss falls?</li>
+    <li>Set the number of latent units to two, reset and run. How much of each picture survives, and which details are sacrificed?</li>
+  </ul>
+  <p>The same loop can be written compactly with matrices. Each row of <span class="m">X</span> holds one picture, so all eight travel through the network at once. The highlighted lines follow the phases of the step above.</p>
+</div>
+
+<div class="wide" style="max-width:860px">
+<pre class="code" id="code"><span class="ln cm"># X : 8 × 256   one picture per row</span><span class="ln cm"># W : 256 × k   encoder, W[i, j] = w_ij from pixel i to latent unit j</span><span class="ln cm"># V : k × 256   decoder, V[j, m] = v_jm from latent unit j to output pixel m</span><span class="ln cm"># shrink(a, t) = sign(a) · max(|a| − t, 0), applied to every entry</span><span class="ln">repeat:</span><span class="ln" data-p="0">    Z  = X @ W + b              <span class="cm"># encode           8 × k</span></span><span class="ln" data-p="0">    X̂  = Z @ V + c              <span class="cm"># decode           8 × 256</span></span><span class="ln" data-p="1">    E  = X̂ − X                  <span class="cm"># errors e_m       8 × 256</span></span><span class="ln" data-p="1">    L  = ½ · mean(sum(E², axis=1))</span><span class="ln" data-p="2">    Δ  = E @ Vᵀ                 <span class="cm"># blame δ_j        8 × k</span></span><span class="ln" data-p="2">    gV = Zᵀ @ E / 8             <span class="cm"># mean of z_j e_m</span></span><span class="ln" data-p="2">    gW = Xᵀ @ Δ / 8             <span class="cm"># mean of x_i δ_j</span></span><span class="ln" data-p="3">    V  = V − η · gV ;   c = c − η · mean(E, axis=0)</span><span class="ln" data-p="3">    W  = W − η · gW ;   b = b − η · mean(Δ, axis=0)</span><span class="ln" data-p="3" data-sp>    if sparse:  V = shrink(V, η·μ) ;  W = W − η·λ·W   <span class="cm"># section 05</span></span></pre>
+</div>
+
+<div class="col">
+  <h2><span class="num">04</span>Any order will do</h2>
+  <p>Back to the order of the pixels. Below, two copies of the same network train side by side. The top one receives the pictures read row by row; the bottom one receives the same pictures in a scrambled order, and its starting weights are shuffled along with the pixels, so that the two start from the same point.</p>
+  <p>To the bottom network the pictures look like noise, and so do the copies it returns. Put the returned values back in place with the same key that scrambled them, and the picture appears. Compare the two loss curves while they run.</p>
+</div>
+
+<div class="wide" style="max-width:1000px"><figure>
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px" class="f4grid">
+    <canvas id="f4cv" style="width:100%;height:330px"></canvas>
+    <div class="box"><h4>loss of both networks</h4><canvas id="f4loss" style="width:100%;height:230px"></canvas>
+      <div class="stat" style="margin-top:6px"><span><span class="pink">━</span> row by row</span><span><span style="color:#cfd6e6">┅</span> <span id="f4name">scrambled</span></span></div>
+      <div class="stat"><span>step <b id="f4T">0</b></span><span>|ΔL| <b id="f4D">0</b></span></div></div>
+  </div>
+  <div class="ctrls">
+    <div class="pickers" data-picker></div>
+    <button class="primary" id="f4run">run ▶</button>
+    <button id="f4reset">reset</button>
+    <div class="grp"><span class="lbl">bottom network reads</span>
+      <div class="seg" id="f4order"><button data-o="snake">snake</button><button data-o="random" class="on">scrambled</button></div></div>
+    <label class="switch"><input type="checkbox" id="f4wrong"><span class="tr"></span><span>read back with a different key</span></label>
+  </div>
+  <figcaption>Each row shows what the network receives (its input vector folded into a 16 × 16 square in slot order), what it returns (folded the same way), and the returned values put back where their pixels came from.</figcaption>
+</figure></div>
+
+<div class="col">
+  <p>Every pixel is connected to every latent unit by its own weight, so the network has no notion of neighbourhood, and any consistent order is equivalent to any other: training follows exactly the same path, up to rounding in the last digits. The one requirement is bookkeeping at the output. The slot that carried pixel (row 4, column 9) on the way in must be read back as pixel (row 4, column 9) on the way out, otherwise a perfectly good copy comes out unreadable, as the switch for a different key shows.</p>
+
+  <h2><span class="num">05</span>What the narrow neck learned</h2>
+  <p>Each latent unit has two sides. Its <b>receptive field</b> is the set of its incoming weights <span class="m">w<sub>1j</sub></span> to <span class="m">w<sub>256,j</sub></span>, drawn as a 16 × 16 image: it shows which pixels drive the unit up (<span class="pos">cyan</span>) and which drive it down (<span class="neg">orange</span>). Its <b>projective field</b> is the set of its outgoing weights <span class="m">v<sub>j1</sub></span> to <span class="m">v<sub>j,256</sub></span>, also drawn as an image: it shows what the unit paints onto the copy when it is active. The first card shows the output biases <span class="m">c</span>, the picture the decoder paints when every unit is silent.</p>
+  <p>Below, the cards update as the network trains. Select a unit and drag its slider to set its activity by hand, or silence it, and watch what happens to the copy on the right.</p>
+</div>
+
+<div class="wide"><figure>
+  <div class="f5">
+    <div>
+      <div class="cards" id="cards"></div>
+      <h3 style="font-size:.95rem;font-family:var(--mono);font-weight:500;color:var(--muted);margin:16px 0 6px">activity of each latent unit for each picture</h3>
+      <canvas id="codecv" style="width:100%;height:230px"></canvas>
+    </div>
+    <div class="box sticky">
+      <h4>intervene</h4>
+      <canvas id="f5img" style="width:100%;height:140px"></canvas>
+      <div class="pickers" data-picker style="margin:8px 0"></div>
+      <div class="lbl" id="f5selLbl" style="margin-top:6px">unit 1</div>
+      <input type="range" id="f5slider" min="0" max="1000" value="500" style="width:100%" aria-label="activity of the selected unit">
+      <div class="stat"><span>natural <b id="f5nat">–</b></span><span>now <b id="f5now">–</b></span></div>
+      <div class="ctrls" style="margin-top:8px"><button id="f5release">release all</button></div>
+    </div>
+  </div>
+  <div class="ctrls">
+    <button class="primary" data-run>run ▶</button>
+    <button data-reset>reset</button>
+    <label class="switch"><input type="checkbox" data-sparse><span class="tr"></span><span>sparsity penalty</span></label>
+    <span class="lbl">step <b id="f5T" style="color:var(--ink);font-weight:500">0</b> · L = <b id="f5L" style="color:var(--ink);font-weight:500">–</b></span>
+  </div>
+  <div class="warn" data-warn>The loss blew up. Lower the learning rate in section 03 and press reset.</div>
+  <figcaption>This is the same network as in section 03; training here continues there and the other way round. Each field is scaled to its own largest value. A unit may paint its part with negative weights while its activity is negative; the two signs cancel, so judge a field by its shape and use the slider to see what it does. In the table, rows are pictures and columns are latent units.</figcaption>
+</figure></div>
+
+<div class="col">
+  <ul class="try">
+    <li>Reset, train with the sparsity penalty switched off, and look at the projective fields. How many parts of the scene does a single field cover?</li>
+    <li>Reset, switch the penalty on, and train again. Look at the projective fields now, and drag the slider of each unit in turn.</li>
+    <li>Compare the receptive field of a unit with its projective field. Do they look alike?</li>
+  </ul>
+  <p>Without the penalty, the network only needs its latent units to span the right directions in the space of pictures, and any mixture of those directions reconstructs equally well. The loss cannot tell a unit that paints the sun from a unit that paints half a sun and half a door, so the units end up as arbitrary blends of the parts, and moving a single unit changes the whole copy at once.</p>
+  <p>The sparsity penalty adds a small cost <span class="m">μ Σ |v<sub>jm</sub>|</span> for every outgoing weight that is not zero. After each step, every decoder weight is pulled a little towards zero, and the weights that are not needed end up exactly at zero. The cheapest way to paint a sun is now a unit that paints only the sun, and since the six parts of the scene never overlap on the canvas, each of them can be handed to a unit of its own. A small decay on the encoder weights (the <span class="m">λ</span> in the code above) prevents the network from dodging the penalty by shrinking all of <span class="m">v</span> while inflating all of <span class="m">z</span>.</p>
+  <p>The receptive fields tell a different story from the projective fields. A unit that paints the sun only needs to detect whether a sun is present, and many patterns of incoming weights can do that job, so its receptive field can look quite unlike the part it paints.</p>
+  <div class="aside"><b>Linear autoencoders and PCA.</b> With linear units and no penalty, the best an autoencoder with <span class="m">k</span> latent units can do is to reproduce each picture's projection, measured from the average picture, onto the first <span class="m">k</span> principal components of the data set, the same subspace that principal component analysis finds (Baldi and Hornik, 1989). Gradient descent reaches that subspace, but it leaves the axes inside it undetermined, which is why the unpenalised fields look like blends.</div>
+  <div class="aside"><b>A link to the brain.</b> The idea that a sparsity constraint makes the parts of a scene appear has a long history in neuroscience. Olshausen and Field (1996) showed that asking for a sparse code of natural image patches yields basis functions that resemble the receptive fields of simple cells in primary visual cortex: localised, oriented and band-pass.</div>
+
+  <h2><span class="num">06</span>The loop in one sentence</h2>
+  <p>An autoencoder squeezes each picture through a narrow layer, compares the copy with the original, sends the difference backwards to find out which connection was responsible for which part of the error, and changes every connection a little in the direction that would have made the copy better. Repeated many times over the same eight pictures, this loop finds a compact code; with a small push towards sparsity, the units of that code come to stand for the parts from which the scene was built.</p>
+</div>
+
+<footer class="col">
+  <canvas id="qr" width="96" height="96" style="width:96px;height:96px"></canvas>
+  <div>More interactive explainers on neural computation:<br><a href="https://mrio.github.io/NeuroAI_explainers/">mrio.github.io/NeuroAI_explainers</a></div>
+</footer>
+
+<script>
+// ===== Autoencoder core (shared by page and node tests) =====
+const D = 256, SIDE = 16; const WD = 0.001;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){let u=0,v=0;while(!u)u=r();while(!v)v=r();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+// ---------- icons ----------
+const PART_NAMES = ['door','windows','chimney','sun','tree','cloud'];
+function blankImg(){return new Float32Array(D);}
+function setPx(im,r,c,v){if(r>=0&&r<16&&c>=0&&c<16)im[r*16+c]=v;}
+function fillRect(im,r0,r1,c0,c1,v){for(let r=r0;r<=r1;r++)for(let c=c0;c<=c1;c++)setPx(im,r,c,v);}
+function drawBase(im){
+  fillRect(im,15,15,0,15,0.3);            // ground
+  fillRect(im,9,14,2,9,0.45);             // house body
+  for(let r=0;r<4;r++){const row=5+r,h=1+r;fillRect(im,row,row,6-h,5+h,0.8);} // roof (rows 5..8)
+}
+const PARTS = {
+  door(im){fillRect(im,11,14,5,6,0.0);},
+  windows(im){fillRect(im,10,11,3,4,1.0);fillRect(im,10,11,7,8,1.0);},
+  chimney(im){fillRect(im,3,6,8,9,0.7);},
+  sun(im){for(let r=0;r<16;r++)for(let c=0;c<16;c++)if((r-2.5)**2+(c-13)**2<=4.6)setPx(im,r,c,1.0);},
+  tree(im){fillRect(im,12,14,13,13,0.35);fillRect(im,7,11,11,15,0.65);setPx(im,7,11,0);setPx(im,7,15,0);setPx(im,11,11,0);setPx(im,11,15,0);},
+  cloud(im){fillRect(im,2,2,2,5,0.9);fillRect(im,1,1,3,4,0.9);fillRect(im,3,3,1,6,0.9);}
+};
+// each part appears in 3 of the 8 pictures, and no pair of parts appears together more than once
+const ICON_PARTS = [['door','windows','chimney'],['sun','tree','cloud'],['door','sun'],['windows','tree'],
+                    ['chimney','cloud'],['door','tree'],['windows','cloud'],['chimney','sun']];
+function makeIcons(){return ICON_PARTS.map(ps=>{const im=blankImg();drawBase(im);ps.forEach(p=>PARTS[p](im));return im;});}
+
+// ---------- pixel orders ----------
+function makeOrder(kind,seed){
+  const o=new Int32Array(D);
+  if(kind==='row'){for(let i=0;i<D;i++)o[i]=i;}
+  else if(kind==='snake'){let i=0;for(let r=0;r<16;r++){for(let c=0;c<16;c++){o[i++]=r*16+(r%2?15-c:c);}}}
+  else {for(let i=0;i<D;i++)o[i]=i;const r=mulberry32(seed||7);for(let i=D-1;i>0;i--){const j=Math.floor(r()*(i+1));const t=o[i];o[i]=o[j];o[j]=t;}}
+  return o; // vector slot s holds pixel o[s]
+}
+
+// ---------- model ----------
+// z_j = b_j + sum_i w_ij x_i        (W: D x k, row i = presynaptic pixel i)
+// xh_m = c_m + sum_j v_jm z_j       (V: k x D, row j = latent unit j)
+// L = mean over pictures of 1/2 sum_m e_m^2  (+ mu sum_jm |v_jm| when sparsity is on),  e = xh - x
+class AE {
+  constructor(k,seed){this.k=k;this.seed=seed;this.reset();}
+  reset(){
+    const k=this.k,r=mulberry32(this.seed);
+    this.W=new Float64Array(D*k);this.b=new Float64Array(k);
+    this.V=new Float64Array(k*D);this.c=new Float64Array(D);
+    for(let i=0;i<D*k;i++)this.W[i]=0.1*gauss(r);
+    for(let i=0;i<k*D;i++)this.V[i]=0.1*gauss(r);
+    this.t=0;this.hist=[];
+  }
+  copyPermuted(src,order){ // same network, expressed in a permuted vector order
+    const k=this.k;
+    for(let s=0;s<D;s++){const p=order[s];
+      for(let j=0;j<k;j++){this.W[s*k+j]=src.W[p*k+j];this.V[j*D+s]=src.V[j*D+p];}
+      this.c[s]=src.c[p];}
+    this.b.set(src.b);this.t=0;this.hist=[];
+  }
+  encode(x,z){const k=this.k;for(let j=0;j<k;j++){let a=this.b[j];for(let i=0;i<D;i++)a+=this.W[i*k+j]*x[i];z[j]=a;}return z;}
+  decode(z,xh){const k=this.k;for(let m=0;m<D;m++){let a=this.c[m];for(let j=0;j<k;j++)a+=this.V[j*D+m]*z[j];xh[m]=a;}return xh;}
+  // one full-batch gradient step; mu>0 switches on the sparsity penalty on the projective fields
+  step(X,eta,mu,keep){
+    const k=this.k,N=X.length;
+    const dW=new Float64Array(D*k),db=new Float64Array(k),dV=new Float64Array(k*D),dc=new Float64Array(D);
+    const z=new Float64Array(k),xh=new Float64Array(D),e=new Float64Array(D),dz=new Float64Array(k);
+    let rec=0;
+    for(let n=0;n<N;n++){
+      const x=X[n];this.encode(x,z);this.decode(z,xh);
+      for(let m=0;m<D;m++){e[m]=xh[m]-x[m];rec+=0.5*e[m]*e[m];dc[m]+=e[m];}
+      for(let j=0;j<k;j++){let s=0;const zj=z[j],o=j*D;
+        for(let m=0;m<D;m++){s+=this.V[o+m]*e[m];dV[o+m]+=zj*e[m];}
+        dz[j]=s;db[j]+=s;}
+      for(let i=0;i<D;i++){const xi=x[i];if(xi===0)continue;const o=i*k;for(let j=0;j<k;j++)dW[o+j]+=xi*dz[j];}
+    }
+    const inv=1/N,wd=mu>0?WD:0,th=eta*mu;
+    if(keep){this.prevW=this.W.slice();this.prevV=this.V.slice();this.prevB=this.b.slice();this.prevC=this.c.slice();}
+    for(let i=0;i<D*k;i++){dW[i]*=inv;this.W[i]-=eta*(dW[i]+wd*this.W[i]);}
+    for(let i=0;i<k*D;i++){dV[i]*=inv;let v=this.V[i]-eta*dV[i];
+      if(th>0)v=v>th?v-th:(v<-th?v+th:0);   // shrink towards zero (L1 penalty)
+      this.V[i]=v;}
+    for(let j=0;j<k;j++){db[j]*=inv;this.b[j]-=eta*db[j];}
+    for(let m=0;m<D;m++){dc[m]*=inv;this.c[m]-=eta*dc[m];}
+    let pen=0;if(mu>0)for(let i=0;i<k*D;i++)pen+=mu*Math.abs(this.V[i]);
+    this.t++;const out={rec:rec*inv,loss:rec*inv+pen};
+    this.hist.push(out.rec);
+    if(keep){out.dW=dW;out.dV=dV;}
+    return out;
+  }
+  lossOf(X){const k=this.k,z=new Float64Array(k),xh=new Float64Array(D);let rec=0;
+    for(const x of X){this.encode(x,z);this.decode(z,xh);for(let m=0;m<D;m++)rec+=0.5*(xh[m]-x[m])**2;}return rec/X.length;}
+}
+
+// ===================== App =====================
+const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
+const SEED0 = 3, MU = 0.02, ETA_MIN = 0.001, ETA_MAX = 0.08;
+const ICONS = makeIcons();
+const ICON_DESC = ICON_PARTS.map(ps => ps.join(' + '));
+const S = { view: 'wires', k: 6, eta: 0.015, speed: 4, sparse: false, running: false, icon: 0, seed: SEED0, diverged: false };
+let model = new AE(S.k, S.seed);
+let markers = [];
+
+// ---------- colour and drawing helpers ----------
+const RGB = { pos: [79,195,232], neg: [240,145,90], gold: [255,209,102], pink: [255,107,157] };
+const MUTED = '#8c96ab', FAINT = '#5b6580', INK = '#dfe3ec';
+const lerp = (a, b, t) => a + (b - a) * t;
+const clamp01 = v => v < 0 ? 0 : v > 1 ? 1 : v;
+const smooth = (a, b, p) => { const t = clamp01((p - a) / (b - a)); return t * t * (3 - 2 * t); };
+const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function grayRGB(v) { if (!(v === v)) v = 0; v = clamp01(v); return [lerp(16, 246, v), lerp(20, 241, v), lerp(33, 228, v)]; }
+function divRGB(v) {
+  if (!(v === v)) v = 0; v = Math.max(-1, Math.min(1, v));
+  const a = Math.pow(Math.abs(v), 0.75), c = v >= 0 ? RGB.pos : RGB.neg;
+  return [lerp(22, c[0], a), lerp(28, c[1], a), lerp(46, c[2], a)];
+}
+const css = (c, a = 1) => `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${a})`;
+function maxAbs(a) { let m = 0; for (let i = 0; i < a.length; i++) { const v = Math.abs(a[i]); if (v > m) m = v; } return m; }
+// Pixel images are painted cell by cell, snapped to device pixels so neighbouring cells meet without seams.
+// (An earlier version copied from one shared off-screen canvas; some browsers defer such copies, so every tile showed the last image.)
+function drawPix(ctx, vals, x, y, w, h, mode = 'gray', scale = 1) {
+  const d = ctx.getTransform().a || 1, cw = w / 16, chh = h / 16;
+  const X = new Float64Array(17), Y = new Float64Array(17);
+  for (let i = 0; i <= 16; i++) { X[i] = Math.round((x + i * cw) * d) / d; Y[i] = Math.round((y + i * chh) * d) / d; }
+  for (let r = 0; r < 16; r++) for (let c = 0; c < 16; c++) {
+    const v = vals[r * 16 + c], col = mode === 'div' ? divRGB(v / scale) : grayRGB(v);
+    ctx.fillStyle = `rgb(${col[0] | 0},${col[1] | 0},${col[2] | 0})`;
+    ctx.fillRect(X[c], Y[r], X[c + 1] - X[c], Y[r + 1] - Y[r]);
+  }
+}
+function fit(cv) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), w = cv.clientWidth, h = cv.clientHeight;
+  const W = Math.max(1, Math.round(w * dpr)), H = Math.max(1, Math.round(h * dpr));
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const ctx = cv.getContext('2d'); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w, h, dpr };
+}
+function ptr(cv, e) { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+function label(ctx, txt, x, y, color = MUTED, size = 11.5, align = 'left', font = "'IBM Plex Mono',monospace") {
+  ctx.font = `${size}px ${font}`; ctx.fillStyle = color; ctx.textAlign = align; ctx.textBaseline = 'alphabetic'; ctx.fillText(txt, x, y);
+}
+function fmt(v) { const a = Math.abs(v); return a >= 100 ? v.toFixed(0) : a >= 10 ? v.toFixed(1) : a >= 1 ? v.toFixed(2) : v.toFixed(3); }
+function forward(m, x) { const z = m.encode(x, new Float64Array(m.k)); const xh = m.decode(z, new Float64Array(D)); return { z, xh }; }
+
+// ---------- visibility ----------
+const vis = {};
+const io = new IntersectionObserver(es => es.forEach(e => { vis[e.target.id] = e.isIntersecting; if (e.isIntersecting) invalidate(); }), { rootMargin: '150px' });
+
+// ---------- icon pickers (linked across figures) ----------
+const pickerEls = [];
+function buildPickers() {
+  $$('[data-picker]').forEach(div => {
+    ICONS.forEach((im, n) => {
+      const c = document.createElement('canvas'); c.width = c.height = 32; c.style.width = c.style.height = '30px';
+      c.title = ICON_DESC[n]; c.tabIndex = 0; c.setAttribute('role', 'button'); c.setAttribute('aria-label', 'picture ' + (n + 1) + ': ' + ICON_DESC[n]);
+      drawPix(c.getContext('2d'), im, 0, 0, 32, 32);
+      c.addEventListener('click', () => setIcon(n));
+      c.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIcon(n); } });
+      div.appendChild(c); pickerEls.push([c, n]);
+    });
+  });
+  syncPickers();
+}
+function syncPickers() { pickerEls.forEach(([c, n]) => c.classList.toggle('sel', n === S.icon)); }
+function setIcon(n) { S.icon = n; syncPickers(); f2.onIcon(); invalidate(); }
+function invalidate() { hero.dirty = f1.dirty = f2.dirty = lab.dirty = f4.dirty = f5.dirty = true; }
+
+// ---------- hero gallery ----------
+const hero = {
+  cv: $('#heroCv'), hover: -1, dirty: true,
+  init() {
+    this.cv.addEventListener('pointermove', e => { const [x, y] = ptr(this.cv, e); const g = this.g; let h = -1;
+      if (g && y >= g.y0 && y < g.y0 + g.s) { const i = Math.floor((x - g.x0) / (g.s + g.gap)); if (i >= 0 && i < 8 && x - g.x0 - i * (g.s + g.gap) <= g.s) h = i; }
+      if (h !== this.hover) { this.hover = h; this.dirty = true; } });
+    this.cv.addEventListener('pointerleave', () => { this.hover = -1; this.dirty = true; });
+    this.cv.addEventListener('click', () => { if (this.hover >= 0) setIcon(this.hover); });
+  },
+  draw() {
+    const { ctx, w, h } = fit(this.cv); ctx.clearRect(0, 0, w, h);
+    const gap = 12, s = Math.min((w - gap * 7 - 6) / 8, h - 34), x0 = (w - (s * 8 + gap * 7)) / 2, y0 = 3; this.g = { x0, s, gap, y0 };
+    for (let i = 0; i < 8; i++) {
+      const x = x0 + i * (s + gap); drawPix(ctx, ICONS[i], x, y0, s, s);
+      if (i === this.hover) { ctx.strokeStyle = css(RGB.gold); ctx.lineWidth = 2; ctx.strokeRect(x - 2, y0 - 2, s + 4, s + 4); }
+    }
+    const txt = this.hover >= 0 ? 'picture ' + (this.hover + 1) + ' · ' + ICON_DESC[this.hover] : 'house, ground and roof in every picture, plus two or three of six parts';
+    label(ctx, txt, w / 2, y0 + s + 22, this.hover >= 0 ? INK : MUTED, 12.5, 'center');
+  }
+};
+
+// ---------- figure 1: unrolling a picture ----------
+const f1 = {
+  cv: $('#f1cv'), kind: 'row', order: makeOrder('row'), inv: null, t0: null, hover: -1, dirty: true, STAG: 0.0055, DUR: 0.42,
+  init() {
+    this.setInv();
+    $$('#f1order button').forEach(b => b.addEventListener('click', () => {
+      $$('#f1order button').forEach(x => x.classList.toggle('on', x === b));
+      this.kind = b.dataset.o; this.order = makeOrder(this.kind, 7); this.setInv(); this.play();
+    }));
+    $('#f1play').addEventListener('click', () => this.play());
+    this.cv.addEventListener('pointermove', e => { const [x, y] = ptr(this.cv, e); this.hit(x, y); });
+    this.cv.addEventListener('pointerleave', () => { this.hover = -1; this.dirty = true; this.readout(); });
+  },
+  setInv() { this.inv = new Int32Array(D); for (let s = 0; s < D; s++) this.inv[this.order[s]] = s; },
+  play() { this.t0 = performance.now(); this.dirty = true; },
+  T(now) { return this.t0 == null ? 0 : (now - this.t0) / 1000; },
+  animating(now) { return this.t0 != null && this.T(now) < this.STAG * 256 + this.DUR + 0.05; },
+  hit(x, y) {
+    const g = this.g; if (!g) return; let s = -1;
+    if (x >= g.gx && x < g.gx + 16 * g.gc && y >= g.gy && y < g.gy + 16 * g.gc) {
+      const r = Math.floor((y - g.gy) / g.gc), c = Math.floor((x - g.gx) / g.gc); s = this.inv[r * 16 + c];
+    } else if (x >= g.sx - 10 && x <= g.bx + g.bl && y >= g.sy && y < g.sy + 256 * g.sh) s = Math.floor((y - g.sy) / g.sh);
+    if (s !== this.hover) { this.hover = s; this.dirty = true; this.readout(); }
+  },
+  readout() {
+    const el = $('#f1read');
+    if (this.hover < 0) { el.textContent = 'Hover over a pixel or over the vector.'; return; }
+    const p = this.order[this.hover], r = p >> 4, c = p & 15, v = ICONS[S.icon][p];
+    el.textContent = `pixel at row ${r + 1}, column ${c + 1}, value ${v.toFixed(2)}  →  slot ${this.hover + 1} of the vector, so x${this.hover + 1} = ${v.toFixed(2)}`;
+  },
+  draw(now) {
+    const { ctx, w, h } = fit(this.cv); ctx.clearRect(0, 0, w, h);
+    const x = ICONS[S.icon], T = this.T(now);
+    const gc = Math.min(20, (h - 56) / 16), gx = 14, gy = 30;
+    const sx = gx + 16 * gc + Math.max(70, Math.min(150, (w - gx - 16 * gc) * 0.16)), sw = 30, sy = 30, sh = (h - 58) / 256;
+    const bx = sx + sw + 22, bl = Math.max(60, w - bx - 16);
+    this.g = { gx, gy, gc, sx, sw, sy, sh, bx, bl };
+    label(ctx, 'picture · 16 × 16', gx, 18); label(ctx, 'x', sx + sw / 2, 18, MUTED, 12, 'center'); label(ctx, 'value of each entry, 0 to 1', bx, 18);
+    // faint axis for bars
+    ctx.strokeStyle = '#232b45'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(bx - 0.5, sy); ctx.lineTo(bx - 0.5, sy + 256 * sh); ctx.moveTo(bx + bl, sy); ctx.lineTo(bx + bl, sy + 256 * sh); ctx.stroke();
+    ctx.globalAlpha = 0.22; drawPix(ctx, x, gx, gy, 16 * gc, 16 * gc); ctx.globalAlpha = 1;
+    ctx.fillStyle = '#0d1222'; ctx.fillRect(sx, sy, sw, 256 * sh);
+    let upto = -1;
+    for (let s = 0; s < 256; s++) {
+      const p = this.order[s], r = p >> 4, c = p & 15, q = clamp01((T - s * this.STAG) / this.DUR), e = easeIO(q);
+      const col = css(grayRGB(x[p]));
+      if (q <= 0) { ctx.fillStyle = col; ctx.fillRect(gx + c * gc, gy + r * gc, gc, gc); continue; }
+      upto = s;
+      if (q < 1) {
+        ctx.fillStyle = col;
+        ctx.fillRect(lerp(gx + c * gc, sx, e), lerp(gy + r * gc, sy + s * sh, e), lerp(gc, sw, e), lerp(gc, Math.max(sh, 1.2), e));
+      } else {
+        ctx.fillStyle = col; ctx.fillRect(sx, sy + s * sh, sw, sh + 0.4);
+        if (x[p] > 0) { ctx.fillStyle = css(grayRGB(0.35 + 0.65 * x[p]), 0.9); ctx.fillRect(bx, sy + s * sh, x[p] * bl, Math.max(sh - 0.2, 0.9)); }
+      }
+    }
+    // grid lines
+    ctx.strokeStyle = 'rgba(11,15,26,0.6)'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let i = 0; i <= 16; i++) { ctx.moveTo(gx + i * gc, gy); ctx.lineTo(gx + i * gc, gy + 16 * gc); ctx.moveTo(gx, gy + i * gc); ctx.lineTo(gx + 16 * gc, gy + i * gc); }
+    ctx.stroke();
+    // reading path
+    if (upto >= 0) {
+      ctx.strokeStyle = css(RGB.gold, this.kind === 'random' ? 0.28 : 0.6); ctx.lineWidth = 1.2; ctx.beginPath();
+      for (let s = 0; s <= upto; s++) { const p = this.order[s], X = gx + ((p & 15) + .5) * gc, Y = gy + ((p >> 4) + .5) * gc; s ? ctx.lineTo(X, Y) : ctx.moveTo(X, Y); }
+      ctx.stroke();
+    }
+    label(ctx, 'x₁', sx - 8, sy + 9, MUTED, 12, 'right'); label(ctx, 'x₂₅₆', sx - 8, sy + 256 * sh, MUTED, 12, 'right');
+    if (this.hover >= 0) {
+      const s = this.hover, p = this.order[s], r = p >> 4, c = p & 15;
+      const unrolled = clamp01((T - s * this.STAG) / this.DUR) >= 1;
+      ctx.strokeStyle = css(RGB.gold); ctx.lineWidth = 2; ctx.strokeRect(gx + c * gc, gy + r * gc, gc, gc);
+      if (unrolled) {
+        const ys = sy + (s + .5) * sh;
+        ctx.fillStyle = css(RGB.gold); ctx.fillRect(sx - 7, ys - 1.5, 5, 3); ctx.fillRect(sx + sw + 2, ys - 1.5, 5, 3);
+        if (x[p] > 0) { ctx.fillStyle = css(RGB.gold, 0.9); ctx.fillRect(bx, ys - 1.5, x[p] * bl, 3); }
+        ctx.strokeStyle = css(RGB.gold, 0.5); ctx.lineWidth = 1; ctx.setLineDash([3, 3]); ctx.beginPath();
+        ctx.moveTo(gx + 16 * gc + 4, gy + (r + .5) * gc); ctx.lineTo(sx - 9, ys); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+  }
+};
+
+// ---------- isometric network view ----------
+class NetView {
+  constructor(cv) {
+    this.cv = cv; this.hover = -1; this.hpix = null; this.onHover = null; this.g = null;
+    cv.addEventListener('pointermove', e => {
+      const [x, y] = ptr(cv, e), r = this.hit(x, y);
+      const key = r ? r.t + r.i : '', old = this.hoverKey || '';
+      cv.style.cursor = r && r.t === 'unit' ? 'pointer' : r ? 'crosshair' : 'default';
+      if (key !== old) { this.hoverKey = key; this.hover = r && r.t === 'unit' ? r.i : -1; this.hpix = r && r.t !== 'unit' ? r : null; this.onHover && this.onHover(); }
+    });
+    cv.addEventListener('pointerleave', () => { if (this.hoverKey) { this.hoverKey = ''; this.hover = -1; this.hpix = null; this.onHover && this.onHover(); } });
+  }
+  layout(w, h, k, images) {
+    const top = 30, bottom = 48, ch = h - top - bottom, nar = w < 600;
+    const colW = nar ? 10 : 16, ps = Math.min(ch * 0.62, w * (nar ? 0.15 : 0.18)), gap = Math.max(nar ? 12 : 22, w * 0.045);
+    const g = { w, h, k, top, ch, colW, ps, nar };
+    g.xPicIn = 8; g.xColIn = g.xPicIn + ps + gap; g.xColOut = w - 8 - ps - gap - colW; g.xPicOut = w - 8 - ps; g.xLat = w / 2;
+    g.picY = top + (ch - ps) / 2;
+    g.sy = s => top + (s + 0.5) * ch / 256;
+    const sp = Math.min(images ? 64 : 36, (ch - 8) / k); g.sp = sp;
+    g.zy = j => top + ch / 2 + (j - (k - 1) / 2) * sp;
+    g.r = Math.max(4, Math.min(11, sp * 0.32));
+    g.ts = Math.max(10, Math.min(sp * 0.86, (g.xLat - g.xColIn - colW) * 0.34, 58));
+    g.txIn = (g.xColIn + colW + g.xLat) / 2 - g.ts / 2; g.txOut = (g.xLat + g.xColOut) / 2 - g.ts / 2;
+    g.pin = []; g.pout = []; g.pz = [];
+    for (let s = 0; s < 256; s++) { g.pin.push([g.xColIn + colW, g.sy(s)]); g.pout.push([g.xColOut, g.sy(s)]); }
+    for (let j = 0; j < k; j++) g.pz.push([g.xLat, g.zy(j)]);
+    return g;
+  }
+  hit(x, y) {
+    const g = this.g; if (!g) return null;
+    for (let j = 0; j < g.k; j++) { const [X, Y] = g.pz[j]; if (Math.hypot(x - X, y - Y) <= Math.max(g.r + 4, 9)) return { t: 'unit', i: j }; }
+    const inPic = X0 => x >= X0 && x < X0 + g.ps && y >= g.picY && y < g.picY + g.ps ? (Math.floor((y - g.picY) / g.ps * 16) * 16 + Math.floor((x - X0) / g.ps * 16)) : -1;
+    const inCol = X0 => x >= X0 - 3 && x <= X0 + g.colW + 3 && y >= g.top && y < g.top + g.ch ? Math.floor((y - g.top) / g.ch * 256) : -1;
+    let i = inPic(g.xPicIn); if (i < 0) i = inCol(g.xColIn); if (i >= 0) return { t: 'in', i };
+    i = inPic(g.xPicOut); if (i < 0) i = inCol(g.xColOut); if (i >= 0) return { t: 'out', i };
+    return null;
+  }
+  bundle(ctx, n1, n2, P1, P2, val, scale, alpha, isHi, dim) {
+    if (alpha <= 0.002 || !(scale > 0)) return;
+    const NB = 7, mk = () => [Array.from({ length: NB }, () => new Path2D()), Array.from({ length: NB }, () => new Path2D())];
+    const base = mk(), hip = dim ? mk() : null;
+    for (let a = 0; a < n1; a++) for (let b = 0; b < n2; b++) {
+      const v = val(a, b); if (!v || !(v === v)) continue;
+      const m = Math.min(1, Math.abs(v) / scale); const hi = dim && isHi(a, b);
+      if (m < (hi ? 0.005 : 0.04)) continue;
+      const bk = Math.min(NB - 1, Math.floor(m * NB)), s = v > 0 ? 0 : 1, tgt = hi ? hip : base;
+      tgt[s][bk].moveTo(P1[a][0], P1[a][1]); tgt[s][bk].lineTo(P2[b][0], P2[b][1]);
+    }
+    const stroke = (set, am, boost) => { for (let s = 0; s < 2; s++) for (let b = 0; b < NB; b++) {
+      const f = (b + 1) / NB; ctx.strokeStyle = css(s ? RGB.neg : RGB.pos, Math.min(1, alpha * am * ((boost ? 0.35 : 0.05) + 0.8 * Math.pow(f, 1.6))));
+      ctx.lineWidth = (boost ? 0.8 : 0.35) + 2.3 * Math.pow(f, 1.3); ctx.stroke(set[s][b]); } };
+    stroke(base, dim ? 0.13 : 1, false);
+    if (hip) stroke(hip, 1.3, true);
+  }
+  vals(ctx, v, mode, scale, alpha, X, isPic) {
+    const g = this.g; if (alpha <= 0) return;
+    ctx.globalAlpha = alpha;
+    if (isPic) drawPix(ctx, v, X, g.picY, g.ps, g.ps, mode, scale);
+    else { const sh = g.ch / 256; for (let s = 0; s < 256; s++) { ctx.fillStyle = css(mode === 'div' ? divRGB(v[s] / scale) : grayRGB(v[s])); ctx.fillRect(X, g.top + s * sh, g.colW, sh + 0.35); } }
+    ctx.globalAlpha = 1;
+  }
+  frame(ctx, X, isPic) {
+    const g = this.g; ctx.strokeStyle = '#3a4570'; ctx.lineWidth = 1;
+    if (isPic) ctx.strokeRect(X - 0.5, g.picY - 0.5, g.ps + 1, g.ps + 1); else ctx.strokeRect(X - 0.5, g.top - 0.5, g.colW + 1, g.ch + 1);
+  }
+  fan(ctx, xA, yA0, yA1, xB, yB0, yB1, a) {
+    ctx.beginPath(); ctx.moveTo(xA, yA0); ctx.lineTo(xB, yB0); ctx.lineTo(xB, yB1); ctx.lineTo(xA, yA1); ctx.closePath();
+    ctx.fillStyle = `rgba(140,150,171,${a})`; ctx.fill();
+  }
+  // st: {k, x, W, V, z, out, encMode, decMode, gW, gV, encAlpha, decAlpha, zAlpha, zLabel, outMode, outScale, outAlpha, outLabel, over, hi, wScale, vScale}
+  draw(st) {
+    const { ctx, w, h } = fit(this.cv); ctx.clearRect(0, 0, w, h);
+    const k = st.k, images = S.view === 'images', g = this.g = this.layout(w, h, k, images);
+    const x = st.x, W = st.W, V = st.V, z = st.z || new Float64Array(k), hiU = st.hi == null ? this.hover : st.hi, hp = this.hpix;
+    const encA = st.encAlpha == null ? 1 : st.encAlpha, decA = st.decAlpha == null ? 1 : st.decAlpha;
+    let ev, es, dv, ds;
+    if (st.encMode === 'grad') { const gr = st.gW; ev = (i, j) => -gr[i * k + j]; es = maxAbs(gr); }
+    else if (st.encMode === 'signal') { ev = (i, j) => W[i * k + j] * x[i]; let m = 0; for (let i = 0; i < 256; i++) for (let j = 0; j < k; j++) m = Math.max(m, Math.abs(W[i * k + j] * x[i])); es = m; }
+    else { ev = (i, j) => W[i * k + j]; es = st.wScale || maxAbs(W); }
+    if (st.decMode === 'grad') { const gr = st.gV; dv = (j, m) => -gr[j * D + m]; ds = maxAbs(gr); }
+    else if (st.decMode === 'signal') { dv = (j, m) => V[j * D + m] * z[j]; let mm = 0; for (let j = 0; j < k; j++) for (let m = 0; m < 256; m++) mm = Math.max(mm, Math.abs(V[j * D + m] * z[j])); ds = mm; }
+    else { dv = (j, m) => V[j * D + m]; ds = st.vScale || maxAbs(V); }
+
+    // mapping hints between pictures and their vectors
+    ctx.strokeStyle = 'rgba(140,150,171,0.35)'; ctx.setLineDash([3, 4]); ctx.lineWidth = 1; ctx.beginPath();
+    ctx.moveTo(g.xPicIn + g.ps, g.picY); ctx.lineTo(g.xColIn, g.top); ctx.moveTo(g.xPicIn + g.ps, g.picY + g.ps); ctx.lineTo(g.xColIn, g.top + g.ch);
+    ctx.moveTo(g.xColOut + g.colW, g.top); ctx.lineTo(g.xPicOut, g.picY); ctx.moveTo(g.xColOut + g.colW, g.top + g.ch); ctx.lineTo(g.xPicOut, g.picY + g.ps);
+    ctx.stroke(); ctx.setLineDash([]);
+
+    if (!images) {
+      const dimE = hiU >= 0 || (hp && hp.t === 'in'), dimD = hiU >= 0 || (hp && hp.t === 'out');
+      this.bundle(ctx, 256, k, g.pin, g.pz, ev, es, encA, (i, j) => hiU >= 0 ? j === hiU : (hp && hp.t === 'in' && i === hp.i), dimE || (hp && hp.t === 'out'));
+      this.bundle(ctx, k, 256, g.pz, g.pout, dv, ds, decA, (j, m) => hiU >= 0 ? j === hiU : (hp && hp.t === 'out' && m === hp.i), dimD || (hp && hp.t === 'in'));
+    } else {
+      const ts = g.ts, fld = new Float64Array(256);
+      for (let j = 0; j < k; j++) {
+        const yz = g.zy(j), on = hiU < 0 || hiU === j, fa = on ? (hiU === j ? 0.16 : 0.055) : 0.02;
+        if (encA > 0) {
+          this.fan(ctx, g.xColIn + g.colW, g.top, g.top + g.ch, g.txIn, yz - ts / 2, yz + ts / 2, fa * encA);
+          for (let i = 0; i < 256; i++) fld[i] = ev(i, j);
+          ctx.globalAlpha = encA * (on ? 1 : 0.3); drawPix(ctx, fld, g.txIn, yz - ts / 2, ts, ts, 'div', es || 1); ctx.globalAlpha = 1;
+          ctx.strokeStyle = css(RGB.gold, 0.5 * encA); ctx.lineWidth = 1; ctx.strokeRect(g.txIn - 0.5, yz - ts / 2 - 0.5, ts + 1, ts + 1);
+          ctx.beginPath(); ctx.moveTo(g.txIn + ts, yz); ctx.lineTo(g.xLat - g.r, yz); ctx.stroke();
+        }
+        if (decA > 0) {
+          this.fan(ctx, g.txOut + ts, yz - ts / 2, yz + ts / 2, g.xColOut, g.top, g.top + g.ch, fa * decA);
+          for (let m = 0; m < 256; m++) fld[m] = dv(j, m);
+          ctx.globalAlpha = decA * (on ? 1 : 0.3); drawPix(ctx, fld, g.txOut, yz - ts / 2, ts, ts, 'div', ds || 1); ctx.globalAlpha = 1;
+          ctx.strokeStyle = css(RGB.gold, 0.5 * decA); ctx.lineWidth = 1; ctx.strokeRect(g.txOut - 0.5, yz - ts / 2 - 0.5, ts + 1, ts + 1);
+          ctx.beginPath(); ctx.moveTo(g.xLat + g.r, yz); ctx.lineTo(g.txOut, yz); ctx.stroke();
+        }
+      }
+    }
+
+    // input picture and vector
+    this.vals(ctx, x, 'gray', 1, 1, g.xPicIn, true); this.vals(ctx, x, 'gray', 1, 1, g.xColIn, false);
+    this.frame(ctx, g.xPicIn, true); this.frame(ctx, g.xColIn, false);
+    // output picture and vector
+    ctx.fillStyle = '#0d1222'; ctx.fillRect(g.xPicOut, g.picY, g.ps, g.ps); ctx.fillRect(g.xColOut, g.top, g.colW, g.ch);
+    const oa = st.outAlpha == null ? 1 : st.outAlpha, om = st.outMode || 'gray', os = st.outScale || 1;
+    this.vals(ctx, st.out, om, os, oa, g.xPicOut, true); this.vals(ctx, st.out, om, os, oa, g.xColOut, false);
+    if (st.over && st.over.alpha > 0) { const o = st.over; this.vals(ctx, o.vals, o.mode, o.scale, o.alpha, g.xPicOut, true); this.vals(ctx, o.vals, o.mode, o.scale, o.alpha, g.xColOut, false); }
+    this.frame(ctx, g.xPicOut, true); this.frame(ctx, g.xColOut, false);
+
+    // latent units
+    const zs = Math.max(1e-9, maxAbs(z)), za = st.zAlpha == null ? 1 : st.zAlpha;
+    for (let j = 0; j < k; j++) {
+      const [X, Y] = g.pz[j], hi = j === hiU;
+      ctx.beginPath(); ctx.arc(X, Y, g.r, 0, 2 * Math.PI); ctx.fillStyle = '#0d1222'; ctx.fill();
+      if (za > 0) { ctx.globalAlpha = za; ctx.fillStyle = css(divRGB(z[j] / zs)); ctx.fill(); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = css(RGB.gold, hi ? 1 : 0.8); ctx.lineWidth = hi ? 2.4 : 1.3; ctx.stroke();
+      const num = (tx, ty, al) => { ctx.font = "10.5px 'IBM Plex Mono',monospace"; ctx.textAlign = al; ctx.lineWidth = 3.5; ctx.strokeStyle = '#10162a';
+        ctx.strokeText(String(j + 1), tx, ty); ctx.fillStyle = hi ? css(RGB.gold) : MUTED; ctx.fillText(String(j + 1), tx, ty); };
+      if (!images && g.sp >= 18) num(X - g.r - 6, Y + 4, 'right');
+      if (images && g.sp >= 40) num(X, Y - g.r - 5, 'center');
+    }
+
+    // hovered pixel
+    if (hp) {
+      const X0 = hp.t === 'in' ? g.xPicIn : g.xPicOut, C0 = hp.t === 'in' ? g.xColIn : g.xColOut, r = hp.i >> 4, c = hp.i & 15, cs = g.ps / 16;
+      ctx.strokeStyle = css(RGB.gold); ctx.lineWidth = 2; ctx.strokeRect(X0 + c * cs, g.picY + r * cs, cs, cs);
+      ctx.fillStyle = css(RGB.gold); ctx.fillRect(C0 - 5, g.sy(hp.i) - 1.5, g.colW + 10, 3);
+      const v = hp.t === 'in' ? x[hp.i] : st.out[hp.i];
+      label(ctx, (hp.t === 'in' ? 'x' : 'x̂') + (hp.i + 1) + ' = ' + fmt(v) + (g.nar ? '' : '   (row ' + (r + 1) + ', column ' + (c + 1) + ')'), hp.t === 'in' ? g.xPicIn : g.xPicOut + g.ps, g.picY - 10, css(RGB.gold), 11, hp.t === 'in' ? 'left' : 'right');
+    }
+
+    // labels
+    const by = g.picY + g.ps;
+    const sub = g.nar ? '16 × 16' : '16 × 16 pixels', fs = g.nar ? 11 : 12.5;
+    label(ctx, 'input x', g.xPicIn + g.ps / 2, by + 22, INK, fs, 'center'); label(ctx, sub, g.xPicIn + g.ps / 2, by + 37, FAINT, 10.5, 'center');
+    label(ctx, g.nar && st.outLabel ? 'error e' : (st.outLabel || 'output x̂'), g.xPicOut + g.ps / 2, by + 22, INK, fs, 'center'); label(ctx, sub, g.xPicOut + g.ps / 2, by + 37, FAINT, 10.5, 'center');
+    label(ctx, 'x', g.xColIn + g.colW / 2, g.top - 9, MUTED, 12, 'center'); label(ctx, 'x̂', g.xColOut + g.colW / 2, g.top - 9, MUTED, 12, 'center');
+    label(ctx, st.zLabel || 'latent z', g.xLat, g.top + g.ch + 22, css(RGB.gold), 12.5, 'center');
+    label(ctx, k + (k === 1 ? ' unit' : ' units'), g.xLat, g.top + g.ch + 37, FAINT, 11, 'center');
+    const nar = g.nar;
+    label(ctx, st.encMode === 'grad' ? (nar ? '−Δw' : 'encoder: change −Δw') : st.encMode === 'signal' ? (nar ? 'w·x' : 'encoder: signals w·x') : (nar ? 'w' : 'encoder weights w'), (g.xColIn + g.colW + g.xLat) / 2, 14, MUTED, 11.5, 'center');
+    label(ctx, st.decMode === 'grad' ? (nar ? '−Δv' : 'decoder: change −Δv') : st.decMode === 'signal' ? (nar ? 'v·z' : 'decoder: signals v·z') : (nar ? 'v' : 'decoder weights v'), (g.xLat + g.xColOut) / 2, 14, MUTED, 11.5, 'center');
+  }
+}
+
+// ---------- figure 2: the untrained funnel ----------
+const f2 = {
+  view: new NetView($('#f2cv')), model: new AE(6, SEED0), t0: null, dirty: true, DUR: 2400,
+  init() { this.view.onHover = () => this.dirty = true; $('#f2go').addEventListener('click', () => { this.t0 = performance.now(); this.dirty = true; }); },
+  onIcon() { if (this.t0 != null) this.t0 = performance.now(); },
+  animating(now) { return this.t0 != null && now - this.t0 < this.DUR + 50; },
+  draw(now) {
+    const m = this.model, x = ICONS[S.icon], { z, xh } = forward(m, x);
+    const p = this.t0 == null ? 0 : clamp01((now - this.t0) / this.DUR);
+    const sent = this.t0 != null;
+    this.view.draw({ k: 6, x, W: m.W, V: m.V, z, out: xh,
+      encMode: sent ? 'signal' : 'weight', decMode: sent ? 'signal' : 'weight',
+      encAlpha: sent ? smooth(0, 0.35, p) : 0.85, zAlpha: sent ? smooth(0.32, 0.48, p) : 0,
+      decAlpha: sent ? smooth(0.45, 0.78, p) : 0.85, outAlpha: sent ? smooth(0.72, 1, p) : 0 });
+  }
+};
+
+// ---------- loss chart ----------
+function niceMax(v) { const e = Math.pow(10, Math.floor(Math.log10(v))), m = v / e; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * e; }
+class LossChart {
+  constructor(cv) { this.cv = cv; }
+  draw(series, marks = [], minN = 60) {
+    const { ctx, w, h } = fit(this.cv); ctx.clearRect(0, 0, w, h);
+    const L = 40, R = 8, T = 10, B = 20, pw = w - L - R, ph = h - T - B;
+    let n = 0, ymax = 0;
+    series.forEach(s => { n = Math.max(n, s.data.length); for (const v of s.data) if (isFinite(v) && v > ymax) ymax = v; });
+    const nx = Math.max(n, minN), top = niceMax(ymax > 0 ? ymax : 1);
+    ctx.font = "10.5px 'IBM Plex Mono',monospace"; ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+      const y = T + ph * (1 - i / 4); ctx.strokeStyle = i ? '#1c2440' : '#2c3657'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(L, Math.round(y) + .5); ctx.lineTo(L + pw, Math.round(y) + .5); ctx.stroke();
+      ctx.fillStyle = FAINT; ctx.textAlign = 'right'; { let tl = fmt(top * i / 4); if (tl.includes('.')) tl = tl.replace(/\.?0+$/, ''); ctx.fillText(tl || '0', L - 6, y); }
+    }
+    ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; ctx.fillStyle = FAINT; ctx.fillText('0', L, h - 5);
+    ctx.textAlign = 'right'; ctx.fillText(nx + ' steps', L + pw, h - 5);
+    marks.forEach(m => {
+      const x = L + pw * m.t / nx; ctx.strokeStyle = css(RGB.gold, 0.45); ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke(); ctx.setLineDash([]);
+      label(ctx, m.label, Math.min(x + 3, L + pw - 4), T + 10, css(RGB.gold, 0.85), 10, x + 3 > L + pw - 60 ? 'right' : 'left');
+    });
+    series.forEach(s => {
+      const d = s.data; if (!d.length) return;
+      const stp = Math.max(1, Math.floor(d.length / pw));
+      ctx.strokeStyle = s.color; ctx.lineWidth = s.width || 1.8; ctx.setLineDash(s.dash || []); ctx.beginPath();
+      const Y = v => T + ph * (1 - Math.min(isFinite(v) ? v : top, top) / top);
+      for (let i = 0; i < d.length; i += stp) { const X = L + pw * i / nx; i ? ctx.lineTo(X, Y(d[i])) : ctx.moveTo(X, Y(d[i])); }
+      ctx.lineTo(L + pw * (d.length - 1) / nx, Y(d[d.length - 1])); ctx.stroke(); ctx.setLineDash([]);
+    });
+  }
+}
+
+// ---------- shared training state ----------
+function setRunning(b) {
+  if (b && S.diverged) return;
+  S.running = b;
+  $$('[data-run]').forEach(btn => { btn.textContent = b ? 'pause ❚❚' : 'run ▶'; btn.classList.toggle('on', b); });
+  if (b) lab.anim = null;
+}
+function checkDiverge(r) {
+  if (!isFinite(r.rec) || r.rec > 1e4) { S.diverged = true; setRunning(false); $$('[data-warn]').forEach(e => e.classList.add('show')); return true; }
+  return false;
+}
+function resetModel() {
+  setRunning(false); model = new AE(S.k, S.seed); markers = []; S.diverged = false;
+  $$('[data-warn]').forEach(e => e.classList.remove('show')); lab.anim = null; f5.rebuild(); invalidate();
+}
+function setSparse(b) {
+  if (b === S.sparse) return; S.sparse = b;
+  $$('[data-sparse]').forEach(c => c.checked = b);
+  $$('[data-sp]').forEach(e => e.style.opacity = b ? 1 : 0.4);
+  if (model.t > 0) markers.push({ t: model.t, label: b ? 'sparsity on' : 'sparsity off' });
+  invalidate();
+}
+const etaFromSlider = v => Math.pow(10, lerp(Math.log10(ETA_MIN), Math.log10(ETA_MAX), v / 1000));
+const sliderFromEta = e => 1000 * (Math.log10(e) - Math.log10(ETA_MIN)) / (Math.log10(ETA_MAX) - Math.log10(ETA_MIN));
+
+// ---------- figure 3: the training lab ----------
+const lab = {
+  view: new NetView($('#labcv')), loss: new LossChart($('#labloss')), anim: null, dirty: true, DUR: [1200, 1000, 1400, 1300], lastPh: -2,
+  init() {
+    this.view.onHover = () => this.dirty = true;
+    $('#labStep').addEventListener('click', () => this.stepAnimated());
+    $('#labEta').value = sliderFromEta(S.eta);
+    $('#labEta').addEventListener('input', e => { S.eta = etaFromSlider(+e.target.value); $('#labEtaV').textContent = S.eta.toFixed(S.eta < 0.01 ? 4 : 3); });
+    $('#labEta').addEventListener('change', () => { if (model.t > 0) markers.push({ t: model.t, label: 'η ' + S.eta.toFixed(3) }); this.dirty = true; });
+    $('#labEtaV').textContent = S.eta.toFixed(3);
+    $('#labSpeed').addEventListener('input', e => { S.speed = +e.target.value; $('#labSpeedV').textContent = S.speed; });
+    $('#labK').addEventListener('input', e => { $('#labKV').textContent = e.target.value; });
+    $('#labK').addEventListener('change', e => { S.k = +e.target.value; resetModel(); });
+    const gal = $('#labgal');
+    gal.addEventListener('click', e => { const [x] = ptr(gal, e); const g = this.galG; if (!g) return; const i = Math.floor((x - g.x0) / (g.s + g.gap)); if (i >= 0 && i < 8) setIcon(i); });
+    gal.style.cursor = 'pointer';
+  },
+  stepAnimated() {
+    if (S.diverged) return;
+    if (S.running) setRunning(false);
+    if (this.anim) { this.anim = null; this.dirty = true; return; }
+    const x = ICONS[S.icon], k = model.k, { z, xh } = forward(model, x);
+    const e = new Float64Array(D); for (let m = 0; m < D; m++) e[m] = xh[m] - x[m];
+    const delta = new Float64Array(k); for (let j = 0; j < k; j++) { let s = 0; for (let m = 0; m < D; m++) s += model.V[j * D + m] * e[m]; delta[j] = s; }
+    const r = model.step(ICONS, S.eta, S.sparse ? MU : 0, true);
+    if (checkDiverge(r)) return;
+    this.anim = { t0: performance.now(), x, z0: z, xh0: xh, e0: e, delta, gW: r.dW, gV: r.dV, pW: model.prevW, pV: model.prevV, pB: model.prevB, pC: model.prevC };
+    f5.dirty = true; this.dirty = true;
+  },
+  phase(now) {
+    if (!this.anim) return { ph: -1, p: 1 };
+    let t = now - this.anim.t0;
+    for (let p = 0; p < 4; p++) { if (t < this.DUR[p]) return { ph: p, p: t / this.DUR[p] }; t -= this.DUR[p]; }
+    this.anim = null; return { ph: -1, p: 1 };
+  },
+  setPhaseUI(ph) {
+    if (ph === this.lastPh) return; this.lastPh = ph;
+    $$('#phases span, #eqrows [data-p], #code [data-p]').forEach(el => el.classList.toggle('on', +el.dataset.p === ph));
+  },
+  render(now) {
+    const { ph, p } = this.phase(now); this.setPhaseUI(ph);
+    const k = model.k, a = this.anim, x = ICONS[S.icon];
+    let st;
+    if (ph < 0) {
+      const { z, xh } = forward(model, x);
+      st = { k, x, W: model.W, V: model.V, z, out: xh };
+    } else if (ph === 0) {
+      st = { k, x, W: a.pW, V: a.pV, z: a.z0, out: a.xh0, encMode: 'signal', decMode: 'signal',
+        encAlpha: smooth(0, 0.4, p), zAlpha: smooth(0.35, 0.52, p), decAlpha: smooth(0.5, 0.82, p), outAlpha: smooth(0.75, 1, p) };
+    } else if (ph === 1) {
+      st = { k, x, W: a.pW, V: a.pV, z: a.z0, out: a.xh0, encAlpha: 0.3, decAlpha: 0.3, outLabel: p < 0.3 ? 'output x̂' : 'error e = x̂ − x',
+        over: { vals: a.e0, mode: 'div', scale: 0.5, alpha: smooth(0.25, 0.6, p) } };
+    } else if (ph === 2) {
+      st = { k, x, W: a.pW, V: a.pV, z: a.delta, zLabel: 'blame δ', zAlpha: smooth(0.3, 0.5, p), out: a.e0, outMode: 'div', outScale: 0.5, outLabel: 'error e = x̂ − x',
+        encMode: 'grad', decMode: 'grad', gW: a.gW, gV: a.gV, decAlpha: smooth(0, 0.35, p), encAlpha: smooth(0.5, 0.85, p) };
+    } else {
+      const e = easeIO(p), Wd = new Float64Array(a.pW.length), Vd = new Float64Array(a.pV.length);
+      for (let i = 0; i < Wd.length; i++) Wd[i] = lerp(a.pW[i], model.W[i], e);
+      for (let i = 0; i < Vd.length; i++) Vd[i] = lerp(a.pV[i], model.V[i], e);
+      const tmp = { k, W: Wd, V: Vd, b: a.pB.map((v, j) => lerp(v, model.b[j], e)), c: a.pC.map((v, m) => lerp(v, model.c[m], e)), encode: AE.prototype.encode, decode: AE.prototype.decode };
+      const { z, xh } = forward(tmp, x);
+      st = { k, x, W: Wd, V: Vd, z, out: xh, wScale: Math.max(maxAbs(a.pW), maxAbs(model.W)), vScale: Math.max(maxAbs(a.pV), maxAbs(model.V)) };
+    }
+    this.view.draw(st);
+    this.drawSide(ph, a);
+  },
+  drawSide(ph, a) {
+    const x = ICONS[S.icon];
+    const { xh } = (ph >= 0 && ph < 3) ? { xh: a.xh0 } : forward(model, x);
+    const e = new Float64Array(D); for (let m = 0; m < D; m++) e[m] = xh[m] - x[m];
+    { const { ctx, w, h } = fit($('#labimgs')); ctx.clearRect(0, 0, w, h);
+      const gap = 10, s = Math.min((w - 2 * gap) / 3, h - 20);
+      [[x, 'gray', 'target x'], [xh, 'gray', 'copy x̂'], [e, 'div', 'x̂ − x']].forEach(([v, mode, t], i) => {
+        const X = i * (s + gap); drawPix(ctx, v, X, 0, s, s, mode, 0.5); label(ctx, t, X + s / 2, s + 15, MUTED, 11, 'center'); }); }
+    this.loss.draw([{ data: model.hist, color: css(RGB.pink), width: 2 }], markers);
+    $('#labT').textContent = model.t; $('#labL').textContent = model.hist.length ? fmt(model.hist[model.hist.length - 1]) : fmt(model.lossOf(ICONS));
+    { const cv = $('#labgal'), { ctx, w, h } = fit(cv); ctx.clearRect(0, 0, w, h);
+      const gap = 4, s = Math.min((w - 7 * gap) / 8, (h - gap) / 2), x0 = (w - (8 * s + 7 * gap)) / 2; this.galG = { x0, s, gap };
+      for (let n = 0; n < 8; n++) { const X = x0 + n * (s + gap); drawPix(ctx, ICONS[n], X, 0, s, s); drawPix(ctx, forward(model, ICONS[n]).xh, X, s + gap, s, s);
+        if (n === S.icon) { ctx.strokeStyle = css(RGB.gold); ctx.lineWidth = 1.5; ctx.strokeRect(X - 1, -0.25, s + 2, 2 * s + gap + 1); } } }
+  }
+};
+
+// ---------- figure 4: any order will do ----------
+const f4 = {
+  cv: $('#f4cv'), loss: new LossChart($('#f4loss')), kind: 'random', running: false, wrong: false, dirty: true, ETA: 0.015,
+  init() {
+    this.reset();
+    $('#f4run').addEventListener('click', () => { this.running = !this.running; $('#f4run').textContent = this.running ? 'pause ❚❚' : 'run ▶'; $('#f4run').classList.toggle('on', this.running); });
+    $('#f4reset').addEventListener('click', () => this.reset());
+    $$('#f4order button').forEach(b => b.addEventListener('click', () => { $$('#f4order button').forEach(x => x.classList.toggle('on', x === b)); this.kind = b.dataset.o; this.reset(); }));
+    $('#f4wrong').addEventListener('change', e => { this.wrong = e.target.checked; this.dirty = true; });
+  },
+  reset() {
+    this.A = new AE(6, SEED0); this.B = new AE(6, SEED0); this.order = makeOrder(this.kind, 7); this.B.copyPermuted(this.A, this.order);
+    this.XB = ICONS.map(x => Float32Array.from(this.order, p => x[p])); this.wrongOrder = makeOrder('random', 99);
+    $('#f4name').textContent = this.kind === 'snake' ? 'snake' : 'scrambled'; this.dirty = true;
+  },
+  step(n) { for (let i = 0; i < n; i++) { this.A.step(ICONS, this.ETA, 0); this.B.step(this.XB, this.ETA, 0); } },
+  draw() {
+    const { ctx, w, h } = fit(this.cv); ctx.clearRect(0, 0, w, h);
+    const n = S.icon, lw = Math.min(138, w * 0.2), gap = 28, s = Math.min((h - 64) / 2, (w - lw - 2 * gap - 8) / 3);
+    const rows = [['row by row', ICONS[n], forward(this.A, ICONS[n]).xh, null], [this.kind === 'snake' ? 'snake' : 'scrambled', this.XB[n], forward(this.B, this.XB[n]).xh, this.wrong ? this.wrongOrder : this.order]];
+    ['receives', 'returns', 'put back in place'].forEach((t, i) => label(ctx, t, lw + i * (s + gap) + s / 2, 14, MUTED, 11.5, 'center'));
+    rows.forEach(([name, inp, out, key], r) => {
+      const Y = 26 + r * (s + 30);
+      label(ctx, name, 4, Y + s / 2, r ? '#cfd6e6' : css(RGB.pink), 12.5);
+      label(ctx, r ? (this.wrong ? 'wrong key' : 'same key') : 'no key needed', 4, Y + s / 2 + 17, FAINT, 10.5);
+      let back = out; if (key) { back = new Float64Array(D); for (let q = 0; q < D; q++) back[key[q]] = out[q]; }
+      [inp, out, back].forEach((v, i) => { const X = lw + i * (s + gap); drawPix(ctx, v, X, Y, s, s);
+        if (i < 2) label(ctx, '→', X + s + gap / 2, Y + s / 2 + 5, FAINT, 15, 'center'); });
+    });
+    this.loss.draw([{ data: this.A.hist, color: css(RGB.pink), width: 3 }, { data: this.B.hist, color: '#cfd6e6', width: 1.6, dash: [5, 4] }], [], 60);
+    $('#f4T').textContent = this.A.t;
+    $('#f4D').textContent = this.A.t ? Math.abs(this.A.hist[this.A.t - 1] - this.B.hist[this.B.t - 1]).toExponential(1) : '0';
+  }
+};
+
+// ---------- figure 5: receptive and projective fields ----------
+const f5 = {
+  sel: 0, silenced: new Set(), clamp: new Map(), cards: [], dirty: true, R: 1,
+  init() {
+    const sl = $('#f5slider');
+    sl.addEventListener('input', () => { this.clamp.set(this.sel, (sl.value / 500 - 1) * this.R); this.dirty = true; });
+    $('#f5release').addEventListener('click', () => { this.silenced.clear(); this.clamp.clear(); this.syncCards(); this.dirty = true; });
+    this.rebuild();
+  },
+  rebuild() {
+    const box = $('#cards'); box.innerHTML = ''; this.cards = []; this.silenced.clear(); this.clamp.clear();
+    this.sel = Math.min(this.sel, model.k - 1);
+    const mkCard = (title, j) => {
+      const d = document.createElement('div'); d.className = 'card' + (j < 0 ? ' bias' : '');
+      const hd = document.createElement('div'); hd.className = 'hd'; const sp = document.createElement('span'); sp.textContent = title; hd.appendChild(sp);
+      let btn = null;
+      if (j >= 0) {
+        btn = document.createElement('button'); btn.textContent = 'silence'; btn.title = 'set this unit to zero';
+        btn.addEventListener('click', e => { e.stopPropagation(); this.silenced.has(j) ? this.silenced.delete(j) : this.silenced.add(j); this.syncCards(); this.dirty = true; });
+        hd.appendChild(btn); d.addEventListener('click', () => { this.sel = j; this.syncCards(); this.dirty = true; });
+      }
+      const cv = document.createElement('canvas'); cv.style.width = '100%'; cv.style.height = '96px';
+      d.appendChild(hd); d.appendChild(cv); box.appendChild(d); this.cards.push({ d, cv, btn, j });
+    };
+    mkCard('default picture c', -1);
+    for (let j = 0; j < model.k; j++) mkCard('unit ' + (j + 1), j);
+    this.syncCards(); this.dirty = true;
+  },
+  syncCards() {
+    this.cards.forEach(c => { if (c.j < 0) return; c.d.classList.toggle('sel', c.j === this.sel);
+      c.btn.classList.toggle('on', this.silenced.has(c.j)); c.btn.textContent = this.silenced.has(c.j) ? 'silenced' : 'silence'; c.cv.style.opacity = this.silenced.has(c.j) ? 0.4 : 1; });
+    $('#f5selLbl').textContent = 'activity of unit ' + (this.sel + 1) + ' (drag to set it by hand)';
+  },
+  draw() {
+    const k = model.k, x = ICONS[S.icon];
+    this.cards.forEach(c => {
+      const { ctx, w, h } = fit(c.cv); ctx.clearRect(0, 0, w, h);
+      const s = Math.min(h - 16, (w - 10) / 2);
+      if (c.j < 0) { drawPix(ctx, model.c, (w - s) / 2, 0, s, s); label(ctx, 'output when all units are 0', w / 2, s + 13, FAINT, 10, 'center'); return; }
+      const rf = new Float64Array(D), pf = new Float64Array(D);
+      for (let i = 0; i < D; i++) { rf[i] = model.W[i * k + c.j]; pf[i] = model.V[c.j * D + i]; }
+      const x0 = (w - 2 * s - 10) / 2;
+      drawPix(ctx, rf, x0, 0, s, s, 'div', maxAbs(rf) || 1); drawPix(ctx, pf, x0 + s + 10, 0, s, s, 'div', maxAbs(pf) || 1);
+      label(ctx, 'receptive', x0 + s / 2, s + 13, FAINT, 10, 'center'); label(ctx, 'projective', x0 + 1.5 * s + 10, s + 13, FAINT, 10, 'center');
+    });
+    // intervention
+    const z = model.encode(x, new Float64Array(k)), nat = z[this.sel];
+    let R = 1; for (const im of ICONS) { const zz = model.encode(im, new Float64Array(k)); R = Math.max(R, Math.abs(zz[this.sel]) * 1.4); }
+    this.R = R;
+    const zi = z.slice(); this.silenced.forEach(j => zi[j] = 0); this.clamp.forEach((v, j) => zi[j] = v);
+    const xh = model.decode(zi, new Float64Array(D)), xh0 = model.decode(z, new Float64Array(D));
+    { const { ctx, w, h } = fit($('#f5img')); ctx.clearRect(0, 0, w, h); const gap = 10, s = Math.min((w - 2 * gap) / 3, h - 20);
+      [[x, 'target'], [xh0, 'copy'], [xh, 'your edit']].forEach(([v, t], i) => { drawPix(ctx, v, i * (s + gap), 0, s, s); label(ctx, t, i * (s + gap) + s / 2, s + 15, i === 2 ? css(RGB.gold) : MUTED, 10.5, 'center'); }); }
+    const cur = this.silenced.has(this.sel) ? 0 : this.clamp.has(this.sel) ? this.clamp.get(this.sel) : nat;
+    if (document.activeElement !== $('#f5slider')) $('#f5slider').value = Math.round(500 * (cur / R + 1));
+    $('#f5nat').textContent = fmt(nat); $('#f5now').textContent = fmt(cur);
+    // code table
+    { const cv = $('#codecv'), { ctx, w, h } = fit(cv); ctx.clearRect(0, 0, w, h);
+      const th = 22, rh = (h - th) / 8, tw = rh - 4, cw = Math.min(64, (w - tw - 12) / k), x0 = tw + 10;
+      const Z = ICONS.map(im => model.encode(im, new Float64Array(k)));
+      for (let j = 0; j < k; j++) label(ctx, String(j + 1), x0 + j * cw + cw / 2, 14, j === this.sel ? css(RGB.gold) : FAINT, 11, 'center');
+      for (let n = 0; n < 8; n++) {
+        const Y = th + n * rh; drawPix(ctx, ICONS[n], 0, Y + 2, tw, tw);
+        for (let j = 0; j < k; j++) { let m = 1e-9; for (let q = 0; q < 8; q++) m = Math.max(m, Math.abs(Z[q][j]));
+          ctx.fillStyle = css(divRGB(Z[n][j] / m)); ctx.fillRect(x0 + j * cw + 1, Y + 1, cw - 2, rh - 2);
+          if (cw > 34 && rh > 15) label(ctx, Z[n][j].toFixed(1), x0 + j * cw + cw / 2, Y + rh / 2 + 4, Math.abs(Z[n][j] / m) > 0.55 ? '#0b0f1a' : MUTED, 10, 'center'); }
+        if (n === S.icon) { ctx.strokeStyle = css(RGB.gold, 0.8); ctx.lineWidth = 1.2; ctx.strokeRect(0.5, Y + 0.5, x0 + k * cw - 0.5, rh - 1); }
+      }
+      ctx.strokeStyle = css(RGB.gold); ctx.lineWidth = 1.5; ctx.strokeRect(x0 + this.sel * cw + 0.5, th - 2, cw - 1, 8 * rh + 2); }
+    $('#f5T').textContent = model.t; $('#f5L').textContent = model.hist.length ? fmt(model.hist[model.hist.length - 1]) : fmt(model.lossOf(ICONS));
+  }
+};
+
+// ---------- wiring ----------
+function setView(v) {
+  S.view = v; $$('[data-view] button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); invalidate();
+}
+function initControls() {
+  $$('[data-view] button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
+  $$('[data-run]').forEach(b => b.addEventListener('click', () => setRunning(!S.running)));
+  $$('[data-reset]').forEach(b => b.addEventListener('click', resetModel));
+  $$('[data-sparse]').forEach(c => c.addEventListener('change', e => setSparse(e.target.checked)));
+  $$('[data-sp]').forEach(e => e.style.opacity = 0.4);
+}
+function renderTex() {
+  if (!window.katex) return;
+  $$('[data-tex]').forEach(el => { try { katex.render(el.dataset.tex, el, { throwOnError: false, displayMode: el.classList.contains('eq') }); } catch (e) {} });
+}
+function drawQR() {
+  const cv = $('#qr'); if (!window.qrcode) { cv.style.display = 'none'; return; }
+  const qr = qrcode(0, 'M'); qr.addData('https://mrio.github.io/NeuroAI_explainers/'); qr.make();
+  const n = qr.getModuleCount(), px = 192; cv.width = cv.height = px; const ctx = cv.getContext('2d'), cell = px / (n + 4);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, px, px); ctx.fillStyle = '#0b0f1a';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect(Math.floor((c + 2) * cell), Math.floor((r + 2) * cell), Math.ceil(cell), Math.ceil(cell));
+}
+function frame(now) {
+  if (S.running && !S.diverged) {
+    for (let i = 0; i < S.speed; i++) { const r = model.step(ICONS, S.eta, S.sparse ? MU : 0, false); if (checkDiverge(r)) break; }
+    lab.dirty = f5.dirty = true;
+  }
+  if (f4.running) { f4.step(3); f4.dirty = true; }
+  if (vis.heroCv && hero.dirty) { hero.draw(); hero.dirty = false; }
+  if (vis.f1cv && (f1.dirty || f1.animating(now))) { f1.draw(now); f1.dirty = false; }
+  if (vis.f2cv && (f2.dirty || f2.animating(now))) { f2.draw(now); f2.dirty = false; }
+  if (vis.labcv && (lab.dirty || lab.anim)) { lab.render(now); lab.dirty = false; }
+  if ((vis.cards || vis.codecv) && f5.dirty) { f5.draw(); f5.dirty = false; }
+  if (vis.f4cv && f4.dirty) { f4.draw(); f4.dirty = false; }
+  requestAnimationFrame(frame);
+}
+function init() {
+  buildPickers(); hero.init(); f1.init(); f2.init(); lab.init(); f4.init(); f5.init(); initControls();
+  ['heroCv', 'f1cv', 'f2cv', 'labcv', 'f4cv', 'cards', 'codecv'].forEach(id => io.observe(document.getElementById(id)));
+  window.addEventListener('resize', invalidate);
+  requestAnimationFrame(frame);
+}
+init();
+window.addEventListener('load', () => { renderTex(); drawQR(); });
+
+</script>
+</body>
+</html>
